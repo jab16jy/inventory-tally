@@ -1,0 +1,10 @@
+{
+  "name": "@conteo/functions",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "engines": {
+    "node": "22"
+  }
+}

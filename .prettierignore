@@ -1,0 +1,11 @@
+# Los documentos de diseño son la autoridad del proyecto y se mantienen a mano.
+# Prettier reflow-ea tablas y rompe el alineado de los diagramas ASCII del doc 11.
+docs/
+
+# Artefactos
+node_modules/
+dist/
+build/
+coverage/
+package-lock.json
+.firebase/

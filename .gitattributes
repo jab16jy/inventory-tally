@@ -1,0 +1,10 @@
+# LF en el repositorio para todo. El equipo mezcla Windows y macOS, y sin esto
+# cada checkout reescribe finales de linea: ruido en cada diff y en cada revision.
+* text=auto eol=lf
+
+# Binarios: sin conversion.
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary

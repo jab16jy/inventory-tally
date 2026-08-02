@@ -1,0 +1,13 @@
+rules_version = '2';
+
+// Placeholder de la ola O1: deniega todo. La ola O3 escribe las reglas
+// reales con TDD (ver docs/diseno/09-seguridad-y-auditoria.md); un
+// placeholder que niega todo hace que sus tests "afirmados" fallen en
+// rojo (el rojo correcto) mientras los "negados" ya pasan.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

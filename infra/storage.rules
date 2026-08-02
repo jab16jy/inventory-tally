@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// Forma final: el proyecto no usa Storage desde el cliente
+// (ver docs/diseno/09-seguridad-y-auditoria.md §"storage.rules con denegación total").
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

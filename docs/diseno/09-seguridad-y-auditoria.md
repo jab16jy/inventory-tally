@@ -1,0 +1,325 @@
+# 09 · Seguridad y auditoría
+
+[← Contratos](08-contratos-y-cloud-functions.md) · [Índice](README.md) · [Siguiente: Análisis y dashboards →](10-analisis-y-dashboards.md)
+
+---
+
+## 1. Modelo de amenazas
+
+La app es cliente-servidor sin servidor intermedio: **cualquiera con las DevTools del
+navegador abiertas sobre la PWA puede escribir directamente en Firestore** usando el SDK
+con su propio token. Las Security Rules no son configuración: son la única capa de
+autorización.
+
+> Con un cliente web, ese acceso es trivial: basta con abrir la consola del navegador,
+> sin necesidad de descompilar nada. **El diseño ya es resistente a esto** —nada confía
+> en el cliente— pero conviene decirlo explícitamente.
+
+| #    | Amenaza                                                 | Impacto                      | Mitigación                                       |
+| ---- | ------------------------------------------------------- | ---------------------------- | ------------------------------------------------ |
+| A-1  | Cajero altera `cantidadTotal` para inflar el inventario | Fraude                       | `lineas` de sólo lectura para clientes           |
+| A-2  | Cajero borra un evento de auditoría                     | Pérdida de trazabilidad      | `auditoria`: `write: if false`                   |
+| A-3  | Cajero registra aportes en sucursales ajenas            | Datos contaminados           | Regla que valida sucursal en claims              |
+| A-4  | Cajero escribe sobre una sesión cerrada                 | Alteración de evidencia      | Regla que lee `estado` de la sesión              |
+| A-5  | Cajero se auto-asciende a admin editando su perfil      | Escalación                   | `usuarios` de sólo lectura; rol en claims        |
+| A-6  | Usuario desvinculado conserva token válido              | Acceso indebido              | `revokeRefreshTokens` + `disabled`               |
+| A-7  | Aporte negativo para restar del total                   | Corrupción                   | Validación en regla y trigger                    |
+| A-8  | Fuerza bruta sobre contraseñas                          | Toma de cuenta               | App Check + política de contraseñas              |
+| A-9  | Escritura masiva para inflar la factura                 | Abuso económico              | App Check, alertas, cuotas                       |
+| A-10 | **Cajero consulta el valor total del inventario**       | Fuga de información sensible | Datos monetarios en documentos que no puede leer |
+| A-11 | **Cajero marca su sincronización sin haberla hecho**    | Cierre con conteos perdidos  | Regla acotada + revalidación en servidor         |
+
+---
+
+## 2. Autenticación y roles
+
+```mermaid
+sequenceDiagram
+    participant U as Usuario
+    participant A as Firebase Auth
+    participant CF as Cloud Function
+    participant F as Firestore
+
+    U->>A: correo + contraseña
+    A-->>U: ID token con claims { rol, sucursales }
+    U->>F: operación con el token
+    F->>F: evalúa reglas contra request.auth.token
+    alt claim válido
+        F-->>U: ✅ permitido
+    else
+        F-->>U: ❌ permission-denied
+    end
+    Note over CF: Sólo el Admin SDK<br/>puede modificar los claims
+```
+
+**Los claims son la fuente de verdad para autorizar.** El documento `usuarios/{uid}`
+existe para la UI. Si una regla dependiera de leerlo, un atacante que lograra escribirlo
+escalaría privilegios, y cada evaluación costaría una lectura.
+
+| Claim        | Contenido               | Origen                             |
+| ------------ | ----------------------- | ---------------------------------- |
+| `rol`        | `"admin"` \| `"cajero"` | `crearCajero` / `actualizarCajero` |
+| `sucursales` | array de IDs (máx. 10)  | ídem                               |
+
+### Política de contraseñas
+
+- Mínimo 8 caracteres con al menos un número (validado en la callable).
+- Contraseña temporal al alta; cambio obligatorio en el primer ingreso.
+- Recuperación por correo con el flujo nativo de Firebase Auth.
+
+### App Check
+
+| Cliente   | Proveedor            |
+| --------- | -------------------- |
+| Web / PWA | reCAPTCHA Enterprise |
+
+Sin App Check, la PWA es un vector abierto para escritura automatizada (A-9).
+
+---
+
+## 3. Security Rules completas
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─────────── Helpers ───────────
+    function autenticado()  { return request.auth != null; }
+    function esAdmin()      { return autenticado() && request.auth.token.rol == 'admin'; }
+    function esCajero()     { return autenticado() && request.auth.token.rol == 'cajero'; }
+    function miUid()        { return request.auth.uid; }
+
+    function tieneSucursal(sucursalId) {
+      return esAdmin() || sucursalId in request.auth.token.sucursales;
+    }
+    function sesion(sesionId) {
+      return get(/databases/$(database)/documents/sesiones/$(sesionId)).data;
+    }
+    function sesionAbierta(sesionId) {
+      return sesion(sesionId).estado == 'abierta';
+    }
+
+    // ─────────── usuarios ───────────
+    match /usuarios/{uid} {
+      allow get:  if autenticado() && (uid == miUid() || esAdmin());
+      allow list: if esAdmin();
+      allow write: if false;                              // ← A-5
+    }
+
+    // ─────────── sucursales ───────────
+    match /sucursales/{sucursalId} {
+      allow read:  if autenticado() && tieneSucursal(sucursalId);
+      allow write: if false;
+    }
+
+    // ─────────── históricos (MONETARIO) ───────────
+    match /sucursales/{sucursalId}/historicos/{sesionId} {
+      allow read:  if esAdmin();                          // ← A-10
+      allow write: if false;
+    }
+
+    // ─────────── catálogo de valores ───────────
+    match /categoriasValor/{categoriaId} {
+      allow read:  if autenticado();
+      allow write: if false;
+    }
+
+    // ─────────── sesiones ───────────
+    match /sesiones/{sesionId} {
+      allow read:  if autenticado() && tieneSucursal(resource.data.sucursalId);
+      allow write: if false;                              // abrir/cerrar vía callables
+    }
+
+    // ─────────── líneas: UNIDADES, sin dinero ───────────
+    match /sesiones/{sesionId}/lineas/{categoriaId} {
+      allow read:  if autenticado() && tieneSucursal(sesion(sesionId).sucursalId);
+      allow write: if false;                              // ← A-1
+    }
+
+    // ─────────── aportes: ÚNICO ESCRITO POR EL CLIENTE ───────────
+    match /sesiones/{sesionId}/lineas/{categoriaId}/aportes/{uid} {
+
+      allow read: if autenticado() && tieneSucursal(sesion(sesionId).sucursalId);
+
+      allow create, update: if autenticado()
+        && uid == miUid()                                       // sólo el propio
+        && tieneSucursal(sesion(sesionId).sucursalId)            // ← A-3
+        && sesionAbierta(sesionId)                               // ← A-4
+        && request.resource.data.cantidad is int
+        && request.resource.data.cantidad >= 0                   // ← A-7
+        && request.resource.data.cantidad <= 100000
+        && request.resource.data.uid == miUid();
+
+      // No se borran aportes: corregir a 0 deja rastro, borrar no.
+      allow delete: if false;
+    }
+
+    // ─────────── resumen: MONETARIO, sólo admin ───────────
+    match /sesiones/{sesionId}/resumen/{docId} {
+      allow read:  if esAdmin();                          // ← A-10 · I-9
+      allow write: if false;
+    }
+
+    // ─────────── sincronización (RF-16) ───────────
+    match /sesiones/{sesionId}/sincronizacion/estado {
+      allow read: if autenticado() && tieneSucursal(sesion(sesionId).sucursalId);
+
+      // El cajero SÓLO puede tocar su propia entrada, y sólo el campo confirmadoEn.
+      allow update: if autenticado()
+        && sesionAbierta(sesionId)
+        && tieneSucursal(sesion(sesionId).sucursalId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['participantes.' + miUid() + '.confirmadoEn', 'actualizadoEn']);
+
+      allow create, delete: if false;
+    }
+
+    // ─────────── auditoría: INMUTABLE ───────────
+    match /auditoria/{eventoId} {
+      allow read:  if esAdmin();
+      allow write: if false;                              // ← A-2, sin excepciones
+    }
+
+    // ─────────── denegación por defecto ───────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+```
+
+### Observaciones de diseño
+
+- **`allow write: if false` no bloquea al backend.** El Admin SDK omite las Security
+  Rules por completo. La regla cierra el cliente, no el servidor. Ese es el efecto buscado.
+- **A-11 sólo se mitiga parcialmente aquí.** La regla impide que un cajero confirme _por
+  otro_, pero no que confirme por sí mismo teniendo pendientes: Firestore no puede saber
+  qué hay en la cola local del cliente. La defensa real es que **el cliente sólo llama a
+  confirmar cuando `hasPendingWrites` es falso**, y que el cierre queda auditado con la
+  lista de quién confirmó. Es una salvaguarda contra el error honesto, no contra el
+  sabotaje deliberado — y para el error honesto, que es el caso real, basta.
+- **Costo de `get()` en reglas.** Cada `sesion(sesionId)` es una lectura facturada. Se
+  acepta: hay 1–2 por escritura de aporte, y la alternativa es confiar en el cliente.
+- **La denegación por defecto al final** protege colecciones que alguien agregue en el
+  futuro sin escribir su regla.
+
+---
+
+## 4. Pruebas de las reglas
+
+Las reglas son código: se prueban, y su test corre en CI antes de cada despliegue.
+
+```typescript
+const cajero = (uid: string, sucursales: string[]) =>
+  testEnv.authenticatedContext(uid, { rol: "cajero", sucursales });
+const admin = () => testEnv.authenticatedContext("uid_admin", { rol: "admin" });
+
+describe("aportes", () => {
+  it("un cajero no puede escribir el aporte de otro", async () => {
+    await assertFails(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_luis")
+        .set({ cantidad: 10, uid: "uid_luis" }),
+    );
+  });
+
+  it("nadie puede escribir el total de una línea", async () => {
+    await assertFails(
+      admin().firestore().doc("sesiones/ses1/lineas/cat_5000").update({ cantidadTotal: 99999 }),
+    );
+  });
+
+  it("no se aceptan aportes en sesión cerrada", async () => {
+    await assertFails(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .doc("sesiones/ses_cerrada/lineas/cat_5000/aportes/uid_ana")
+        .set({ cantidad: 5, uid: "uid_ana" }),
+    );
+  });
+});
+
+describe("separación por rol", () => {
+  it("un cajero NO puede leer el resumen monetario", async () => {
+    await assertFails(
+      cajero("uid_ana", ["suc_norte"]).firestore().doc("sesiones/ses1/resumen/actual").get(),
+    );
+  });
+
+  it("un cajero SÍ puede leer las líneas de unidades", async () => {
+    await assertSucceeds(
+      cajero("uid_ana", ["suc_norte"]).firestore().doc("sesiones/ses1/lineas/cat_5000").get(),
+    );
+  });
+
+  it("un cajero no puede leer la auditoría", async () => {
+    await assertFails(cajero("uid_ana", ["suc_norte"]).firestore().collection("auditoria").get());
+  });
+});
+
+describe("sincronización", () => {
+  it("un cajero sólo confirma su propia entrada", async () => {
+    await assertFails(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .doc("sesiones/ses1/sincronizacion/estado")
+        .update({ "participantes.uid_luis.confirmadoEn": new Date() }),
+    );
+  });
+});
+
+describe("auditoría", () => {
+  it("es inmutable incluso para el admin", async () => {
+    await assertFails(admin().firestore().doc("auditoria/e1").delete());
+  });
+});
+```
+
+**Criterio de aceptación:** cada regla tiene al menos un test que la afirma y otro que la
+niega. Sin eso, no se despliega ([12](12-despliegue-y-entornos.md)).
+
+---
+
+## 5. Diseño de la auditoría
+
+| Propiedad              | Cómo se logra                                                    |
+| ---------------------- | ---------------------------------------------------------------- |
+| **Inmutable**          | `allow write: if false` para todo cliente                        |
+| **Completa**           | Escrita por el trigger en la **misma transacción** que el cambio |
+| **Atribuible**         | `usuarioId` viene de `event.params`, no de datos del cliente     |
+| **Contextual**         | Nombres denormalizados: refleja el estado del momento del hecho  |
+| **Con hora confiable** | `serverTimestamp()`, no la hora del dispositivo                  |
+| **Consultable**        | Índices por sucursal, usuario y sesión                           |
+
+### Eventos relevantes para el nuevo flujo
+
+| Evento                               | Cuándo                                            | Por qué importa                                         |
+| ------------------------------------ | ------------------------------------------------- | ------------------------------------------------------- |
+| `CIERRE_BLOQUEADO`                   | El admin intentó cerrar con cajeros sin confirmar | Documenta que la salvaguarda actuó                      |
+| `SESION_CERRADA` con `forzado: true` | El admin anuló la verificación                    | Deja constancia de quién asumió el riesgo y sobre quién |
+| `RECONCILIACION`                     | La función semanal corrigió un total              | Trazabilidad de correcciones automáticas                |
+
+### Detección de inconsistencias
+
+`reconciliarLineas` compara semanalmente `cantidadTotal` contra la suma real de aportes.
+Una discrepancia indica un trigger fallido o una escritura anómala. Corrige recalculando
+desde los aportes y deja un evento `RECONCILIACION`.
+
+---
+
+## 6. Protecciones complementarias
+
+| Medida                                                | Propósito                                           |
+| ----------------------------------------------------- | --------------------------------------------------- |
+| **App Check** (Play Integrity + reCAPTCHA Enterprise) | Rechaza peticiones que no vengan de la app legítima |
+| **Alerta de presupuesto** en Cloud Billing            | Aviso al superar el umbral mensual                  |
+| **Cuota diaria de Firestore**                         | Tope de operaciones contra facturas descontroladas  |
+| **`storage.rules` con denegación total**              | El proyecto no usa Storage desde el cliente         |
+| **CSP en Firebase Hosting**                           | Reduce superficie de XSS en la PWA                  |
+| **Sin datos personales sensibles**                    | Sólo nombre y correo laboral                        |
+
+---
+
+[← Contratos](08-contratos-y-cloud-functions.md) · [Índice](README.md) · [Siguiente: Análisis y dashboards →](10-analisis-y-dashboards.md)

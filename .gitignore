@@ -1,0 +1,20 @@
+node_modules/
+dist/
+build/
+coverage/
+
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+.env*
+!.env.example
+
+*.local
+.DS_Store
+
+# Estado local del tooling de agentes: se regenera con `gentle-ai skill-registry
+# refresh` y cambia cada vez que se instala una skill. Versionarlo invalida el
+# recibo de revision en cada cambio de tooling, sin aportar nada al proyecto.
+.atl/
