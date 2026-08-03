@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancela ejecuciones previas de la misma rama: el monorepo tarda y no vale la
+# pena pagar dos veces por un commit que ya quedó obsoleto.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # El monorepo hace el CI más largo (doc 12 §2), así que cada job se ejecuta
+  # sólo si sus rutas cambiaron.
+  cambios:
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filtro.outputs.web }}
+      functions: ${{ steps.filtro.outputs.functions }}
+      reglas: ${{ steps.filtro.outputs.reglas }}
+      contratos: ${{ steps.filtro.outputs.contratos }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filtro
+        with:
+          filters: |
+            web:
+              - 'apps/web/**'
+              - 'packages/data/**'
+              - 'packages/shared/**'
+              - 'package.json'
+              - 'tsconfig.base.json'
+            functions:
+              - 'packages/functions/**'
+              - 'packages/shared/**'
+              - 'contracts/**'
+            reglas:
+              - 'infra/**'
+            contratos:
+              - 'contracts/**'
+
+  web:
+    needs: cambios
+    if: needs.cambios.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test --workspace apps/web
+      - run: npm run test --workspace packages/data
+      - run: npm run build --workspace apps/web
+
+  contratos:
+    needs: cambios
+    if: needs.cambios.outputs.contratos == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run test --workspace contracts
+      - run: npm run test --workspace packages/shared
+
+  functions:
+    needs: cambios
+    if: needs.cambios.outputs.functions == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Node 22, no la versión local: Cloud Functions v2 no soporta runtime 24.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      # Los emuladores de Firebase necesitan una JVM.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: npm ci
+      - run: npm run test --workspace packages/functions
+
+  # Regla de oro (doc 12 §2): las Security Rules no se despliegan si sus tests
+  # fallan. Una regla mal desplegada abre la base de datos entera y es el único
+  # fallo de este sistema con consecuencias irreversibles.
+  reglas:
+    needs: cambios
+    if: needs.cambios.outputs.reglas == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: npm ci
+      - run: npm run test:rules
