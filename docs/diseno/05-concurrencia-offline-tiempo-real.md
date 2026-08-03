@@ -91,7 +91,13 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
 export const onAporteEscrito = onDocumentWritten(
-  "sesiones/{sesionId}/lineas/{categoriaId}/aportes/{uid}",
+  {
+    document: "sesiones/{sesionId}/lineas/{categoriaId}/aportes/{uid}",
+    // En Functions v2 el reintento de funciones de fondo es opt-in. Sin él, una
+    // transacción que agote sus reintentos por contención pierde la agregación
+    // en silencio. Sólo es seguro porque el delta de abajo es idempotente.
+    retry: true,
+  },
   async (event) => {
     const { sesionId, categoriaId, uid } = event.params;
     const antes = event.data?.before.data();
@@ -99,8 +105,6 @@ export const onAporteEscrito = onDocumentWritten(
 
     const cantidadAnterior = antes?.cantidad ?? 0;
     const cantidadNueva = despues?.cantidad ?? 0;
-    const delta = cantidadNueva - cantidadAnterior;
-    if (delta === 0) return;
 
     const db = getFirestore();
     const sesionRef = db.doc(`sesiones/${sesionId}`);
@@ -115,15 +119,33 @@ export const onAporteEscrito = onDocumentWritten(
       if (sesion.data()?.estado !== "abierta") return;
 
       // Idempotencia ante reejecución del trigger
-      const versionAplicada = linea.get(`versiones.${uid}`) ?? 0;
+      const versiones = linea.get("versiones") ?? {};
+      const versionAplicada = versiones[uid] ?? 0;
       const versionEntrante = despues?.version ?? 0;
       if (versionEntrante <= versionAplicada) return;
 
+      // El delta se calcula contra el ÚLTIMO ESTADO APLICADO, no contra el
+      // `before` del evento. Firestore entrega at-least-once y además puede
+      // reordenar: si el evento v2 (5→12) se procesa antes que el v1 (0→5),
+      // calcular `cantidadNueva - cantidadAnterior` haría que v1 se descartara
+      // por versión y su aporte desapareciera del total. Con el mapa
+      // `aplicados`, v2 primero da 12−0 = 12 y v1 posterior se descarta sin
+      // restar nada: el orden deja de importar.
+      const aplicados = linea.get("aplicados") ?? {};
+      const delta = cantidadNueva - (aplicados[uid] ?? 0);
+      if (delta === 0) return;
+
+      // Los campos anidados van como objetos reales, NO como claves con punto.
+      // `set(..., { merge: true })` no interpreta `"versiones.uid_ana"` como un
+      // FieldPath —crea un campo literal con el punto en el nombre—, a
+      // diferencia de `update()`. Y `update()` no sirve aquí porque el
+      // documento puede no existir todavía.
       tx.set(
         lineaRef,
         {
           cantidadTotal: FieldValue.increment(delta),
-          [`versiones.${uid}`]: versionEntrante,
+          versiones: { [uid]: versionEntrante },
+          aplicados: { [uid]: cantidadNueva },
           actualizadaEn: FieldValue.serverTimestamp(),
           actualizadaPor: uid,
         },
@@ -143,8 +165,8 @@ export const onAporteEscrito = onDocumentWritten(
       tx.set(
         syncRef,
         {
-          [`participantes.${uid}`]: {
-            ultimoAporteServidor: FieldValue.serverTimestamp(),
+          participantes: {
+            [uid]: { ultimoAporteServidor: FieldValue.serverTimestamp() },
           },
         },
         { merge: true },

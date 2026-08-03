@@ -79,6 +79,15 @@ Sin App Check, la PWA es un vector abierto para escritura automatizada (A-9).
 
 ## 3. Security Rules completas
 
+> **Erratas corregidas contra el emulador.** Dos expresiones de la versión
+> original de este bloque no funcionaban, y ninguna de las dos fallaba de forma
+> visible: el `affectedKeys()` de `sincronizacion/estado` producía *evaluation
+> error* para toda escritura —denegando por igual lo permitido y lo prohibido—,
+> y la regla de `aportes` no acotaba el campo `version`, dejando en manos del
+> cliente la única guardia de idempotencia del trigger. Ambas se detectaron
+> escribiendo los tests **afirmativos**, no los negativos. El texto de abajo es
+> el que está desplegado y probado.
+
 ```javascript
 rules_version = '2';
 service cloud.firestore {
@@ -146,10 +155,26 @@ service cloud.firestore {
         && uid == miUid()                                       // sólo el propio
         && tieneSucursal(sesion(sesionId).sucursalId)            // ← A-3
         && sesionAbierta(sesionId)                               // ← A-4
+        && request.resource.data.keys().hasOnly(
+             ['uid', 'nombre', 'cantidad', 'registradoEn', 'dispositivoId', 'version'])
         && request.resource.data.cantidad is int
         && request.resource.data.cantidad >= 0                   // ← A-7
         && request.resource.data.cantidad <= 100000
-        && request.resource.data.uid == miUid();
+        && request.resource.data.uid == miUid()
+        // `version` es la ÚNICA guardia de idempotencia del trigger ([05](05-concurrencia-offline-tiempo-real.md)).
+        // Sin acotarla aquí, el cliente la controla: bastaría reenviar una
+        // corrección con la misma versión para que el trigger la descartara y
+        // el total agregado quedara congelado por encima de la verdad — la
+        // amenaza A-1 entrando por la puerta de atrás.
+        //
+        // Restricción que esto impone al cliente: `version` se escribe con
+        // `increment(1)` mediante `update()` o `set({ merge: true })`, nunca con
+        // un `set()` que reemplace el documento entero — en ese caso la regla
+        // no ve el valor calculado y falla con "evaluation error".
+        && request.resource.data.version is int
+        && (resource == null
+              ? request.resource.data.version == 1
+              : request.resource.data.version > resource.data.version);
 
       // No se borran aportes: corregir a 0 deja rastro, borrar no.
       allow delete: if false;
@@ -166,11 +191,24 @@ service cloud.firestore {
       allow read: if autenticado() && tieneSucursal(sesion(sesionId).sucursalId);
 
       // El cajero SÓLO puede tocar su propia entrada, y sólo el campo confirmadoEn.
+      //
+      // El diff se hace por NIVELES. `affectedKeys()` sobre el documento
+      // completo no admite comparar una clave anidada escrita como string con
+      // puntos: la expresión `hasOnly(['participantes.' + miUid() + '.confirmadoEn'])`
+      // produce "evaluation error" en el emulador para TODA escritura a esta
+      // ruta. Y como falla igual en el caso afirmado y en el negado, una suite
+      // que sólo probara casos negativos la daría por buena — por eso cada
+      // regla necesita también su par afirmativo ([07 §9](07-monorepo-y-arquitectura.md)).
       allow update: if autenticado()
         && sesionAbierta(sesionId)
         && tieneSucursal(sesion(sesionId).sucursalId)
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['participantes.' + miUid() + '.confirmadoEn', 'actualizadoEn']);
+             .hasOnly(['participantes', 'actualizadoEn'])
+        && request.resource.data.participantes.diff(resource.data.participantes)
+             .affectedKeys().hasOnly([miUid()])
+        && request.resource.data.participantes[miUid()]
+             .diff(resource.data.participantes[miUid()])
+             .affectedKeys().hasOnly(['confirmadoEn']);
 
       allow create, delete: if false;
     }
