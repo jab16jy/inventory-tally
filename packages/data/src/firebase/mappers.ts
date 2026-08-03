@@ -1,0 +1,79 @@
+// packages/data/src/firebase/mappers.ts — únicos puntos del sistema que
+// convierten tipos de Firestore (Timestamp) a los tipos de dominio de
+// `packages/shared` (doc 07 §2/§6: shared no puede importar Firebase).
+import type { Timestamp } from "firebase/firestore";
+import type { Aporte } from "@conteo/shared/models/aporte.js";
+import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
+import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
+
+interface AporteDoc {
+  readonly uid: string;
+  readonly nombre: string;
+  readonly cantidad: number;
+  readonly registradoEn: Timestamp;
+  readonly dispositivoId: string;
+  readonly version: number;
+}
+
+export function aporteDesdeDoc(data: AporteDoc): Aporte {
+  return {
+    uid: data.uid,
+    nombre: data.nombre,
+    cantidad: data.cantidad,
+    registradoEn: data.registradoEn.toDate(),
+    dispositivoId: data.dispositivoId,
+    version: data.version,
+  };
+}
+
+interface LineaConteoDoc {
+  readonly valorUnitario: number;
+  readonly etiqueta: string;
+  readonly cantidadTotal: number;
+  readonly numAportantes: number;
+  readonly versiones: Record<string, number>;
+  readonly actualizadaEn: Timestamp;
+  readonly actualizadaPor: string;
+}
+
+export function lineaConteoDesdeDoc(categoriaId: string, data: LineaConteoDoc): LineaConteo {
+  return {
+    categoriaId,
+    valorUnitario: data.valorUnitario,
+    etiqueta: data.etiqueta,
+    cantidadTotal: data.cantidadTotal,
+    numAportantes: data.numAportantes,
+    versiones: data.versiones,
+    actualizadaEn: data.actualizadaEn.toDate(),
+    actualizadaPor: data.actualizadaPor,
+  };
+}
+
+interface SesionConteoDoc {
+  readonly sucursalId: string;
+  readonly sucursalNombre: string;
+  readonly estado: "abierta" | "cerrada";
+  readonly abiertaEn: Timestamp;
+  readonly abiertaPor: string;
+  readonly cerradaEn: Timestamp | null;
+  readonly cerradaPor: string | null;
+  readonly participantes: readonly string[];
+  readonly totalUnidades: number;
+  readonly sesionCorregidaId: string | null;
+}
+
+export function sesionConteoDesdeDoc(sesionId: string, data: SesionConteoDoc): SesionConteo {
+  return {
+    sesionId,
+    sucursalId: data.sucursalId,
+    sucursalNombre: data.sucursalNombre,
+    estado: data.estado,
+    abiertaEn: data.abiertaEn.toDate(),
+    abiertaPor: data.abiertaPor,
+    cerradaEn: data.cerradaEn?.toDate() ?? null,
+    cerradaPor: data.cerradaPor,
+    participantes: data.participantes,
+    totalUnidades: data.totalUnidades,
+    sesionCorregidaId: data.sesionCorregidaId,
+  };
+}
