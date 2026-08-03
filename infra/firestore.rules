@@ -1,11 +1,136 @@
 rules_version = '2';
 
-// Placeholder de la ola O1: deniega todo. La ola O3 escribe las reglas
-// reales con TDD (ver docs/diseno/09-seguridad-y-auditoria.md); un
-// placeholder que niega todo hace que sus tests "afirmados" fallen en
-// rojo (el rojo correcto) mientras los "negados" ya pasan.
+// Reglas reales de la ola O3, transcritas íntegras desde doc 09 §3 (modelo de
+// amenazas A-1…A-11). Sustituyen el placeholder de denegación total de O1.
+// Probadas en infra/test/reglas.test.ts.
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ─────────── Helpers ───────────
+    function autenticado()  { return request.auth != null; }
+    function esAdmin()      { return autenticado() && request.auth.token.rol == 'admin'; }
+    function esCajero()     { return autenticado() && request.auth.token.rol == 'cajero'; }
+    function miUid()        { return request.auth.uid; }
+
+    function tieneSucursal(sucursalId) {
+      return esAdmin() || sucursalId in request.auth.token.sucursales;
+    }
+    function sesion(sesionId) {
+      return get(/databases/$(database)/documents/sesiones/$(sesionId)).data;
+    }
+    function sesionAbierta(sesionId) {
+      return sesion(sesionId).estado == 'abierta';
+    }
+
+    // ─────────── usuarios ───────────
+    match /usuarios/{uid} {
+      allow get:  if autenticado() && (uid == miUid() || esAdmin());
+      allow list: if esAdmin();
+      allow write: if false;                              // ← A-5
+    }
+
+    // ─────────── sucursales ───────────
+    match /sucursales/{sucursalId} {
+      allow read:  if autenticado() && tieneSucursal(sucursalId);
+      allow write: if false;
+    }
+
+    // ─────────── históricos (MONETARIO) ───────────
+    match /sucursales/{sucursalId}/historicos/{sesionId} {
+      allow read:  if esAdmin();                          // ← A-10
+      allow write: if false;
+    }
+
+    // ─────────── catálogo de valores ───────────
+    match /categoriasValor/{categoriaId} {
+      allow read:  if autenticado();
+      allow write: if false;
+    }
+
+    // ─────────── sesiones ───────────
+    match /sesiones/{sesionId} {
+      allow read:  if autenticado() && tieneSucursal(resource.data.sucursalId);
+      allow write: if false;                              // abrir/cerrar vía callables
+    }
+
+    // ─────────── líneas: UNIDADES, sin dinero ───────────
+    match /sesiones/{sesionId}/lineas/{categoriaId} {
+      allow read:  if autenticado() && tieneSucursal(sesion(sesionId).sucursalId);
+      allow write: if false;                              // ← A-1
+    }
+
+    // ─────────── aportes: ÚNICO ESCRITO POR EL CLIENTE ───────────
+    match /sesiones/{sesionId}/lineas/{categoriaId}/aportes/{uid} {
+
+      allow read: if autenticado() && tieneSucursal(sesion(sesionId).sucursalId);
+
+      allow create, update: if autenticado()
+        && uid == miUid()                                       // sólo el propio
+        && tieneSucursal(sesion(sesionId).sucursalId)            // ← A-3
+        && sesionAbierta(sesionId)                               // ← A-4
+        && request.resource.data.keys().hasOnly(
+             ['uid', 'nombre', 'cantidad', 'registradoEn', 'dispositivoId', 'version'])
+        && request.resource.data.cantidad is int
+        && request.resource.data.cantidad >= 0                   // ← A-7
+        && request.resource.data.cantidad <= 100000
+        && request.resource.data.uid == miUid()
+        // D1: `version` es la única guardia de idempotencia del trigger; sin
+        // acotarla aquí el cliente la controla y puede congelar el total.
+        // create arranca en 1; update exige un valor estrictamente mayor al
+        // anterior. El cliente escribe version con increment(1): las reglas
+        // ven el valor ya calculado si el write es update()/set({merge:true})
+        // — comprobado con test. Un set() de reemplazo total del documento
+        // con increment() produce "evaluation error"; el cliente NO debe
+        // usar ese patrón para escribir version.
+        && request.resource.data.version is int
+        && (resource == null
+              ? request.resource.data.version == 1
+              : request.resource.data.version > resource.data.version);
+
+      // No se borran aportes: corregir a 0 deja rastro, borrar no.
+      allow delete: if false;
+    }
+
+    // ─────────── resumen: MONETARIO, sólo admin ───────────
+    match /sesiones/{sesionId}/resumen/{docId} {
+      allow read:  if esAdmin();                          // ← A-10 · I-9
+      allow write: if false;
+    }
+
+    // ─────────── sincronización (RF-16) ───────────
+    match /sesiones/{sesionId}/sincronizacion/estado {
+      allow read: if autenticado() && tieneSucursal(sesion(sesionId).sucursalId);
+
+      // El cajero SÓLO puede tocar su propia entrada, y sólo el campo confirmadoEn.
+      //
+      // DESVIACIÓN DOCUMENTADA respecto al literal de doc 09 §3: la expresión del
+      // doc (`.affectedKeys().hasOnly(['participantes.' + miUid() + '.confirmadoEn', ...])`
+      // sobre el diff del documento completo) produce "evaluation error" en el
+      // emulador real de Firestore para TODA escritura a esta ruta, afirmada o
+      // negada por igual — comprobado en infra/test/reglas.test.ts, no es una
+      // suposición. `affectedKeys()` no admite comparar una clave de mapa anidada
+      // como string con puntos contra el conjunto que devuelve un diff del
+      // documento completo. La equivalencia funcional correcta —mismo efecto de
+      // seguridad, "sólo mi entrada, sólo confirmadoEn"— exige diffear el mapa
+      // `participantes` y la entrada del propio uid por separado.
+      allow update: if autenticado()
+        && sesionAbierta(sesionId)
+        && tieneSucursal(sesion(sesionId).sucursalId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participantes', 'actualizadoEn'])
+        && request.resource.data.participantes.diff(resource.data.participantes).affectedKeys().hasOnly([miUid()])
+        && request.resource.data.participantes[miUid()].diff(resource.data.participantes[miUid()])
+             .affectedKeys().hasOnly(['confirmadoEn']);
+
+      allow create, delete: if false;
+    }
+
+    // ─────────── auditoría: INMUTABLE ───────────
+    match /auditoria/{eventoId} {
+      allow read:  if esAdmin();
+      allow write: if false;                              // ← A-2, sin excepciones
+    }
+
+    // ─────────── denegación por defecto ───────────
     match /{document=**} {
       allow read, write: if false;
     }

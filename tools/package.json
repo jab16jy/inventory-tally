@@ -3,5 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "index.ts"
+  "main": "index.ts",
+  "scripts": {
+    "seed": "node --experimental-strip-types seed.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
 }
