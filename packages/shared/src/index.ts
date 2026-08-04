@@ -11,6 +11,8 @@ export {
   totalUnidadesSesion,
 } from "./services/calculadora.js";
 
+export { aporteConfirmado } from "./services/sincronizacion.js";
+
 export {
   CantidadInvalidaError,
   CierreBloqueadoError,

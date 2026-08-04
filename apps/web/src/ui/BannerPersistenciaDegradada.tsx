@@ -16,9 +16,14 @@ export function BannerPersistenciaDegradada({ monitor }: BannerPersistenciaDegra
   if (!degradada) return null;
 
   return (
-    <div role="alert" aria-live="assertive">
-      Este dispositivo no pudo guardar el conteo sin conexión. Mantén la app abierta y con señal
-      hasta terminar, o tus conteos podrían perderse.
+    <div
+      role="alert"
+      aria-live="assertive"
+      className="border-b border-riesgo bg-riesgo-placa px-3 py-2.5 text-base text-tinta"
+    >
+      <strong className="font-semibold text-riesgo">Sin guardado sin conexión.</strong> Este
+      dispositivo no pudo guardar el conteo sin conexión. Mantén la app abierta y con señal hasta
+      terminar, o tus conteos podrían perderse.
     </div>
   );
 }

@@ -15,9 +15,9 @@ export function ConteoScreen() {
   const pendientes = usePendientes(sesionId);
 
   return (
-    <section>
+    <section className="mx-auto max-w-md px-3 pt-3 pb-8">
       <BannerPendientes pendientes={pendientes} />
-      <ul>
+      <ul className="mt-3 flex flex-col gap-2">
         {lineas.map((linea) => (
           <FilaCategoria key={linea.categoriaId} sesionId={sesionId} linea={linea} />
         ))}

@@ -53,6 +53,10 @@
 
   /* Estado. Rojo es el único color además del ámbar. */
   --color-riesgo: oklch(0.62 0.21 25); /* 4.7:1 */
+  /* Superficie del aviso de riesgo. Opaca a propósito: el banner es sticky
+     sobre la lista en scroll, y un rojo translúcido deja pasar las filas
+     por debajo justo cuando el mensaje más importa. */
+  --color-riesgo-placa: oklch(0.26 0.06 25);
 
   --font-placa: "Archivo Variable", system-ui, sans-serif;
 
@@ -61,7 +65,13 @@
   --text-micro: 0.75rem;
   --text-base: 0.9375rem;
   --text-medio: 1.125rem;
-  --text-placa: 2rem; /* el outlier: ESTE es el mundo */
+  /* El outlier: ESTE es el mundo.
+     Se llama `numeral` y no `placa` a propósito. Tailwind deriva el nombre
+     de utilidad del sufijo del token, así que `--text-placa` y
+     `--color-placa` producen los DOS la clase `text-placa` y gana el color:
+     el numeral heredaba 15 px en vez de 32 y la jerarquía se caía en
+     silencio. Verificado en el navegador, no supuesto. */
+  --text-numeral: 2rem;
 
   --radius-placa: 2px; /* borde duro, casi cero */
   --size-toque: 3.5rem; /* 56px — el mínimo del doc 11 es 48 */

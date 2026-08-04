@@ -39,8 +39,11 @@ export function AppRouter(): ReactNode {
           path="/login"
           element={
             <LoginScreen
-              onIniciarSesion={(correo, password) => {
-                void signInWithEmailAndPassword(auth, correo, password);
+              // Se DEVUELVE la promesa (antes se descartaba con `void`): es
+              // lo que deja a LoginScreen mostrar el error inline y bloquear
+              // el botón mientras el intento está en vuelo.
+              onIniciarSesion={async (correo, password) => {
+                await signInWithEmailAndPassword(auth, correo, password);
               }}
             />
           }
