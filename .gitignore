@@ -18,3 +18,4 @@ ui-debug.log
 # refresh` y cambia cada vez que se instala una skill. Versionarlo invalida el
 # recibo de revision en cada cambio de tooling, sin aportar nada al proyecto.
 .atl/
+.codegraph/

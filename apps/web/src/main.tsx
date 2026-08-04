@@ -2,6 +2,7 @@
 import { FirestoreConteoRepository, type ProveedorUsuarioActual } from "@conteo/data";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import "./estilos/tema.css";
 import { auth, db, monitorPersistencia } from "./lib/firebase.js";
 import { AppRouter } from "./lib/router.js";
 import { ConteoRepositoryProvider } from "./state/repositorio-contexto.js";

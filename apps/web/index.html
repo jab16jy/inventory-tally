@@ -4,6 +4,31 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0F1115" />
+
+    <!-- CONTRATO DE DIRECCIÓN — "Placa de bodega".
+         Vive aquí y en src/estilos/tema.css para que sobreviva al build.
+
+         THESIS — Cada categoría de valor es un rótulo físico de estantería,
+         no una tarjeta.
+         OWN-WORLD — Fondo #0F1115. Una sola señal ámbar. Numerales
+         condensados tabulares a 32 px. Borde duro, radio 0–2 px. Regla de
+         tinta izquierda en cada fila.
+         STORY — El cajero entiende de un vistazo cuánto contó él, cuánto
+         lleva el equipo, y si su conteo ya está a salvo.
+         FIRST VIEWPORT — Cabecera-placa, progreso, pila de rótulos, y un
+         deck fijo inferior siempre bajo el pulgar.
+         LA FIRMA — La regla izquierda pasa de hueca a sólida cuando el
+         servidor confirma. -->
+
+    <!-- La fuente es la primera pintura del mundo: sin preload, el rótulo
+         entra con la sans del sistema y salta al llegar Archivo. -->
+    <link
+      rel="preload"
+      href="/fuentes/archivo-latin-var.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     <title>Conteo de Inventario</title>
   </head>
   <body>

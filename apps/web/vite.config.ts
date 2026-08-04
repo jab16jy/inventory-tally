@@ -1,5 +1,6 @@
 // apps/web/vite.config.ts (doc 06 §4)
 import { fileURLToPath } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig } from "vitest/config";
@@ -19,6 +20,9 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    // Tailwind v4 sólo necesita este plugin y `@import "tailwindcss"`: sin
+    // PostCSS, sin autoprefixer, sin tailwind.config.js (doc de v4).
+    tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
       workbox: {

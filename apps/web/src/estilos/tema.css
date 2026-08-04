@@ -1,0 +1,129 @@
+/* apps/web/src/estilos/tema.css — sistema de diseño "Placa de bodega".
+ *
+ * <!--
+ * THESIS — Cada categoría de valor es un rótulo físico de estantería, no una
+ * tarjeta. Rechaza el arreglo por defecto de la categoría: lista de cards
+ * redondeadas sobre near-black con etiquetas grises de 14 px y un FAB
+ * flotante.
+ *
+ * OWN-WORLD — Fondo #0F1115. Una sola señal ámbar de alta visibilidad.
+ * Numerales condensados tabulares a 32 px. Bloques de borde duro, radio
+ * 0–2 px. Regla de tinta izquierda en cada fila. Reconocible sin una sola
+ * palabra de contenido.
+ *
+ * STORY — El cajero entiende de un vistazo cuánto contó él, cuánto lleva el
+ * equipo, y —lo único que de verdad le angustia— si su conteo ya está a
+ * salvo.
+ *
+ * FIRST VIEWPORT — Cabecera-placa con sucursal y estado. Progreso 47/60. La
+ * pila de rótulos ocupa dos tercios. El tercio inferior es un deck fijo:
+ * totales y FINALIZAR CONTEO, siempre bajo el pulgar.
+ *
+ * FORM — Rótulo de estantería industrial fusionado con la escala del numeral
+ * de billete. Primera de siete candidatas derivadas del mundo del cajero.
+ * Seed degradado (catálogo no alcanzable): asignación propia, sin retadores.
+ *
+ * LA FIRMA — La regla izquierda de la fila pasa de hueca a sólida cuando el
+ * servidor confirma. Una sola propiedad CSS por fila, escala a 200 filas sin
+ * costo, y comunica exactamente lo que RNF-12 y RF-16 protegen. Es la única
+ * audacia del sistema; todo lo demás se mantiene disciplinado y callado.
+ * -->
+ */
+
+@import "tailwindcss";
+@import "./fuentes.css";
+
+@theme {
+  /* Superficies — #0F1115 viene fijado por el manifest y por
+     <meta name="theme-color"> en index.html. No cambiarlo. */
+  --color-fondo: #0f1115;
+  --color-placa: #16191f;
+  --color-placa-alta: #1e222a;
+  --color-borde: #2a2f38;
+
+  /* Señal única. Los docs piden 🟢 para "Sincronizado", pero el verde se
+     elimina a propósito: si el ámbar sólido ya significa "a salvo", el verde
+     es un tercer color haciendo un trabajo que ya está hecho. */
+  --color-senal: oklch(0.82 0.17 78); /* ámbar alta visibilidad, 10.6:1 sobre fondo */
+  --color-senal-hueco: oklch(0.82 0.17 78 / 0.28);
+
+  /* Tinta — hueso, no blanco puro: menos glare sobre negro. */
+  --color-tinta: #f2efe9; /* 16.5:1 */
+  --color-tenue: #8a9099; /* 5.9:1 — AA para texto normal, no sólo grande */
+
+  /* Estado. Rojo es el único color además del ámbar. */
+  --color-riesgo: oklch(0.62 0.21 25); /* 4.7:1 */
+
+  --font-placa: "Archivo Variable", system-ui, sans-serif;
+
+  /* Escala fija en rem (modo Operate: nunca fluida), ratio ~1.2, más UN
+     outlier deliberado: el numeral de denominación. */
+  --text-micro: 0.75rem;
+  --text-base: 0.9375rem;
+  --text-medio: 1.125rem;
+  --text-placa: 2rem; /* el outlier: ESTE es el mundo */
+
+  --radius-placa: 2px; /* borde duro, casi cero */
+  --size-toque: 3.5rem; /* 56px — el mínimo del doc 11 es 48 */
+}
+
+@layer base {
+  html {
+    background-color: var(--color-fondo);
+    /* El teléfono va en la mano a ~40 cm durante 2–4 horas: el color de
+       sobredesplazamiento de iOS también tiene que ser del mundo. */
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-fondo);
+    color: var(--color-tinta);
+    font-family: var(--font-placa);
+    font-size: var(--text-base);
+    line-height: 1.4;
+    /* viewport-fit=cover en index.html mete la UI bajo el notch; sin esto la
+       cabecera queda debajo de la barra de estado en un iPhone real. */
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Toda cantidad va en cifras tabulares: sin esto las columnas bailan al
+     incrementar, que es justo el momento en que el cajero está mirando. */
+  [data-numeral] {
+    font-variant-numeric: tabular-nums;
+    font-stretch: 75%;
+    letter-spacing: -0.02em;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    /* El objetivo es un iPhone: sin esto, cada − / + parpadea en gris de
+       sistema al tocarlo y rompe el mundo. */
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  input {
+    font: inherit;
+    color: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-senal);
+    outline-offset: 2px;
+  }
+
+  /* El cajero puede tener activado "reducir movimiento"; el sistema sólo usa
+     transiciones de estado, así que apagarlas no le quita información. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

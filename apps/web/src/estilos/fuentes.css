@@ -1,0 +1,24 @@
+/* apps/web/src/estilos/fuentes.css
+ *
+ * Archivo Variable, autoalojada. NUNCA desde el CDN de Google: RNF-11 exige
+ * que la app funcione tras 30 días sin abrirse, y una fuente remota falla sin
+ * red — justo en la bodega con mala señal donde se usa.
+ *
+ * Subset latin (U+0000-00FF cubre todos los acentos del español). Un solo
+ * .woff2 de 88 KB con los dos ejes: `wght` 100–900 y `wdth` 62–125.
+ * Verificado contra el archivo descargado, no supuesto: el `font-stretch`
+ * declarado abajo es el rango real que expone el eje wdth, así que el plan B
+ * de dos subsets (Archivo + Archivo Narrow) no hace falta.
+ */
+
+@font-face {
+  font-family: "Archivo Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-display: swap;
+  src: url("/fuentes/archivo-latin-var.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}

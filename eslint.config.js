@@ -58,4 +58,41 @@ export default defineConfig([
       ],
     },
   },
+  {
+    // Mismo principio que packages/shared, un nivel más arriba: los
+    // primitivos visuales sólo reciben props. Si uno se suscribe al
+    // repositorio o al estado, deja de ser reusable y arrastra la
+    // suscripción de FilaCategoria hacia el padre — que es exactamente la
+    // decisión de rendimiento que doc 07 §7 protege.
+    files: ["apps/web/src/ui/primitivos/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "firebase",
+              message: "ui/primitivos sólo recibe props: nada de Firebase.",
+            },
+            {
+              name: "@conteo/data",
+              message: "ui/primitivos sólo recibe props: nada de repositorios.",
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                "firebase/*",
+                "@conteo/data/*",
+                "**/state/*",
+                "../state/**",
+                "../../state/**",
+              ],
+              message: "ui/primitivos sólo recibe props: nada de estado, repositorios ni Firebase.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);
