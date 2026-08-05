@@ -9,8 +9,18 @@
 // la fila es el alternativo (doc 11 §158-166). "Volver", nunca "Cerrar": la
 // pantalla de conteo no puede tener un botón cuyo nombre accesible matchee
 // /cerrar|descartar/i.
+//
+// F4-A1 (doc 10 §10, "cantidad absurda por dedo torpe") añade la
+// confirmación SUAVE cuando lo tecleado supera 10× el promedio de la
+// categoría: en vez de un segundo <dialog> (rompería el foco atrapado del
+// primero y arriesgaría un role="alert" de más, restricción dura de
+// ConteoScreen.test.tsx), es una segunda VISTA dentro del mismo diálogo —
+// el teclado se reemplaza por el mensaje y dos botones, sin abrir nada
+// nuevo. "Corregir", nunca "Cancelar", porque no cancela el conteo: sólo
+// vuelve al teclado con lo ya tecleado intacto.
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
+import { cantidadEsAbsurda } from "@conteo/shared";
 
 export interface HojaProps {
   readonly abierta: boolean;
@@ -18,13 +28,28 @@ export interface HojaProps {
   readonly etiqueta: string;
   /** Lo que el cajero ya tiene registrado para esta categoría (0 si nada). */
   readonly valorInicial: number;
+  /**
+   * Promedio de unidades por aportante en la categoría en edición (0 = sin
+   * aportantes todavía, o prop omitida). Prop OPCIONAL con default 0 a
+   * propósito: así ningún test anterior a F4-A1 que monta `<Hoja>` sin esta
+   * prop cambia de comportamiento — "sin promedio" sigue siendo "nunca
+   * absurdo", igual que antes de que este prop existiera.
+   */
+  readonly promedioCategoria?: number;
   readonly onConfirmar: (cantidad: number) => void;
   readonly onVolver: () => void;
 }
 
 const TECLAS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "borrar", "0", "guardar"] as const;
 
-export function Hoja({ abierta, etiqueta, valorInicial, onConfirmar, onVolver }: HojaProps) {
+export function Hoja({
+  abierta,
+  etiqueta,
+  valorInicial,
+  promedioCategoria = 0,
+  onConfirmar,
+  onVolver,
+}: HojaProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [valor, setValor] = useState(String(valorInicial));
   // Primer dígito tras abrir REEMPLAZA el valor precargado en vez de
@@ -32,6 +57,9 @@ export function Hoja({ abierta, etiqueta, valorInicial, onConfirmar, onVolver }:
   // un input numérico nativo) — sin esto, tocar "3" sobre un valor
   // precargado de 12 escribe 123 en vez de reemplazarlo por 3.
   const [tocado, setTocado] = useState(false);
+  // Vista de confirmación suave (F4-A1) en vez del teclado — nunca las dos
+  // superpuestas.
+  const [pidiendoConfirmacion, setPidiendoConfirmacion] = useState(false);
 
   // Se resetea cada vez que cambia LA CATEGORÍA (etiqueta), no en cada
   // render: es lo que deja al cajero seguir editando sus propios dígitos sin
@@ -39,6 +67,7 @@ export function Hoja({ abierta, etiqueta, valorInicial, onConfirmar, onVolver }:
   useEffect(() => {
     setValor(String(valorInicial));
     setTocado(false);
+    setPidiendoConfirmacion(false);
     // Deliberadamente sólo depende de `etiqueta` (identifica la categoría):
     // `valorInicial` sólo debe releerse al cambiar de categoría, nunca en
     // cada render mientras el cajero sigue escribiendo sus propios dígitos.
@@ -71,7 +100,12 @@ export function Hoja({ abierta, etiqueta, valorInicial, onConfirmar, onVolver }:
       return;
     }
     if (t === "guardar") {
-      onConfirmar(Number(valor));
+      const cantidad = Number(valor);
+      if (cantidadEsAbsurda(cantidad, promedioCategoria)) {
+        setPidiendoConfirmacion(true);
+        return;
+      }
+      onConfirmar(cantidad);
       return;
     }
     setValor((v) => {
@@ -117,24 +151,62 @@ export function Hoja({ abierta, etiqueta, valorInicial, onConfirmar, onVolver }:
         {valor}
       </p>
 
-      <div className="grid grid-cols-3 gap-2">
-        {TECLAS.map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => tecla(t)}
-            aria-label={t === "borrar" ? "Borrar" : t === "guardar" ? "Guardar" : t}
-            className={clsx(
-              "min-h-[var(--size-toque)] rounded-placa border text-medio font-semibold",
-              t === "guardar"
-                ? "border-senal bg-senal text-fondo"
-                : "border-borde text-tinta active:border-senal active:bg-fondo",
-            )}
-          >
-            {t === "borrar" ? "Borrar" : t === "guardar" ? "Guardar" : t}
-          </button>
-        ))}
-      </div>
+      {pidiendoConfirmacion ? (
+        // role="status" (nunca "alert"): ConteoScreen.test.tsx exige que la
+        // pantalla de conteo nunca tenga más de un role="alert" a la vez, y
+        // ese rol ya está reservado a los banners de riesgo real de pérdida
+        // de datos (BannerPendientes). Esto es una confirmación SUAVE — el
+        // cajero pudo contar bien — no una alerta; mismo criterio que el
+        // bloque "Enviando…" de FinalizarScreen.tsx.
+        <div role="status" aria-live="polite" className="flex flex-col gap-3">
+          <p className="text-base text-tinta">
+            {valor} es mucho más que el promedio de esta categoría (≈
+            {Math.round(promedioCategoria)} por persona). Si contaste bien, guarda igual.
+          </p>
+          <div className="flex gap-2">
+            {/* autoFocus porque el botón "Guardar" que tenía el foco se
+                DESMONTA al cambiar de vista: sin esto el foco cae al <body>
+                y quien navega por teclado tiene que rebuscar dónde quedó
+                dentro del diálogo. Aterriza en "Corregir" y no en "Sí,
+                guardar" a propósito — el foco por defecto no debe estar
+                sobre la acción que confirma un número sospechoso. */}
+            <button
+              type="button"
+              autoFocus
+              onClick={() => setPidiendoConfirmacion(false)}
+              className="min-h-[var(--size-toque)] flex-1 rounded-placa border border-borde text-medio font-semibold text-tinta active:border-senal active:bg-fondo"
+            >
+              Corregir
+            </button>
+            <button
+              type="button"
+              onClick={() => onConfirmar(Number(valor))}
+              className="min-h-[var(--size-toque)] flex-1 rounded-placa border border-senal bg-senal text-medio font-semibold text-fondo"
+            >
+              Sí, guardar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          {TECLAS.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => tecla(t)}
+              aria-label={t === "borrar" ? "Borrar" : t === "guardar" ? "Guardar" : t}
+              className={clsx(
+                "min-h-[var(--size-toque)] rounded-placa border text-medio font-semibold",
+                t === "guardar"
+                  ? "border-senal bg-senal text-fondo"
+                  : "border-borde text-tinta active:border-senal active:bg-fondo",
+              )}
+            >
+              {t === "borrar" ? "Borrar" : t === "guardar" ? "Guardar" : t}
+            </button>
+          ))}
+        </div>
+      )}
     </dialog>
   );
 }

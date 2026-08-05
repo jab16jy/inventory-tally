@@ -33,12 +33,14 @@ export class FakeConteoRepository implements ConteoRepository {
   private readonly lineas: MapaLineas = new Map();
   private readonly aportes: MapaAportes = new Map();
   private readonly sesionesPorSucursal = new Map<string, SesionConteo>();
+  private readonly sesionesPorId = new Map<string, SesionConteo>();
   private readonly sucursales = new Map<string, Sucursal>();
   private readonly pendientesPorSesion = new Map<string, number>();
 
   private readonly listenersLineas = new Map<string, Set<(l: LineaConteo[]) => void>>();
   private readonly listenersAporte = new Map<string, Set<(a: Aporte | null) => void>>();
   private readonly listenersSesion = new Map<string, Set<(s: SesionConteo | null) => void>>();
+  private readonly listenersSesionPorId = new Map<string, Set<(s: SesionConteo | null) => void>>();
   private readonly listenersPendientes = new Map<string, Set<(n: number) => void>>();
 
   constructor(
@@ -58,6 +60,15 @@ export class FakeConteoRepository implements ConteoRepository {
   sembrarSesionAbierta(sucursalId: string, sesion: SesionConteo): void {
     this.sesionesPorSucursal.set(sucursalId, sesion);
     this.listenersSesion.get(sucursalId)?.forEach((cb) => cb(sesion));
+  }
+
+  /** Siembra (o reemplaza) por `sesionId`, notificando a los suscriptores
+   *  activos de `observarSesion` — así un test puede simular al admin
+   *  cerrando la sesión a mitad de un conteo (F4-A1), sembrando de nuevo con
+   *  `estado: "cerrada"`. */
+  sembrarSesion(sesion: SesionConteo): void {
+    this.sesionesPorId.set(sesion.sesionId, sesion);
+    this.listenersSesionPorId.get(sesion.sesionId)?.forEach((cb) => cb(sesion));
   }
 
   sembrarSucursal(sucursal: Sucursal): void {
@@ -92,6 +103,13 @@ export class FakeConteoRepository implements ConteoRepository {
     const listeners = this.listenersDe(this.listenersSesion, sucursalId);
     listeners.add(onChange);
     onChange(this.sesionesPorSucursal.get(sucursalId) ?? null);
+    return () => listeners.delete(onChange);
+  }
+
+  observarSesion(sesionId: string, onChange: (sesion: SesionConteo | null) => void): Unsubscribe {
+    const listeners = this.listenersDe(this.listenersSesionPorId, sesionId);
+    listeners.add(onChange);
+    onChange(this.sesionesPorId.get(sesionId) ?? null);
     return () => listeners.delete(onChange);
   }
 

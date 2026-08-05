@@ -31,6 +31,16 @@ export interface ConteoRepository {
   ): Unsubscribe;
 
   /**
+   * Observa UNA sesión por `sesionId` — al revés de `observarSesionAbierta`,
+   * que necesita el `sucursalId` y no sirve para esto (F4-A1). Es la ruta de
+   * escalamiento que ya nombraba el `ponytail:` de `PrepararScreen.tsx`, y la
+   * única forma de detectar "sesión cerrada por el admin" (doc 11 §5:
+   * `estado != 'abierta'`) desde la pantalla de conteo, que sólo tiene el
+   * `sesionId` de la ruta.
+   */
+  observarSesion(sesionId: string, onChange: (sesion: SesionConteo | null) => void): Unsubscribe;
+
+  /**
    * Observa las sucursales asignadas al cajero activo. `sucursalIds` entra
    * por parámetro — no lo resuelve el repositorio — porque la fuente real
    * es el custom claim `request.auth.token.sucursales`

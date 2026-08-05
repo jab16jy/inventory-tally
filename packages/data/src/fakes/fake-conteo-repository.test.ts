@@ -128,6 +128,34 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
     expect(otras[0]).toBeNull();
   });
 
+  it("observarSesion emite la sesión sembrada por sesionId, o null si no hay ninguna (F4-A1)", () => {
+    const repo = new FakeConteoRepository();
+    repo.sembrarSesion(crearSesion());
+
+    const recibidas: Array<SesionConteo | null> = [];
+    repo.observarSesion("ses_20260802_norte_01", (s) => recibidas.push(s));
+    expect(recibidas[0]?.sesionId).toBe("ses_20260802_norte_01");
+
+    const otras: Array<SesionConteo | null> = [];
+    repo.observarSesion("ses_inexistente", (s) => otras.push(s));
+    expect(otras[0]).toBeNull();
+  });
+
+  it("observarSesion notifica a los suscriptores activos cuando la sesión sembrada cambia de estado", () => {
+    // Ruta que dispara el modal bloqueante del cajero (F4-A1, doc 11 §5,
+    // "estado != 'abierta'"): el admin cierra la sesión MIENTRAS el cajero
+    // sigue con la pantalla abierta, no antes de que la observe.
+    const repo = new FakeConteoRepository();
+    repo.sembrarSesion(crearSesion());
+
+    const recibidas: Array<SesionConteo | null> = [];
+    repo.observarSesion("ses_20260802_norte_01", (s) => recibidas.push(s));
+    expect(recibidas.at(-1)?.estado).toBe("abierta");
+
+    repo.sembrarSesion(crearSesion({ estado: "cerrada", cerradaPor: "uid_admin" }));
+    expect(recibidas.at(-1)?.estado).toBe("cerrada");
+  });
+
   it("observarSucursales emite [] de inmediato cuando no hay IDs, mismo contrato que la implementación real", () => {
     const repo = new FakeConteoRepository();
     const recibidas: Sucursal[][] = [];

@@ -6,15 +6,16 @@
 // FUERA DE ALCANCE, verificado contra el código y no sólo asumido: el mock
 // del plan (doc 11 §3) titula la pantalla "Conteo de agosto · Sucursal
 // Norte" y condiciona un aviso a `sucursal.conectividad`. Esta ruta sólo
-// recibe `:sesionId` (doc 11 §2, mapa de navegación) y `ConteoRepository`
-// no tiene forma de resolver una `Sucursal` ni una `SesionConteo` a partir
-// de un `sesionId` — sólo `observarSesionAbierta(sucursalId, …)`, que va en
-// sentido contrario. Pedirle ese dato a esta pantalla exigiría o bien
-// cambiar la forma de la ruta (rompe el mapa de navegación ya fijado) o
-// añadir un método nuevo a `ConteoRepository` (+ Fake + Firestore) que
-// ninguna de las otras dos piezas de esta ola consume. Se omite el nombre
-// de sucursal/sesión y el aviso de datos móviles; ver el `ponytail:` sobre
-// el <header> más abajo para la ruta de escalamiento si hace falta.
+// recibe `:sesionId` (doc 11 §2, mapa de navegación). F4-A1 ya añadió
+// `ConteoRepository.observarSesion(sesionId, …)` — la ruta de escalamiento
+// que este comentario nombraba antes de que existiera — así que el nombre de
+// sucursal (`SesionConteo.sucursalNombre`, ya viene denormalizado en la
+// propia sesión) es alcanzable sin una segunda pieza. El aviso de datos
+// móviles NO: `conectividad` sólo vive en `Sucursal`, y resolverla exige un
+// segundo lookup (`observarSucursales([sesion.sucursalId], …)`) que ninguna
+// pantalla de esta ola pide. Esta pantalla sigue sin consumir ninguno de los
+// dos — ver el `ponytail:` sobre el <header> más abajo para la ruta de
+// escalamiento real que queda.
 import { useNavigate, useParams } from "react-router-dom";
 import { useConexion } from "../state/useConexion.js";
 import { useLineasSesion } from "../state/useLineasSesion.js";
@@ -53,12 +54,15 @@ export function PrepararScreen() {
       {/* Cabecera callada — mismo criterio que SucursalesScreen: el numeral
           de 2rem es el outlier reservado a la denominación de categoría
           (DESIGN.md §Typography), no a un título de pantalla.
-          ponytail: sin nombre de sucursal/sesión ni aviso de datos móviles
-          — el techo es que `ConteoRepository` no resuelve `Sucursal` ni
-          `SesionConteo` a partir de `sesionId` (ver comentario de archivo).
-          Ruta de escalamiento: añadir `observarSesion(sesionId, …)` a
-          `ConteoRepository` (+ Fake + Firestore) el día que una pantalla
-          real lo necesite. */}
+          ponytail: sin nombre de sucursal/sesión ni aviso de datos móviles.
+          El techo YA NO es la falta de `observarSesion` (F4-A1 lo añadió a
+          `ConteoRepository` + Fake + Firestore) — es que esta pantalla no lo
+          llama, y que el aviso de conectividad sigue necesitando un segundo
+          lookup a `Sucursal` que `SesionConteo` no trae (ver comentario de
+          archivo). Ruta de escalamiento: consumir `observarSesion(sesionId,
+          …)` aquí para el nombre, y `observarSucursales([sesion.sucursalId],
+          …)` para el aviso de datos móviles, el día que una pantalla real lo
+          necesite. */}
       <header className="pb-3">
         <h1 className="text-micro tracking-[0.18em] text-tenue uppercase">Antes de empezar</h1>
       </header>

@@ -131,6 +131,61 @@ describe("FirestoreConteoRepository.uidActual", () => {
   });
 });
 
+describe("FirestoreConteoRepository.observarSesion (F4-A1, doc 11 §5)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function snapSesion(existe: boolean, datos?: Record<string, unknown>) {
+    return { exists: () => existe, data: () => datos };
+  }
+
+  it("suscribe a doc(sesiones/{sesionId}) y mapea con sesionConteoDesdeDoc", () => {
+    let callback: ((snap: unknown) => void) | undefined;
+    onSnapshot.mockImplementation((_ref: unknown, cb: (snap: unknown) => void) => {
+      callback = cb;
+      return vi.fn();
+    });
+    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const recibidas: Array<{ sesionId: string; estado: string } | null> = [];
+
+    repo.observarSesion("ses_1", (s) => recibidas.push(s as never));
+    expect(doc).toHaveBeenCalledWith({}, "sesiones", "ses_1");
+
+    callback?.(
+      snapSesion(true, {
+        sucursalId: "suc_norte",
+        sucursalNombre: "Sucursal Norte",
+        estado: "cerrada",
+        abiertaEn: { toDate: () => new Date("2026-08-02T08:00:00Z") },
+        abiertaPor: "uid_admin",
+        cerradaEn: { toDate: () => new Date("2026-08-02T11:30:00Z") },
+        cerradaPor: "uid_admin",
+        participantes: ["uid_ana"],
+        totalUnidades: 0,
+        sesionCorregidaId: null,
+      }),
+    );
+
+    expect(recibidas.at(-1)).toEqual(
+      expect.objectContaining({ sesionId: "ses_1", estado: "cerrada" }),
+    );
+  });
+
+  it("emite null cuando el documento de sesión no existe", () => {
+    let callback: ((snap: unknown) => void) | undefined;
+    onSnapshot.mockImplementation((_ref: unknown, cb: (snap: unknown) => void) => {
+      callback = cb;
+      return vi.fn();
+    });
+    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const recibidas: Array<unknown | null> = [];
+
+    repo.observarSesion("ses_inexistente", (s) => recibidas.push(s));
+    callback?.(snapSesion(false));
+
+    expect(recibidas.at(-1)).toBeNull();
+  });
+});
+
 describe("FirestoreConteoRepository.observarSucursales (doc 04 §3 — decisión: N listeners de documento, no query 'in')", () => {
   beforeEach(() => vi.clearAllMocks());
 

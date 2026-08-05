@@ -6,14 +6,21 @@
 // dashboard"), el Deck de totales y la Hoja con teclado numérico.
 import { useCallback, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { estaPendiente, siguientePendiente, totalUnidadesSesion } from "@conteo/shared";
+import {
+  estaPendiente,
+  promedioCategoria,
+  siguientePendiente,
+  totalUnidadesSesion,
+} from "@conteo/shared";
 import { useConteoRepository } from "../state/repositorio-contexto.js";
 import { useConexion } from "../state/useConexion.js";
 import { useLineasSesion } from "../state/useLineasSesion.js";
 import { useMiAporte } from "../state/useMiAporte.js";
 import { usePendientes } from "../state/usePendientes.js";
+import { useSesion } from "../state/useSesion.js";
 import { BannerPendientes } from "./BannerPendientes.js";
 import { FilaCategoria } from "./FilaCategoria.js";
+import { ModalSesionCerrada } from "./ModalSesionCerrada.js";
 import { BarraProgreso } from "./primitivos/BarraProgreso.js";
 import { ChipEstado } from "./primitivos/ChipEstado.js";
 import { Deck } from "./primitivos/Deck.js";
@@ -32,6 +39,12 @@ export function ConteoScreen() {
   const lineas = useLineasSesion(sesionId);
   const escriturasPendientes = usePendientes(sesionId);
   const enLinea = useConexion();
+  // Estado 4 del plan (§5, doc 11 §5): "estado != 'abierta'" es la condición
+  // exacta de la fila de la tabla de estados. `sesion` arranca en `null`
+  // hasta que el listener resuelve, así que el modal NO se muestra por
+  // defecto — sólo cuando de verdad sabemos que ya no está abierta.
+  const sesion = useSesion(sesionId);
+  const sesionCerrada = sesion !== null && sesion.estado !== "abierta";
 
   const [busqueda, setBusqueda] = useState("");
   const [soloPendientes, setSoloPendientes] = useState(false);
@@ -61,9 +74,20 @@ export function ConteoScreen() {
   // Única suscripción extra, y sólo mientras la Hoja está abierta: precarga
   // el teclado con lo que el cajero ya tenía registrado para esa categoría.
   const miAporteEnEdicion = useMiAporte(sesionId, categoriaEnEdicion ?? "");
+  // Estado 8 del plan (§5, doc 10 §10): 0 cuando no hay línea en edición o
+  // todavía nadie aportó — `cantidadEsAbsurda` (dentro de Hoja) ya trata ese
+  // 0 como "nunca absurdo", sin cálculo aparte aquí.
+  const promedioEnEdicion = lineaEnEdicion ? promedioCategoria(lineaEnEdicion) : 0;
 
   function confirmarDesdeHoja(cantidad: number): void {
     if (!categoriaEnEdicion) return;
+    // El modal bloqueante NO es la garantía: la inercia del <dialog> nativo
+    // sólo detiene la INTERACCIÓN del usuario, y aun así deja una ventana
+    // real entre que el admin cierra la sesión y que el listener lo emite.
+    // La integridad del dato la sostiene esta comprobación, no la capa de
+    // pintura. Las reglas de Firestore son la última red; ésta evita la
+    // escritura optimista que el cajero vería aplicada en local.
+    if (sesionCerrada) return;
     void repo.registrarAporte({ sesionId, categoriaId: categoriaEnEdicion, cantidad });
     // Avanza sola a la siguiente pendiente (plan §5) — o cierra si el
     // cajero ya terminó el catálogo.
@@ -132,8 +156,19 @@ export function ConteoScreen() {
 
       <BannerPendientes pendientes={escriturasPendientes} />
 
+      {/* Con la sesión cerrada NO se montan las filas. Los +/- que escriben
+          viven dentro de FilaCategoria y llaman al repositorio ellos mismos,
+          así que taparlos con el modal no es una garantía de integridad: la
+          inercia del <dialog> detiene la interacción del usuario, pero no
+          cubre la ventana entre que el admin cierra la sesión y que el
+          listener lo emite. Desmontar es lo único que quita el acceso a la
+          escritura desde aquí sin tocar FilaCategoria, y además es honesto:
+          esas filas ya no son accionables. Se descartó `<fieldset disabled>`
+          —la vía nativa, y la primera que se probó— porque su propagación a
+          los controles descendientes no es observable en el entorno de
+          test: quedaba un arreglo sin red de regresión. */}
       <ul className="mt-1 flex flex-1 flex-col gap-2 overflow-y-auto pb-4">
-        {lineasVisibles.map((linea) => (
+        {(sesionCerrada ? [] : lineasVisibles).map((linea) => (
           <FilaCategoria
             key={linea.categoriaId}
             sesionId={sesionId}
@@ -154,9 +189,20 @@ export function ConteoScreen() {
         abierta={lineaEnEdicion !== null}
         etiqueta={lineaEnEdicion?.etiqueta ?? ""}
         valorInicial={miAporteEnEdicion?.cantidad ?? 0}
+        promedioCategoria={promedioEnEdicion}
         onConfirmar={confirmarDesdeHoja}
         onVolver={() => setCategoriaEnEdicion(null)}
       />
+
+      {/* Se monta SIEMPRE (como Hoja arriba) y decide su propia visibilidad
+          por `abierta`: si en cambio condicionáramos el montaje a
+          `sesionCerrada`, perderíamos el primer render en el que
+          `useSesion` todavía no ha resuelto nada, sin ganar nada a cambio —
+          el <dialog> cerrado no pinta nada. Va DESPUÉS de la Hoja a
+          propósito: si el admin cierra la sesión con la Hoja abierta, este
+          showModal() se invoca más tarde y por eso queda encima en el top
+          layer nativo (orden de invocación, no de DOM). */}
+      <ModalSesionCerrada abierta={sesionCerrada} onSalir={() => navigate("/sucursales")} />
     </section>
   );
 }

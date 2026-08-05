@@ -92,6 +92,13 @@ export class FirestoreConteoRepository implements ConteoRepository {
     });
   }
 
+  observarSesion(sesionId: string, onChange: (sesion: SesionConteo | null) => void): Unsubscribe {
+    const ref = doc(this.db, "sesiones", sesionId);
+    return onSnapshot(ref, (snap) => {
+      onChange(snap.exists() ? sesionConteoDesdeDoc(sesionId, snap.data() as never) : null);
+    });
+  }
+
   // Decisión ya tomada (F3-A): N listeners onSnapshot(doc(...)), uno por
   // sucursalId, NUNCA where(documentId(), "in", ids). Tres razones:
   //   1. `infra/firestore.rules:33` concede `allow read` por documento vía
