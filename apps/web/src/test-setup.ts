@@ -23,3 +23,22 @@ if (typeof HTMLDialogElement !== "undefined" && !HTMLDialogElement.prototype.sho
     this.dispatchEvent(new Event("close"));
   };
 }
+
+// jsdom tampoco implementa window.matchMedia (useInstalacionPwa.ts la usa
+// para detectar `display-mode: standalone`). Mismo criterio que el parche
+// de <dialog> de arriba: el navegador real objetivo sí la soporta, así que
+// el stub va aquí y no como rama especulativa en el componente de
+// producción. Cada test que necesite `matches: true` reasigna
+// `window.matchMedia` puntualmente.
+if (typeof window !== "undefined" && !window.matchMedia) {
+  window.matchMedia = (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  });
+}

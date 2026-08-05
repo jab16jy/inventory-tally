@@ -6,7 +6,9 @@ import "./estilos/tema.css";
 import { auth, db, monitorPersistencia } from "./lib/firebase.js";
 import { AppRouter } from "./lib/router.js";
 import { ConteoRepositoryProvider } from "./state/repositorio-contexto.js";
+import { BannerInstalarPwa } from "./ui/BannerInstalarPwa.js";
 import { BannerPersistenciaDegradada } from "./ui/BannerPersistenciaDegradada.js";
+import { ModalActualizacionDisponible } from "./ui/ModalActualizacionDisponible.js";
 
 const usuarioActual: ProveedorUsuarioActual = {
   obtenerUid: () => {
@@ -24,7 +26,9 @@ if (!raiz) throw new Error("No se encontró #root en index.html");
 createRoot(raiz).render(
   <StrictMode>
     <ConteoRepositoryProvider repo={repo}>
+      <ModalActualizacionDisponible />
       <BannerPersistenciaDegradada monitor={monitorPersistencia} />
+      <BannerInstalarPwa />
       <AppRouter />
     </ConteoRepositoryProvider>
   </StrictMode>,

@@ -24,7 +24,12 @@ export default defineConfig({
     // PostCSS, sin autoprefixer, sin tailwind.config.js (doc de v4).
     tailwindcss(),
     VitePWA({
-      registerType: "autoUpdate",
+      // "autoUpdate" recarga el service worker (y la pestaña) SOLO, sin
+      // avisar — puede recargarle la app al cajero a mitad de conteo y
+      // perderle lo que no se ha sincronizado (RNF-12). "prompt" deja el SW
+      // nuevo en `waiting` hasta que ModalActualizacionDisponible.tsx lo
+      // active a petición del cajero (plan §5, estado 6).
+      registerType: "prompt",
       workbox: {
         // El bootstrap (index.html) nunca se cachea agresivamente; los
         // assets con hash sí, porque son inmutables por versión (doc 06 §4).
