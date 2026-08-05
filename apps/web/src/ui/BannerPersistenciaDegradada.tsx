@@ -21,7 +21,10 @@ export function BannerPersistenciaDegradada({ monitor }: BannerPersistenciaDegra
       aria-live="assertive"
       className="border-b border-riesgo bg-riesgo-placa px-3 py-2.5 text-base text-tinta"
     >
-      <strong className="font-semibold text-riesgo">Sin guardado sin conexión.</strong> Este
+      {/* text-tinta, no text-riesgo — mismo hallazgo de contraste que
+          BannerPendientes.tsx (F4-B): 3.93:1 bajo AA, verificado con la
+          fórmula WCAG, no asumido. */}
+      <strong className="font-semibold text-tinta">Sin guardado sin conexión.</strong> Este
       dispositivo no pudo guardar el conteo sin conexión. Mantén la app abierta y con señal hasta
       terminar, o tus conteos podrían perderse.
     </div>

@@ -24,4 +24,19 @@ describe("BannerPersistenciaDegradada", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent(/no pudo guardar/i);
   });
+
+  it("F4-B: el énfasis en negrita no usa text-riesgo (3.93:1, bajo AA) sobre el fondo del banner", () => {
+    const consolaFalsa = { warn: vi.fn() };
+    const monitor = instalarMonitorPersistencia(consolaFalsa);
+    render(<BannerPersistenciaDegradada monitor={monitor} />);
+
+    act(() => {
+      consolaFalsa.warn(
+        "Error using user provided cache. Falling back to memory cache: cuota excedida",
+      );
+    });
+
+    const enfasis = screen.getByText("Sin guardado sin conexión.");
+    expect(enfasis).not.toHaveClass("text-riesgo");
+  });
 });

@@ -141,4 +141,30 @@ describe("SucursalesScreen (F3-A)", () => {
 
     expect(await screen.findAllByRole("button")).toHaveLength(10);
   });
+
+  it("F4-B: con el claim resuelto y IDs, pero los snapshots de sucursal aún en vuelo, pinta un esqueleto en vez de nada", async () => {
+    // El hueco que el comentario de SucursalesScreen.tsx documentaba sin
+    // construir: `estadoAuth` ya resolvió con IDs (por eso no aparece "No
+    // tienes sucursales asignadas"), pero ningún doc de Sucursal se sembró
+    // todavía, así que `sucursales` se queda en [] — la misma ventana que en
+    // producción cubren los N listeners de `observarSucursales` mientras
+    // Firestore no ha emitido su primer snapshot.
+    const repo = new FakeConteoRepository();
+
+    renderPantalla(repo, ["suc_norte", "suc_sur"]);
+
+    expect(await screen.findAllByTestId("fila-esqueleto")).toHaveLength(2);
+    expect(screen.queryByText(/no tienes sucursales/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("F4-B: el esqueleto desaparece en cuanto llegan las sucursales reales", async () => {
+    const repo = new FakeConteoRepository();
+    repo.sembrarSucursal(crearSucursal({ sucursalId: "suc_norte", nombre: "Sucursal Norte" }));
+
+    renderPantalla(repo, ["suc_norte"]);
+
+    expect(await screen.findByText("Sucursal Norte")).toBeInTheDocument();
+    expect(screen.queryByTestId("fila-esqueleto")).not.toBeInTheDocument();
+  });
 });

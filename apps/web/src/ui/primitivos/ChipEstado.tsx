@@ -37,6 +37,13 @@ export function ChipEstado({ estado }: ChipEstadoProps) {
   const cfg = CONFIG[estado];
   return (
     <span
+      // Región viva discreta (F4-B, doc 11 §9): "Sincronizado" ⇄ "Sin
+      // conexión" es justo el cambio que más le importa al cajero y hoy
+      // sólo lo comunicaba el color, que no llega a un lector de pantalla.
+      // `polite`, nunca `assertive`: ese nivel está reservado a
+      // BannerPendientes (riesgo real de pérdida de datos), y un cambio de
+      // chip no puede competir por esa misma urgencia.
+      aria-live="polite"
       className={clsx(
         "inline-flex shrink-0 items-center gap-1.5 rounded-placa border px-2 py-1 text-micro",
         cfg.borde,

@@ -62,6 +62,17 @@ export function SucursalesScreen({ auth }: SucursalesScreenProps) {
     // es la que decide cuándo volver a suscribirse.
   }, [repo, claveSucursales]);
 
+  // La misma ventana que el comentario de más abajo describía sin construir:
+  // el claim ya resolvió con IDs reales (por eso NO es el caso de "no tienes
+  // sucursales"), pero el efecto de arriba todavía no vio un solo snapshot
+  // de Sucursal. `estadoAuth !== undefined` es la autoridad, no
+  // `sucursales.length` a secas — así no se muestra el esqueleto por error
+  // en el instante inicial en el que ni siquiera el claim ha resuelto (ese
+  // instante no pinta nada, como antes; no es la ventana que este cambio
+  // cubre).
+  const cargandoSucursales =
+    estadoAuth !== undefined && sucursalIds.length > 0 && sucursales.length === 0;
+
   return (
     <section className="mx-auto flex min-h-dvh max-w-md flex-col px-3 pt-3">
       {/* Cabecera callada a propósito. El primer borrador puso el h1 en
@@ -79,65 +90,94 @@ export function SucursalesScreen({ auth }: SucursalesScreenProps) {
           de snapshots: `useAuthState` arranca en `undefined` y `sucursales`
           está vacío también mientras los N listeners de documento aún no
           emiten. Condicionar el mensaje a `sucursales.length` afirmaba algo
-          falso en cada carga. La ventana "claim resuelto con IDs, snapshots
-          en vuelo" queda deliberadamente sin contenido; le corresponde el
-          skeleton con la forma final del plan §5 (F4), nunca un spinner. */}
+          falso en cada carga. */}
       {estadoAuth !== undefined && sucursalIds.length === 0 && (
         <p className="text-base text-tenue">No tienes sucursales asignadas.</p>
       )}
 
-      <ul className="flex flex-col gap-2 pb-4">
-        {sucursales.map((sucursal) => {
-          const navegable = sucursal.sesionAbiertaId !== null;
-          return (
-            <li key={sucursal.sucursalId} className="list-none">
+      {/* Región viva silenciosa: el único aviso de "cargando" que llega a un
+          lector de pantalla, ya que el esqueleto de abajo es `aria-hidden`
+          (no hay contenido real que anunciar fila por fila). Vacía el resto
+          del tiempo — sólo cambia de vacío a texto y de vuelta, nunca se
+          desmonta, así el lector de pantalla ya tiene la región registrada
+          cuando empieza a haber algo que anunciar. */}
+      <p className="sr-only" aria-live="polite">
+        {cargandoSucursales ? "Cargando sucursales…" : ""}
+      </p>
+
+      {/* La ventana "claim resuelto con IDs, snapshots en vuelo": antes no
+          pintaba nada (comentario retirado, ver commit); ahora es un
+          esqueleto con la forma final de la fila real (plan §5, F4) — nunca
+          un spinner. `sucursalIds` ya da la cuenta exacta de filas
+          esperadas, así que no hay que adivinar cuántas pintar. */}
+      {cargandoSucursales ? (
+        <ul aria-hidden="true" className="flex flex-col gap-2 pb-4">
+          {sucursalIds.map((id) => (
+            <li key={id} className="list-none" data-testid="fila-esqueleto">
               <Placa className="py-2.5">
-                <button
-                  type="button"
-                  disabled={!navegable}
-                  // Entra por /preparar, no directo al conteo: el grafo de
-                  // docs/diseno/11-ux-y-navegacion.md §2 es `SUC --> PREP`, y
-                  // el uso es MENSUAL (PRODUCT.md) — nadie llega recordando
-                  // cómo va el flujo, así que el recordatorio de los cuatro
-                  // pasos precede al conteo en vez de colgar a un lado.
-                  onClick={() => navigate(`/conteo/${sucursal.sesionAbiertaId}/preparar`)}
-                  // Sin atenuar al deshabilitar, a diferencia del patrón
-                  // `disabled` de BotonPaso (DESIGN.md §Components): ahí el
-                  // 40 % apaga un glifo −/+; aquí apagaría la fila entera y
-                  // el nombre de la sucursal cae de 15.34:1 a 3.48:1 —
-                  // calculado sobre --color-tinta contra --color-placa, no
-                  // supuesto—, bajo el mínimo AA de 4.5:1, y la marca de
-                  // conectividad a 1.93:1. Es exactamente la fila que el
-                  // cajero necesita leer para saber CUÁL no tiene sesión.
-                  // El estado lo comunica el texto "Sin sesión abierta".
-                  className="flex min-h-[var(--size-toque)] w-full items-center justify-between gap-3 text-left disabled:cursor-not-allowed"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate text-medio leading-none font-semibold text-tinta">
-                      {sucursal.nombre}
-                    </span>
-                    <span className="mt-1 flex items-center gap-1.5 text-micro text-tenue">
-                      <Icono
-                        nombre={sucursal.conectividad === "wifi" ? "wifi" : "datos"}
-                        className="size-3.5 shrink-0"
-                      />
-                      {sucursal.conectividad === "wifi" ? "WiFi" : "Datos móviles"}
-                    </span>
-                  </span>
-                  {/* Etiqueta corta a propósito: medido en el harness a
-                      390 px, "Sin sesión abierta" empujaba el nombre de la
-                      sucursal a truncarse ("Zona Industrial Puente Ar…").
-                      El nombre es el dato con el que el cajero decide; la
-                      etiqueta de estado es secundaria y cede el ancho. */}
-                  <span className="shrink-0 text-micro text-tenue">
-                    {navegable ? "Continuar →" : "Sin sesión"}
-                  </span>
-                </button>
+                <div className="flex min-h-[var(--size-toque)] w-full flex-col justify-center gap-2">
+                  <span className="h-[1.125rem] w-32 animate-pulse rounded-placa bg-placa-alta" />
+                  <span className="h-3 w-20 animate-pulse rounded-placa bg-placa-alta" />
+                </div>
               </Placa>
             </li>
-          );
-        })}
-      </ul>
+          ))}
+        </ul>
+      ) : (
+        <ul className="flex flex-col gap-2 pb-4">
+          {sucursales.map((sucursal) => {
+            const navegable = sucursal.sesionAbiertaId !== null;
+            return (
+              <li key={sucursal.sucursalId} className="list-none">
+                <Placa className="py-2.5">
+                  <button
+                    type="button"
+                    disabled={!navegable}
+                    // Entra por /preparar, no directo al conteo: el grafo de
+                    // docs/diseno/11-ux-y-navegacion.md §2 es `SUC --> PREP`,
+                    // y el uso es MENSUAL (PRODUCT.md) — nadie llega
+                    // recordando cómo va el flujo, así que el recordatorio de
+                    // los cuatro pasos precede al conteo en vez de colgar a
+                    // un lado.
+                    onClick={() => navigate(`/conteo/${sucursal.sesionAbiertaId}/preparar`)}
+                    // Sin atenuar al deshabilitar, a diferencia del patrón
+                    // `disabled` de BotonPaso (DESIGN.md §Components): ahí el
+                    // 40 % apaga un glifo −/+; aquí apagaría la fila entera y
+                    // el nombre de la sucursal cae de 15.34:1 a 3.48:1 —
+                    // calculado sobre --color-tinta contra --color-placa, no
+                    // supuesto—, bajo el mínimo AA de 4.5:1, y la marca de
+                    // conectividad a 1.93:1. Es exactamente la fila que el
+                    // cajero necesita leer para saber CUÁL no tiene sesión.
+                    // El estado lo comunica el texto "Sin sesión abierta".
+                    className="flex min-h-[var(--size-toque)] w-full items-center justify-between gap-3 text-left disabled:cursor-not-allowed"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-medio leading-none font-semibold text-tinta">
+                        {sucursal.nombre}
+                      </span>
+                      <span className="mt-1 flex items-center gap-1.5 text-micro text-tenue">
+                        <Icono
+                          nombre={sucursal.conectividad === "wifi" ? "wifi" : "datos"}
+                          className="size-3.5 shrink-0"
+                        />
+                        {sucursal.conectividad === "wifi" ? "WiFi" : "Datos móviles"}
+                      </span>
+                    </span>
+                    {/* Etiqueta corta a propósito: medido en el harness a
+                        390 px, "Sin sesión abierta" empujaba el nombre de la
+                        sucursal a truncarse ("Zona Industrial Puente Ar…").
+                        El nombre es el dato con el que el cajero decide; la
+                        etiqueta de estado es secundaria y cede el ancho. */}
+                    <span className="shrink-0 text-micro text-tenue">
+                      {navegable ? "Continuar →" : "Sin sesión"}
+                    </span>
+                  </button>
+                </Placa>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }

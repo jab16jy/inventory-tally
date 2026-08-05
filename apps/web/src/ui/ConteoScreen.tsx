@@ -26,6 +26,7 @@ import { ChipEstado } from "./primitivos/ChipEstado.js";
 import { Deck } from "./primitivos/Deck.js";
 import { Hoja } from "./primitivos/Hoja.js";
 import { Icono } from "./primitivos/Icono.js";
+import { Placa } from "./primitivos/Placa.js";
 
 export function ConteoScreen() {
   // Valor por defecto para no romper las reglas de hooks con un return
@@ -40,11 +41,52 @@ export function ConteoScreen() {
   const escriturasPendientes = usePendientes(sesionId);
   const enLinea = useConexion();
   // Estado 4 del plan (§5, doc 11 §5): "estado != 'abierta'" es la condición
-  // exacta de la fila de la tabla de estados. `sesion` arranca en `null`
-  // hasta que el listener resuelve, así que el modal NO se muestra por
-  // defecto — sólo cuando de verdad sabemos que ya no está abierta.
+  // exacta de la fila de la tabla de estados. Exige `estado === "existe"`, así
+  // que el modal NO se muestra mientras el listener no ha resuelto ni cuando
+  // el documento no está — sólo cuando de verdad SABEMOS que la sesión existe
+  // y ya no está abierta.
   const sesion = useSesion(sesionId);
-  const sesionCerrada = sesion !== null && sesion.estado !== "abierta";
+  const sesionCerrada = sesion.estado === "existe" && sesion.sesion.estado !== "abierta";
+  // Sesión borrada: `abrirSesion` la elimina si la siembra de líneas falla a
+  // mitad, para dejar la sucursal reintentable (su compensación D3).
+  //
+  // NO se navega fuera ni se abre el modal bloqueante al detectarlo, aunque
+  // el primer borrador de este arreglo hacía lo primero. Firestore emite un
+  // snapshot con `exists: false` para un documento que NO está en la caché
+  // local cuando el dispositivo está sin conexión, y esta app es
+  // offline-first sobre bodegas con datos móviles (PRODUCT.md): expulsar al
+  // cajero de su conteo por tener la caché fría es mucho peor que el hueco
+  // que este estado viene a cerrar. Lo único que cambia es que aquí NO se
+  // promete contenido con un esqueleto — no va a llegar nada.
+  const sesionBorrada = sesion.estado === "borrada";
+  // Una sesión abierta sin líneas significa "vienen en camino", no "está
+  // vacía". Ojo con la razón, porque NO es la garantía atómica que da el
+  // claim en `/sucursales`: `abrirSesion`
+  // (packages/functions/src/callables/abrir-sesion.ts) siembra las líneas
+  // en lotes de 400 y FUERA de la transacción de apertura — su propio
+  // comentario D3 lo dice. O sea que la ventana con cero líneas es todavía
+  // más ancha de lo que sería con un solo batch: cubre tanto "el listener
+  // de observarLineas no ha emitido su primer snapshot" como "la siembra
+  // sigue corriendo en el servidor". El esqueleto es lo honesto en ambas.
+  // Antes de esto la lista pintaba vacía sin indicio de que algo viene:
+  // 0/0 en la barra de progreso, deck en cero, ningún hueco visible.
+  //
+  // El esqueleto promete que algo viene, así que sólo se pinta donde eso es
+  // cierto: mientras el listener de sesión no ha resuelto, y con la sesión
+  // abierta y sin líneas todavía. Con la sesión BORRADA no se pinta —no va a
+  // llegar nada nunca, y ahí un esqueleto animado es peor que la lista vacía
+  // que había antes de F4-B, porque la lista vacía no afirma nada. Poder
+  // separar esos casos es justamente lo que `EstadoSesion` vino a resolver:
+  // antes ambos eran `null`.
+  //
+  // ponytail: queda un caso sin acotar — una sesión abierta cuyo catálogo se
+  // sembró con CERO categorías activas es indistinguible desde el cliente de
+  // una cuyas líneas siguen llegando, así que ahí el esqueleto no termina. Es
+  // configuración del servidor, no un fallo de esta pantalla, y el cliente no
+  // recibe ninguna señal que las separe. Ruta de escalamiento: que la sesión
+  // lleve el número de líneas esperadas —`abrirSesion` ya lo conoce al
+  // sembrar— y comparar contra él en vez de contra cero.
+  const cargandoLineas = !sesionBorrada && !sesionCerrada && lineas.length === 0;
 
   const [busqueda, setBusqueda] = useState("");
   const [soloPendientes, setSoloPendientes] = useState(false);
@@ -167,17 +209,39 @@ export function ConteoScreen() {
           —la vía nativa, y la primera que se probó— porque su propagación a
           los controles descendientes no es observable en el entorno de
           test: quedaba un arreglo sin red de regresión. */}
-      <ul className="mt-1 flex flex-1 flex-col gap-2 overflow-y-auto pb-4">
-        {(sesionCerrada ? [] : lineasVisibles).map((linea) => (
-          <FilaCategoria
-            key={linea.categoriaId}
-            sesionId={sesionId}
-            linea={linea}
-            onSeleccionar={abrirHoja}
-            onCantidadPropiaCambio={manejarCantidadPropia}
-          />
-        ))}
-      </ul>
+      {cargandoLineas ? (
+        // Esqueleto con la forma final de la fila real (plan §5, F4): nunca
+        // un spinner. Cuenta fija (no hay de dónde sacar el total real
+        // todavía, a diferencia de `/sucursales` con sus IDs del claim) —
+        // sólo comunica "esto viene en camino", no cuántas categorías habrá.
+        <ul aria-hidden="true" className="mt-1 flex flex-1 flex-col gap-2 overflow-y-auto pb-4">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <li key={i} className="list-none" data-testid="fila-esqueleto">
+              <Placa className="py-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="flex min-w-0 flex-1 flex-col gap-2 py-1">
+                    <span className="h-[2rem] w-24 animate-pulse rounded-placa bg-placa-alta" />
+                    <span className="h-3 w-32 animate-pulse rounded-placa bg-placa-alta" />
+                  </div>
+                  <span className="size-[var(--size-toque)] shrink-0 animate-pulse rounded-placa bg-placa-alta" />
+                </div>
+              </Placa>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <ul className="mt-1 flex flex-1 flex-col gap-2 overflow-y-auto pb-4">
+          {(sesionCerrada ? [] : lineasVisibles).map((linea) => (
+            <FilaCategoria
+              key={linea.categoriaId}
+              sesionId={sesionId}
+              linea={linea}
+              onSeleccionar={abrirHoja}
+              onCantidadPropiaCambio={manejarCantidadPropia}
+            />
+          ))}
+        </ul>
+      )}
 
       <Deck
         tuAporte={tuAporteTotal}

@@ -17,7 +17,13 @@ export function BannerPendientes({ pendientes }: BannerPendientesProps) {
       aria-live="assertive"
       className="sticky top-0 z-10 border border-riesgo bg-riesgo-placa rounded-placa px-3 py-2.5 text-base text-tinta"
     >
-      <strong className="font-semibold text-riesgo">No cierres la aplicación.</strong> Tienes{" "}
+      {/* text-tinta, no text-riesgo: verificado con la fórmula WCAG (F4-B),
+          ámbar/riesgo-placa mide 3.93:1 — bajo el mínimo AA de 4.5:1 para
+          texto normal, y este `<strong>` a 15px semibold no llega al umbral
+          de "texto grande" que exime la excepción. El rojo sigue marcando
+          el riesgo en el borde y el fondo del banner; el texto usa el tono
+          de mayor contraste (13.82:1) para que se pueda leer de verdad. */}
+      <strong className="font-semibold text-tinta">No cierres la aplicación.</strong> Tienes{" "}
       {pendientes} {pendientes === 1 ? "conteo" : "conteos"} sin enviar. Busca señal o WiFi para que
       se guarden.
     </div>
