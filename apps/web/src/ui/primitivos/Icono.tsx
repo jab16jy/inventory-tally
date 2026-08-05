@@ -18,6 +18,11 @@ const PATHS = {
   /** Barras ascendentes de señal — marca de conectividad "datos" (datos
    *  móviles) en `/sucursales`, trazo recto puro, sin curvas. */
   datos: "M4 20V17M9 20V14M14 20V10M19 20V5",
+  /** Visto — checklist de `/conteo/:sesionId/preparar` y `/finalizar`
+   *  (doc 11 §3, §6). Ángulo recto en el quiebre, nunca la curva de un
+   *  check tipográfico: mantiene la gramática de trazo duro del mundo y
+   *  reemplaza el "✅" del mock, que en iOS renderiza el emoji de Apple. */
+  visto: "M4 13l4 4L20 6",
 } as const;
 
 export interface IconoProps extends Omit<SVGProps<SVGSVGElement>, "children"> {

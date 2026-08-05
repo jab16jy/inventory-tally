@@ -95,7 +95,12 @@ export function SucursalesScreen({ auth }: SucursalesScreenProps) {
                 <button
                   type="button"
                   disabled={!navegable}
-                  onClick={() => navigate(`/conteo/${sucursal.sesionAbiertaId}`)}
+                  // Entra por /preparar, no directo al conteo: el grafo de
+                  // docs/diseno/11-ux-y-navegacion.md §2 es `SUC --> PREP`, y
+                  // el uso es MENSUAL (PRODUCT.md) — nadie llega recordando
+                  // cómo va el flujo, así que el recordatorio de los cuatro
+                  // pasos precede al conteo en vez de colgar a un lado.
+                  onClick={() => navigate(`/conteo/${sucursal.sesionAbiertaId}/preparar`)}
                   // Sin atenuar al deshabilitar, a diferencia del patrón
                   // `disabled` de BotonPaso (DESIGN.md §Components): ahí el
                   // 40 % apaga un glifo −/+; aquí apagaría la fila entera y

@@ -160,3 +160,25 @@ export function ConteoScreen() {
     </section>
   );
 }
+
+/**
+ * Envoltorio que usa `router.tsx` para montar `ConteoScreen` (F3-B,
+ * seguimiento pendiente de F2). React Router reutiliza la MISMA instancia
+ * de `ConteoScreen` cuando sólo cambia `:sesionId` dentro de la misma ruta
+ * — es el comportamiento normal de reconciliación de React, no un bug de la
+ * librería — así que el estado local de la pantalla (búsqueda, filtro
+ * "sólo pendientes", categoría en edición de la Hoja, "tu aporte"
+ * acumulado) sobrevivía al cambio de sesión sin que nada lo reseteara
+ * (`ConteoScreen.remount.test.tsx`).
+ *
+ * `key={sesionId}` en el punto donde el PADRE crea el elemento es lo único
+ * que fuerza el remount: React usa `(tipo, key)` para decidir si reutiliza
+ * o desecha la instancia en esa posición del árbol. Ponerlo dentro del
+ * propio `<section>` que `ConteoScreen` retorna no sirve — el key sólo
+ * cuenta para quien CREA el elemento, no para el componente que lo contiene
+ * (error real cometido y corregido durante esta ola).
+ */
+export function ConteoScreenPorSesion() {
+  const { sesionId } = useParams<{ sesionId: string }>();
+  return <ConteoScreen key={sesionId} />;
+}

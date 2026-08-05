@@ -47,6 +47,7 @@ function renderPantalla(repo: FakeConteoRepository, sucursalesDelClaim: string[]
       <ConteoRepositoryProvider repo={repo}>
         <Routes>
           <Route path="/sucursales" element={<SucursalesScreen auth={{} as never} />} />
+          <Route path="/conteo/:sesionId/preparar" element={<p>Pantalla de preparación</p>} />
           <Route path="/conteo/:sesionId" element={<p>Pantalla de conteo</p>} />
         </Routes>
       </ConteoRepositoryProvider>
@@ -72,7 +73,15 @@ describe("SucursalesScreen (F3-A)", () => {
     expect(screen.getByText(/wifi/i)).toBeInTheDocument();
   });
 
-  it("tocar una sucursal con sesión abierta navega a /conteo/:sesionId", async () => {
+  it("tocar una sucursal con sesión abierta entra por /preparar, no directo al conteo", async () => {
+    // El grafo de navegación de docs/diseno/11-ux-y-navegacion.md §2 es
+    // `SUC --> PREP`: la preparación no es una pantalla opcional colgada al
+    // lado, es el paso que precede al conteo. El uso es MENSUAL (PRODUCT.md),
+    // así que nadie recuerda cómo va el flujo y saltárselo deja al cajero
+    // frente a una lista de categorías sin contexto. Saltar a
+    // `/conteo/:sesionId` dejaba además la ruta `/preparar` sin un solo
+    // consumidor — pantalla muerta, el error que ya costó cuatro primitivos
+    // en F1.
     const repo = new FakeConteoRepository();
     repo.sembrarSucursal(
       crearSucursal({ sucursalId: "suc_norte", sesionAbiertaId: "ses_20260802_norte_01" }),
@@ -83,7 +92,8 @@ describe("SucursalesScreen (F3-A)", () => {
     const boton = await screen.findByRole("button", { name: /sucursal norte/i });
     fireEvent.click(boton);
 
-    expect(await screen.findByText("Pantalla de conteo")).toBeInTheDocument();
+    expect(await screen.findByText("Pantalla de preparación")).toBeInTheDocument();
+    expect(screen.queryByText("Pantalla de conteo")).not.toBeInTheDocument();
   });
 
   it("una sucursal sin sesión abierta no es tocable y lo comunica en vez de dejar un botón muerto", async () => {

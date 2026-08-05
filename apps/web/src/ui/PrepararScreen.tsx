@@ -1,0 +1,117 @@
+// apps/web/src/ui/PrepararScreen.tsx (F3-B, doc 11 §3, plan §5 "las otras
+// cuatro" — de "no existe" a pantalla real). Aparece al entrar a una sesión:
+// resuelve el olvido por uso mensual con el recordatorio de los 4 pasos y
+// confirma que el catálogo ya está disponible antes de contar.
+//
+// FUERA DE ALCANCE, verificado contra el código y no sólo asumido: el mock
+// del plan (doc 11 §3) titula la pantalla "Conteo de agosto · Sucursal
+// Norte" y condiciona un aviso a `sucursal.conectividad`. Esta ruta sólo
+// recibe `:sesionId` (doc 11 §2, mapa de navegación) y `ConteoRepository`
+// no tiene forma de resolver una `Sucursal` ni una `SesionConteo` a partir
+// de un `sesionId` — sólo `observarSesionAbierta(sucursalId, …)`, que va en
+// sentido contrario. Pedirle ese dato a esta pantalla exigiría o bien
+// cambiar la forma de la ruta (rompe el mapa de navegación ya fijado) o
+// añadir un método nuevo a `ConteoRepository` (+ Fake + Firestore) que
+// ninguna de las otras dos piezas de esta ola consume. Se omite el nombre
+// de sucursal/sesión y el aviso de datos móviles; ver el `ponytail:` sobre
+// el <header> más abajo para la ruta de escalamiento si hace falta.
+import { useNavigate, useParams } from "react-router-dom";
+import { useConexion } from "../state/useConexion.js";
+import { useLineasSesion } from "../state/useLineasSesion.js";
+import { usePendientes } from "../state/usePendientes.js";
+import { ChipEstado } from "./primitivos/ChipEstado.js";
+import { Icono } from "./primitivos/Icono.js";
+import { Placa } from "./primitivos/Placa.js";
+
+const PASOS = [
+  "Elige un valor de la lista",
+  "Escribe cuántas unidades contaste TÚ",
+  "El sistema suma lo de todo el equipo",
+  'Al terminar, pulsa "Finalizar conteo"',
+] as const;
+
+export function PrepararScreen() {
+  // Mismo valor por defecto que ConteoScreen y por la misma razón: no
+  // romper las reglas de hooks con un return condicional antes de los
+  // hooks de estado — la ruta siempre provee :sesionId al montar.
+  const { sesionId = "" } = useParams<{ sesionId: string }>();
+  const navigate = useNavigate();
+
+  const lineas = useLineasSesion(sesionId);
+  const pendientes = usePendientes(sesionId);
+  const enLinea = useConexion();
+
+  const catalogoCargado = lineas.length > 0;
+  const estadoSync: "sincronizado" | "pendiente" | "sin-conexion" = !enLinea
+    ? "sin-conexion"
+    : pendientes > 0
+      ? "pendiente"
+      : "sincronizado";
+
+  return (
+    <section className="mx-auto flex min-h-dvh max-w-md flex-col px-3 pt-3 pb-4">
+      {/* Cabecera callada — mismo criterio que SucursalesScreen: el numeral
+          de 2rem es el outlier reservado a la denominación de categoría
+          (DESIGN.md §Typography), no a un título de pantalla.
+          ponytail: sin nombre de sucursal/sesión ni aviso de datos móviles
+          — el techo es que `ConteoRepository` no resuelve `Sucursal` ni
+          `SesionConteo` a partir de `sesionId` (ver comentario de archivo).
+          Ruta de escalamiento: añadir `observarSesion(sesionId, …)` a
+          `ConteoRepository` (+ Fake + Firestore) el día que una pantalla
+          real lo necesite. */}
+      <header className="pb-3">
+        <h1 className="text-micro tracking-[0.18em] text-tenue uppercase">Antes de empezar</h1>
+      </header>
+
+      <ul className="flex flex-col gap-2">
+        <li className="list-none">
+          {/* Sin `confirmado`: LA FIRMA significa "el servidor agregó tu
+              aporte" (sólida) o "en tránsito" (hueca). "Catálogo cargado" no
+              es ninguna de las dos, y reusar la regla ámbar para un tercer
+              significado la vacía justo donde sí decide algo — la misma razón
+              por la que /sucursales dejó de pintarla. El estado ya lo lleva
+              el visto de la izquierda, que no necesita un segundo emisor. */}
+          <Placa className="flex items-center gap-2 py-2.5">
+            <Icono
+              nombre="visto"
+              aria-hidden="true"
+              className={
+                catalogoCargado ? "size-4 shrink-0 text-senal" : "size-4 shrink-0 text-tenue"
+              }
+            />
+            <span className="text-base text-tinta">
+              {catalogoCargado
+                ? `Catálogo cargado (${lineas.length} categorías)`
+                : "Cargando catálogo…"}
+            </span>
+          </Placa>
+        </li>
+
+        <li className="flex list-none items-center gap-2 py-1">
+          <span className="text-base text-tinta">Estado de la sesión</span>
+          <ChipEstado estado={estadoSync} />
+        </li>
+      </ul>
+
+      <h2 className="mt-5 mb-2 text-micro font-semibold text-tenue uppercase">Cómo funciona</h2>
+      {/* <ol> nativo: el orden SÍ importa (son pasos secuenciales), así que la
+          numeración no es la decoración "01/02/03" que craft-floor.md
+          rechaza — aquí la lleva gratis el navegador, sin badges a mano. */}
+      <ol aria-label="Cómo funciona" className="flex flex-col gap-2 pl-5 text-base text-tinta">
+        {PASOS.map((paso) => (
+          <li key={paso} className="list-decimal marker:text-tenue">
+            {paso}
+          </li>
+        ))}
+      </ol>
+
+      <button
+        type="button"
+        onClick={() => navigate(`/conteo/${sesionId}`)}
+        className="mt-6 min-h-[var(--size-toque)] w-full rounded-placa bg-senal font-semibold text-fondo transition-colors duration-150 ease-out active:bg-senal/85"
+      >
+        Empezar a contar
+      </button>
+    </section>
+  );
+}

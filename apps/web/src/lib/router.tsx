@@ -1,6 +1,6 @@
-// apps/web/src/lib/router.tsx (doc 11 §2). Esta ola (F3-A) implementa
-// /login, /sucursales y /conteo/:sesionId; el resto del mapa de navegación
-// (/admin/*, /conteo/:id/preparar, /conteo/:id/finalizar, …) sigue como
+// apps/web/src/lib/router.tsx (doc 11 §2). F3-A dejó /login, /sucursales y
+// /conteo/:sesionId; esta ola (F3-B) añade /conteo/:sesionId/preparar y
+// /conteo/:sesionId/finalizar. El resto del mapa (/admin/*, …) sigue como
 // stub detrás de la ruta comodín, a la espera de las próximas olas.
 import { signInWithEmailAndPassword } from "firebase/auth";
 import type { ReactElement, ReactNode } from "react";
@@ -8,8 +8,10 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-route
 import { calcularRedireccion } from "./guardas.js";
 import { auth } from "./firebase.js";
 import { useAuthState } from "../state/useAuthState.js";
-import { ConteoScreen } from "../ui/ConteoScreen.js";
+import { ConteoScreenPorSesion } from "../ui/ConteoScreen.js";
+import { FinalizarScreen } from "../ui/FinalizarScreen.js";
 import { LoginScreen } from "../ui/LoginScreen.js";
+import { PrepararScreen } from "../ui/PrepararScreen.js";
 import { SucursalesScreen } from "../ui/SucursalesScreen.js";
 
 function SplashScreen() {
@@ -58,10 +60,26 @@ export function AppRouter(): ReactNode {
           }
         />
         <Route
+          path="/conteo/:sesionId/preparar"
+          element={
+            <RequireAuth>
+              <PrepararScreen />
+            </RequireAuth>
+          }
+        />
+        <Route
           path="/conteo/:sesionId"
           element={
             <RequireAuth>
-              <ConteoScreen />
+              <ConteoScreenPorSesion />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/conteo/:sesionId/finalizar"
+          element={
+            <RequireAuth>
+              <FinalizarScreen />
             </RequireAuth>
           }
         />
