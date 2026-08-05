@@ -1,9 +1,23 @@
-// apps/web/src/state/useAuthState.ts (doc 07 §7) — sesión activa y rol.
-// `rol` viene de los custom claims del token (doc 04 §3: se duplica ahí
-// justamente para que las Security Rules y este hook lean la misma fuente).
+// apps/web/src/state/useAuthState.ts (doc 07 §7) — sesión activa, rol y
+// sucursales asignadas. `rol` y `sucursales` vienen de los custom claims
+// del token (doc 04 §3: se duplican ahí justamente para que las Security
+// Rules y este hook lean la misma fuente — `infra/firestore.rules:16`,
+// `tools/seed.ts:41`).
 import { onAuthStateChanged, type Auth } from "firebase/auth";
 import { useEffect, useState } from "react";
 import type { EstadoAuth } from "../lib/guardas.js";
+
+/**
+ * El SDK tipa `token.claims` como `Record<string, unknown>`: el claim
+ * `sucursales` puede llegar ausente (usuario sin sucursales asignadas) o
+ * con un tipo inesperado (un custom claim mal escrito desde otra
+ * herramienta, o un token viejo con otra forma). Es un límite de confianza
+ * — se valida elemento por elemento, nunca se castea a ciegas.
+ */
+function normalizarSucursales(valor: unknown): readonly string[] {
+  if (!Array.isArray(valor)) return [];
+  return valor.filter((v): v is string => typeof v === "string");
+}
 
 export function useAuthState(auth: Auth): EstadoAuth {
   const [estado, setEstado] = useState<EstadoAuth>(undefined);
@@ -19,6 +33,7 @@ export function useAuthState(auth: Auth): EstadoAuth {
           uid: usuario.uid,
           nombre: usuario.displayName,
           esAdmin: token.claims.rol === "admin",
+          sucursales: normalizarSucursales(token.claims.sucursales),
         });
       });
     });

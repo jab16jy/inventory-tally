@@ -1,6 +1,6 @@
-// apps/web/src/lib/router.tsx (doc 11 §2). Esta ola sólo implementa
+// apps/web/src/lib/router.tsx (doc 11 §2). Esta ola (F3-A) implementa
 // /login, /sucursales y /conteo/:sesionId; el resto del mapa de navegación
-// (/admin/*, /conteo/:id/preparar, /conteo/:id/finalizar, …) queda como
+// (/admin/*, /conteo/:id/preparar, /conteo/:id/finalizar, …) sigue como
 // stub detrás de la ruta comodín, a la espera de las próximas olas.
 import { signInWithEmailAndPassword } from "firebase/auth";
 import type { ReactElement, ReactNode } from "react";
@@ -10,6 +10,7 @@ import { auth } from "./firebase.js";
 import { useAuthState } from "../state/useAuthState.js";
 import { ConteoScreen } from "../ui/ConteoScreen.js";
 import { LoginScreen } from "../ui/LoginScreen.js";
+import { SucursalesScreen } from "../ui/SucursalesScreen.js";
 
 function SplashScreen() {
   return <p>Cargando…</p>;
@@ -52,7 +53,7 @@ export function AppRouter(): ReactNode {
           path="/sucursales"
           element={
             <RequireAuth>
-              <StubScreen titulo="Sucursales" />
+              <SucursalesScreen auth={auth} />
             </RequireAuth>
           }
         />

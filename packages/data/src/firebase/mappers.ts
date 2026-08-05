@@ -5,6 +5,7 @@ import type { Timestamp } from "firebase/firestore";
 import type { Aporte } from "@conteo/shared/models/aporte.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
+import type { Conectividad, Sucursal } from "@conteo/shared/models/sucursal.js";
 
 interface AporteDoc {
   readonly uid: string;
@@ -60,6 +61,27 @@ interface SesionConteoDoc {
   readonly participantes: readonly string[];
   readonly totalUnidades: number;
   readonly sesionCorregidaId: string | null;
+}
+
+interface SucursalDoc {
+  readonly nombre: string;
+  readonly direccion: string;
+  readonly conectividad: Conectividad;
+  readonly activa: boolean;
+  readonly sesionAbiertaId: string | null;
+  readonly creadaEn: Timestamp;
+}
+
+export function sucursalDesdeDoc(sucursalId: string, data: SucursalDoc): Sucursal {
+  return {
+    sucursalId,
+    nombre: data.nombre,
+    direccion: data.direccion,
+    conectividad: data.conectividad,
+    activa: data.activa,
+    sesionAbiertaId: data.sesionAbiertaId,
+    creadaEn: data.creadaEn.toDate(),
+  };
 }
 
 export function sesionConteoDesdeDoc(sesionId: string, data: SesionConteoDoc): SesionConteo {

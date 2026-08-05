@@ -6,6 +6,12 @@ export interface UsuarioAutenticado {
   readonly uid: string;
   readonly nombre: string | null;
   readonly esAdmin: boolean;
+  // Opcional a propósito (F3-A): `guardas.test.ts` está protegido y
+  // construye literales `{ uid, nombre, esAdmin }` como UsuarioAutenticado
+  // sin este campo. Volverlo requerido rompe `npm run typecheck` en un
+  // archivo que no se puede tocar. El consumidor (`SucursalesScreen`)
+  // normaliza la ausencia a `[]`.
+  readonly sucursales?: readonly string[];
 }
 
 /** `undefined` = resolviendo la sesión (splash); `null` = sin sesión. */

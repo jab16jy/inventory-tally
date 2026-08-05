@@ -1,6 +1,11 @@
 import { Timestamp } from "firebase/firestore";
 import { describe, expect, it } from "vitest";
-import { aporteDesdeDoc, lineaConteoDesdeDoc, sesionConteoDesdeDoc } from "./mappers.js";
+import {
+  aporteDesdeDoc,
+  lineaConteoDesdeDoc,
+  sesionConteoDesdeDoc,
+  sucursalDesdeDoc,
+} from "./mappers.js";
 
 describe("aporteDesdeDoc (doc 04 §3)", () => {
   it("mapea un documento de aporte a Aporte, con Timestamp → Date", () => {
@@ -81,7 +86,48 @@ describe("sesionConteoDesdeDoc (doc 04 §3)", () => {
       sesionCorregidaId: null,
     });
   });
+});
 
+describe("sucursalDesdeDoc (doc 04 §3)", () => {
+  it("mapea con conectividad datos, sesionAbiertaId null y creadaEn convertido", () => {
+    const creadaEn = Timestamp.fromDate(new Date("2026-01-15T10:00:00Z"));
+    const sucursal = sucursalDesdeDoc("suc_norte", {
+      nombre: "Sucursal Norte",
+      direccion: "Cra 43 #75-120",
+      conectividad: "datos",
+      activa: true,
+      sesionAbiertaId: null,
+      creadaEn,
+    });
+
+    expect(sucursal).toEqual({
+      sucursalId: "suc_norte",
+      nombre: "Sucursal Norte",
+      direccion: "Cra 43 #75-120",
+      conectividad: "datos",
+      activa: true,
+      sesionAbiertaId: null,
+      creadaEn: creadaEn.toDate(),
+    });
+  });
+
+  it("mapea con una sesión abierta", () => {
+    const creadaEn = Timestamp.fromDate(new Date("2026-01-15T10:00:00Z"));
+    const sucursal = sucursalDesdeDoc("suc_norte", {
+      nombre: "Sucursal Norte",
+      direccion: "Cra 43 #75-120",
+      conectividad: "wifi",
+      activa: true,
+      sesionAbiertaId: "ses_20260802_norte_01",
+      creadaEn,
+    });
+
+    expect(sucursal.sesionAbiertaId).toBe("ses_20260802_norte_01");
+    expect(sucursal.conectividad).toBe("wifi");
+  });
+});
+
+describe("sesionConteoDesdeDoc (doc 04 §3)", () => {
   it("mapea cerradaEn como Date cuando la sesión está cerrada", () => {
     const abiertaEn = Timestamp.fromDate(new Date("2026-08-02T08:00:00Z"));
     const cerradaEn = Timestamp.fromDate(new Date("2026-08-02T11:30:00Z"));

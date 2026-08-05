@@ -11,13 +11,23 @@ import clsx from "clsx";
 import type { ReactNode } from "react";
 
 export interface PlacaProps {
-  /** Regla sólida = el servidor ya agregó el aporte. Hueca = en tránsito. */
+  /**
+   * Regla sólida = el servidor ya agregó el aporte. Hueca = en tránsito.
+   *
+   * AUSENTE = la pantalla no tiene el concepto de confirmación y no se
+   * pinta regla alguna. No es lo mismo que `false`: `false` afirma
+   * "pendiente, aún en tránsito". `/sucursales` no sincroniza nada, así que
+   * ahí una regla ámbar sería una señal encendida sin significado — la
+   * decoración que el sistema rechaza (DESIGN.md §Colors, "cada color hace
+   * un trabajo específico"). LA FIRMA sólo vale si aparece donde de verdad
+   * dice algo.
+   */
   readonly confirmado?: boolean;
   readonly className?: string;
   readonly children: ReactNode;
 }
 
-export function Placa({ confirmado = false, className, children }: PlacaProps) {
+export function Placa({ confirmado, className, children }: PlacaProps) {
   return (
     <div
       className={clsx(
@@ -32,13 +42,15 @@ export function Placa({ confirmado = false, className, children }: PlacaProps) {
         className,
       )}
     >
-      <span
-        aria-hidden="true"
-        className={clsx(
-          "absolute inset-y-0 left-0 w-1 transition-colors duration-200 ease-out",
-          confirmado ? "bg-senal" : "bg-senal-hueco",
-        )}
-      />
+      {confirmado !== undefined && (
+        <span
+          aria-hidden="true"
+          className={clsx(
+            "absolute inset-y-0 left-0 w-1 transition-colors duration-200 ease-out",
+            confirmado ? "bg-senal" : "bg-senal-hueco",
+          )}
+        />
+      )}
       {children}
     </div>
   );

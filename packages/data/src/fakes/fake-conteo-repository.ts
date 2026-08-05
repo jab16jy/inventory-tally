@@ -5,6 +5,7 @@ import { CantidadInvalidaError } from "@conteo/shared/errors.js";
 import type { Aporte } from "@conteo/shared/models/aporte.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
+import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import type {
   ConteoRepository,
   RegistrarAporteInput,
@@ -32,6 +33,7 @@ export class FakeConteoRepository implements ConteoRepository {
   private readonly lineas: MapaLineas = new Map();
   private readonly aportes: MapaAportes = new Map();
   private readonly sesionesPorSucursal = new Map<string, SesionConteo>();
+  private readonly sucursales = new Map<string, Sucursal>();
   private readonly pendientesPorSesion = new Map<string, number>();
 
   private readonly listenersLineas = new Map<string, Set<(l: LineaConteo[]) => void>>();
@@ -56,6 +58,10 @@ export class FakeConteoRepository implements ConteoRepository {
   sembrarSesionAbierta(sucursalId: string, sesion: SesionConteo): void {
     this.sesionesPorSucursal.set(sucursalId, sesion);
     this.listenersSesion.get(sucursalId)?.forEach((cb) => cb(sesion));
+  }
+
+  sembrarSucursal(sucursal: Sucursal): void {
+    this.sucursales.set(sucursal.sucursalId, sucursal);
   }
 
   // ─────────── ConteoRepository ───────────
@@ -87,6 +93,21 @@ export class FakeConteoRepository implements ConteoRepository {
     listeners.add(onChange);
     onChange(this.sesionesPorSucursal.get(sucursalId) ?? null);
     return () => listeners.delete(onChange);
+  }
+
+  // Mismo contrato observable que FirestoreConteoRepository.observarSucursales
+  // (doc 07 §6): orden estable por nombre con desempate por id, IDs
+  // inexistentes omitidos, array vacío → un solo onChange([]).
+  observarSucursales(
+    sucursalIds: readonly string[],
+    onChange: (sucursales: Sucursal[]) => void,
+  ): Unsubscribe {
+    const encontradas = sucursalIds
+      .map((id) => this.sucursales.get(id))
+      .filter((s): s is Sucursal => s !== undefined)
+      .sort((a, b) => a.nombre.localeCompare(b.nombre) || a.sucursalId.localeCompare(b.sucursalId));
+    onChange(encontradas);
+    return () => {};
   }
 
   async registrarAporte({ sesionId, categoriaId, cantidad }: RegistrarAporteInput): Promise<void> {

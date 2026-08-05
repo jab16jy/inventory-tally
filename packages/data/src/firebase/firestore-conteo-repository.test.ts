@@ -131,6 +131,96 @@ describe("FirestoreConteoRepository.uidActual", () => {
   });
 });
 
+describe("FirestoreConteoRepository.observarSucursales (doc 04 §3 — decisión: N listeners de documento, no query 'in')", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function snapDoc(existe: boolean, datos?: Record<string, unknown>) {
+    return {
+      exists: () => existe,
+      data: () => datos,
+    };
+  }
+
+  it("con sucursalIds vacío emite [] una sola vez, sin abrir ningún listener, y el unsubscribe es no-op", () => {
+    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const recibidas: unknown[][] = [];
+
+    const unsub = repo.observarSucursales([], (s) => recibidas.push(s));
+
+    expect(recibidas).toEqual([[]]);
+    expect(onSnapshot).not.toHaveBeenCalled();
+    expect(() => unsub()).not.toThrow();
+  });
+
+  it("emite parcialmente en cada snapshot individual (no espera a los N), ordenado por nombre con desempate por id", () => {
+    const callbacks: Array<(snap: unknown) => void> = [];
+    onSnapshot.mockImplementation((_ref: unknown, cb: (snap: unknown) => void) => {
+      callbacks.push(cb);
+      return vi.fn();
+    });
+    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const recibidas: Array<{ sucursalId: string; nombre: string }[]> = [];
+
+    repo.observarSucursales(["suc_b", "suc_a"], (s) => recibidas.push(s));
+    expect(onSnapshot).toHaveBeenCalledTimes(2);
+
+    // Sólo respondió el segundo listener (suc_a) primero — orden de llegada
+    // real, no el orden del array de entrada.
+    callbacks[1]!(
+      snapDoc(true, {
+        nombre: "Sucursal Alameda",
+        direccion: "Cll 1",
+        conectividad: "wifi",
+        activa: true,
+        sesionAbiertaId: null,
+        creadaEn: { toDate: () => new Date("2026-01-15T10:00:00Z") },
+      }),
+    );
+    expect(recibidas.at(-1)).toEqual([
+      expect.objectContaining({ sucursalId: "suc_a", nombre: "Sucursal Alameda" }),
+    ]);
+
+    callbacks[0]!(
+      snapDoc(true, {
+        nombre: "Sucursal Bosque",
+        direccion: "Cll 2",
+        conectividad: "datos",
+        activa: true,
+        sesionAbiertaId: null,
+        creadaEn: { toDate: () => new Date("2026-01-15T10:00:00Z") },
+      }),
+    );
+    expect(recibidas.at(-1)?.map((s) => s.sucursalId)).toEqual(["suc_a", "suc_b"]);
+  });
+
+  it("un ID inexistente (!snap.exists()) se omite del array sin romper la emisión", () => {
+    const callbacks: Array<(snap: unknown) => void> = [];
+    onSnapshot.mockImplementation((_ref: unknown, cb: (snap: unknown) => void) => {
+      callbacks.push(cb);
+      return vi.fn();
+    });
+    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const recibidas: Array<{ sucursalId: string }[]> = [];
+
+    repo.observarSucursales(["suc_borrada"], (s) => recibidas.push(s));
+    callbacks[0]!(snapDoc(false));
+
+    expect(recibidas.at(-1)).toEqual([]);
+  });
+
+  it("el Unsubscribe devuelto cancela TODOS los listeners de documento", () => {
+    const unsubsIndividuales = [vi.fn(), vi.fn(), vi.fn()];
+    let i = 0;
+    onSnapshot.mockImplementation(() => unsubsIndividuales[i++]);
+    const repo = new FirestoreConteoRepository({} as never, usuario);
+
+    const unsub = repo.observarSucursales(["suc_a", "suc_b", "suc_c"], () => {});
+    unsub();
+
+    for (const u of unsubsIndividuales) expect(u).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
   beforeEach(() => vi.clearAllMocks());
 

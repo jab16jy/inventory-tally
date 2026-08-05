@@ -1,6 +1,7 @@
 import { CantidadInvalidaError } from "@conteo/shared/errors.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
+import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import { describe, expect, it, vi } from "vitest";
 import { FakeConteoRepository } from "./fake-conteo-repository.js";
 
@@ -31,6 +32,19 @@ function crearSesion(overrides: Partial<SesionConteo> = {}): SesionConteo {
     participantes: [],
     totalUnidades: 0,
     sesionCorregidaId: null,
+    ...overrides,
+  };
+}
+
+function crearSucursal(overrides: Partial<Sucursal> = {}): Sucursal {
+  return {
+    sucursalId: "suc_norte",
+    nombre: "Sucursal Norte",
+    direccion: "Cra 43 #75-120",
+    conectividad: "datos",
+    activa: true,
+    sesionAbiertaId: null,
+    creadaEn: new Date("2026-01-15T10:00:00Z"),
     ...overrides,
   };
 }
@@ -112,6 +126,34 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
     const otras: Array<SesionConteo | null> = [];
     repo.observarSesionAbierta("suc_centro", (s) => otras.push(s));
     expect(otras[0]).toBeNull();
+  });
+
+  it("observarSucursales emite [] de inmediato cuando no hay IDs, mismo contrato que la implementación real", () => {
+    const repo = new FakeConteoRepository();
+    const recibidas: Sucursal[][] = [];
+    repo.observarSucursales([], (s) => recibidas.push(s));
+    expect(recibidas).toEqual([[]]);
+  });
+
+  it("observarSucursales emite las sembradas ordenadas por nombre, desempatando por id", () => {
+    const repo = new FakeConteoRepository();
+    repo.sembrarSucursal(crearSucursal({ sucursalId: "suc_b", nombre: "Sucursal Bosque" }));
+    repo.sembrarSucursal(crearSucursal({ sucursalId: "suc_a", nombre: "Sucursal Alameda" }));
+
+    const recibidas: Sucursal[][] = [];
+    repo.observarSucursales(["suc_b", "suc_a"], (s) => recibidas.push(s));
+
+    expect(recibidas.at(-1)?.map((s) => s.sucursalId)).toEqual(["suc_a", "suc_b"]);
+  });
+
+  it("observarSucursales omite un ID sembrado que no existe, sin romper", () => {
+    const repo = new FakeConteoRepository();
+    repo.sembrarSucursal(crearSucursal({ sucursalId: "suc_a" }));
+
+    const recibidas: Sucursal[][] = [];
+    repo.observarSucursales(["suc_a", "suc_inexistente"], (s) => recibidas.push(s));
+
+    expect(recibidas.at(-1)?.map((s) => s.sucursalId)).toEqual(["suc_a"]);
   });
 
   it("observarEscriturasPendientes sube al registrar y baja tras sincronizar (RF-16)", async () => {

@@ -6,6 +6,7 @@
 import type { Aporte } from "@conteo/shared/models/aporte.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
+import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 
 export type Unsubscribe = () => void;
 
@@ -27,6 +28,20 @@ export interface ConteoRepository {
   observarSesionAbierta(
     sucursalId: string,
     onChange: (sesion: SesionConteo | null) => void,
+  ): Unsubscribe;
+
+  /**
+   * Observa las sucursales asignadas al cajero activo. `sucursalIds` entra
+   * por parámetro — no lo resuelve el repositorio — porque la fuente real
+   * es el custom claim `request.auth.token.sucursales`
+   * (`infra/firestore.rules:16`, `tools/seed.ts:41`), y este repositorio
+   * está deliberadamente desacoplado de `firebase/auth` (ver `uidActual()`
+   * más abajo: mismo principio, misma razón). Quien construye el
+   * repositorio no conoce los claims; quien renderiza la pantalla sí.
+   */
+  observarSucursales(
+    sucursalIds: readonly string[],
+    onChange: (sucursales: Sucursal[]) => void,
   ): Unsubscribe;
 
   /** Registra o corrige el aporte propio. NUNCA escribe totales. */

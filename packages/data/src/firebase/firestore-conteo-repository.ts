@@ -18,12 +18,18 @@ import { CantidadInvalidaError } from "@conteo/shared/errors.js";
 import type { Aporte } from "@conteo/shared/models/aporte.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
+import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import type {
   ConteoRepository,
   RegistrarAporteInput,
   Unsubscribe,
 } from "../repositories/conteo-repository.js";
-import { aporteDesdeDoc, lineaConteoDesdeDoc, sesionConteoDesdeDoc } from "./mappers.js";
+import {
+  aporteDesdeDoc,
+  lineaConteoDesdeDoc,
+  sesionConteoDesdeDoc,
+  sucursalDesdeDoc,
+} from "./mappers.js";
 import { obtenerIdDispositivo } from "./dispositivo.js";
 
 /** Desacopla el repositorio de `firebase/auth`: quien lo construye resuelve
@@ -84,6 +90,63 @@ export class FirestoreConteoRepository implements ConteoRepository {
       const primero = snap.docs[0];
       onChange(primero ? sesionConteoDesdeDoc(primero.id, primero.data() as never) : null);
     });
+  }
+
+  // Decisión ya tomada (F3-A): N listeners onSnapshot(doc(...)), uno por
+  // sucursalId, NUNCA where(documentId(), "in", ids). Tres razones:
+  //   1. `infra/firestore.rules:33` concede `allow read` por documento vía
+  //      `tieneSucursal(sucursalId)`, que depende del wildcard de la ruta
+  //      (`match /sucursales/{sucursalId}`) — una consulta de colección no
+  //      lo satisface de forma fiable documento por documento.
+  //   2. El máximo por cajero es 10 (`contracts/schemas/crear-cajero.schema.ts`:
+  //      `sucursalesAsignadas: z.array(z.string()).max(10)`), así que 10
+  //      listeners de documento no cuestan nada y evitan un índice
+  //      compuesto y los límites de `in` (máx. 10 valores, coincidencia).
+  //   3. Cada doc individual sirve desde la caché offline sin depender de
+  //      que la consulta completa esté cacheada — más robusto para una
+  //      pantalla que se abre justo después de iniciar sesión.
+  observarSucursales(
+    sucursalIds: readonly string[],
+    onChange: (sucursales: Sucursal[]) => void,
+  ): Unsubscribe {
+    if (sucursalIds.length === 0) {
+      onChange([]);
+      return () => {};
+    }
+
+    // Emisión PARCIAL desde el primer snapshot que llega, sin esperar a
+    // los N: offline-first significa que cada doc resuelve su caché local
+    // de forma independiente, y con máx. 10 sucursales bloquear la
+    // pantalla hasta que la más lenta responda deja al cajero mirando una
+    // lista vacía cuando 9 de 10 ya estaban disponibles. El array se
+    // recalcula completo en cada snapshot porque el orden de llegada entre
+    // N listeners independientes no es determinista.
+    const vistas = new Map<string, Sucursal>();
+
+    const emitir = (): void => {
+      // Orden estable exigido por la ola: por nombre, desempate por id —
+      // necesario porque el orden de llegada de los snapshots no lo es.
+      const ordenadas = [...vistas.values()].sort(
+        (a, b) => a.nombre.localeCompare(b.nombre) || a.sucursalId.localeCompare(b.sucursalId),
+      );
+      onChange(ordenadas);
+    };
+
+    const unsubs = sucursalIds.map((sucursalId) => {
+      const ref = doc(this.db, "sucursales", sucursalId);
+      return onSnapshot(ref, (snap) => {
+        if (snap.exists()) {
+          vistas.set(sucursalId, sucursalDesdeDoc(sucursalId, snap.data() as never));
+        } else {
+          // ID inexistente (p.ej. sucursal desactivada/borrada tras
+          // asignar el claim): se omite del array, no rompe la pantalla.
+          vistas.delete(sucursalId);
+        }
+        emitir();
+      });
+    });
+
+    return () => unsubs.forEach((unsub) => unsub());
   }
 
   async registrarAporte({ sesionId, categoriaId, cantidad }: RegistrarAporteInput): Promise<void> {
