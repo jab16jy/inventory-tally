@@ -124,6 +124,13 @@ describe("FirestoreConteoRepository.confirmarSincronizacion (RF-16)", () => {
   });
 });
 
+describe("FirestoreConteoRepository.uidActual", () => {
+  it("delega en el proveedor de usuario actual (nunca importa firebase/auth aquí)", () => {
+    const repo = new FirestoreConteoRepository({} as never, usuario);
+    expect(repo.uidActual()).toBe("uid_ana");
+  });
+});
+
 describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
   beforeEach(() => vi.clearAllMocks());
 

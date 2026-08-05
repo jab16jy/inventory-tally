@@ -139,6 +139,10 @@ export class FirestoreConteoRepository implements ConteoRepository {
     } as DocumentData);
   }
 
+  uidActual(): string {
+    return this.usuario.obtenerUid();
+  }
+
   observarEscriturasPendientes(sesionId: string, onChange: (n: number) => void): Unsubscribe {
     let listeners = this.listenersPendientes.get(sesionId);
     if (!listeners) {

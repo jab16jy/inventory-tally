@@ -13,6 +13,8 @@ export {
 
 export { aporteConfirmado } from "./services/sincronizacion.js";
 
+export { estaPendiente, siguientePendiente } from "./services/progreso.js";
+
 export {
   CantidadInvalidaError,
   CierreBloqueadoError,

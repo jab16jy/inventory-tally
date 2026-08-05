@@ -9,3 +9,17 @@ import "@testing-library/jest-dom/vitest";
 afterEach(() => {
   cleanup();
 });
+
+// jsdom (v30) todavía no implementa showModal()/close() de <dialog> (Hoja.tsx,
+// plan §3): el navegador real objetivo — iOS Safari 15.4+ — sí lo soporta
+// nativo, así que el parche va aquí (el entorno de test), no como una rama
+// de compatibilidad especulativa dentro del componente de producción.
+if (typeof HTMLDialogElement !== "undefined" && !HTMLDialogElement.prototype.showModal) {
+  HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
+    this.setAttribute("open", "");
+  };
+  HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) {
+    this.removeAttribute("open");
+    this.dispatchEvent(new Event("close"));
+  };
+}

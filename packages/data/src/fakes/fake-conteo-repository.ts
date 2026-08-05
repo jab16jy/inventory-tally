@@ -143,6 +143,10 @@ export class FakeConteoRepository implements ConteoRepository {
     return () => listeners.delete(onChange);
   }
 
+  uidActual(): string {
+    return this.usuario.uid;
+  }
+
   // ─────────── helpers privados ───────────
 
   private lineasDeSesion(sesionId: string): Map<string, LineaConteo> {

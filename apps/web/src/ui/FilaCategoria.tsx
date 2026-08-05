@@ -8,7 +8,13 @@
 //
 // VESTIRLA NO PUEDE SUBIR ESA SUSCRIPCIÓN AL PADRE. Si algún día la fila
 // necesita algo más del repositorio, se suscribe aquí dentro también.
-import { memo } from "react";
+//
+// `onCantidadPropiaCambio` (F2) NO rompe esa regla: la suscripción sigue
+// siendo ésta, la de la propia fila; sólo se REPORTA el número resultante
+// hacia arriba para que ConteoScreen sume "Tu aporte" en el Deck sin abrir
+// una segunda suscripción por categoría (doc 10 §2, "cero lecturas
+// adicionales" — aquí, cero suscripciones adicionales).
+import { memo, useEffect } from "react";
 import { aporteConfirmado, type LineaConteo } from "@conteo/shared";
 import { useConteoRepository } from "../state/repositorio-contexto.js";
 import { useMiAporte } from "../state/useMiAporte.js";
@@ -19,13 +25,27 @@ import { Placa } from "./primitivos/Placa.js";
 interface FilaCategoriaProps {
   readonly sesionId: string;
   readonly linea: LineaConteo;
+  /** Abre la Hoja (teclado numérico) para esta categoría — el camino
+   *  PRINCIPAL de captura es tocar la fila (doc 11 §158-166). */
+  readonly onSeleccionar?: (categoriaId: string) => void;
+  /** Reporta el aporte propio actual, para el total del Deck. */
+  readonly onCantidadPropiaCambio?: (categoriaId: string, cantidad: number) => void;
 }
 
-function FilaCategoriaBase({ sesionId, linea }: FilaCategoriaProps) {
+function FilaCategoriaBase({
+  sesionId,
+  linea,
+  onSeleccionar,
+  onCantidadPropiaCambio,
+}: FilaCategoriaProps) {
   const repo = useConteoRepository();
   const miAporte = useMiAporte(sesionId, linea.categoriaId);
   const miCantidad = miAporte?.cantidad ?? 0;
   const confirmado = aporteConfirmado(linea, miAporte);
+
+  useEffect(() => {
+    onCantidadPropiaCambio?.(linea.categoriaId, miCantidad);
+  }, [linea.categoriaId, miCantidad, onCantidadPropiaCambio]);
 
   function registrar(cantidad: number): void {
     void repo.registrarAporte({
@@ -51,7 +71,18 @@ function FilaCategoriaBase({ sesionId, linea }: FilaCategoriaProps) {
             entran cuatro categorías más en el primer viewport, que con 60
             categorías es la diferencia entre desplazarse 6 veces o 9. */}
         <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1">
+          {/* Tocar la fila es el camino PRINCIPAL de captura (doc 11
+              §158-166): abre la Hoja con teclado numérico. Un <button>, no
+              un <div onClick>, para que tenga foco y rol nativos — de ahí
+              que el bloque "Tú/Equipo" de abajo sea un <span> (contenido de
+              frase) y no un <p> (de bloque), que no es válido dentro de un
+              button. */}
+          <button
+            type="button"
+            onClick={() => onSeleccionar?.(linea.categoriaId)}
+            aria-label={`Contar ${linea.etiqueta}`}
+            className="min-w-0 flex-1 text-left"
+          >
             <Numeral className="block text-tinta">{linea.etiqueta}</Numeral>
 
             {/* Cada cifra tiene que quedar en el MISMO nodo de texto que su
@@ -59,7 +90,7 @@ function FilaCategoriaBase({ sesionId, linea }: FilaCategoriaProps) {
                 findByText(/tú: 1/i), y meter el número en un <span> aparte
                 rompe esa consulta. Es la restricción más fuerte del
                 rediseño de la fila. */}
-            <p className="mt-1 flex gap-3 text-micro text-tenue">
+            <span className="mt-1 flex gap-3 text-micro text-tenue">
               <span>Tú: {miAporte ? miCantidad : "—"}</span>
               <span>Equipo: {linea.cantidadTotal}</span>
               {/* La regla de tinta dice esto mismo en color, y el color no
@@ -68,8 +99,8 @@ function FilaCategoriaBase({ sesionId, linea }: FilaCategoriaProps) {
                   lectores. Sin aria-live: 60 filas anunciándose a la vez
                   serían inservibles; se lee al recorrer la fila. */}
               <span className="sr-only">{confirmado ? "Guardado" : "Sin enviar"}</span>
-            </p>
-          </div>
+            </span>
+          </button>
 
           <BotonPaso
             signo="menos"

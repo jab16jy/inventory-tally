@@ -37,4 +37,16 @@ export interface ConteoRepository {
 
   /** Escrituras aún no confirmadas por el servidor. */
   observarEscriturasPendientes(sesionId: string, onChange: (n: number) => void): Unsubscribe;
+
+  /**
+   * uid del cajero activo. Síncrono y sin suscripción propia — a diferencia
+   * del resto de la interfaz, no cambia mientras dura la sesión de la
+   * pantalla. Existe para que `ConteoScreen` pueda leer
+   * `LineaConteo.versiones[uid]` (progreso, filtro "sólo pendientes", avance
+   * del teclado) sin importar `firebase/auth` directamente: cada
+   * implementación ya conocía su propio uid por dentro
+   * (`FirestoreConteoRepository.usuario.obtenerUid()`,
+   * `FakeConteoRepository.usuario.uid`), esto sólo lo expone.
+   */
+  uidActual(): string;
 }

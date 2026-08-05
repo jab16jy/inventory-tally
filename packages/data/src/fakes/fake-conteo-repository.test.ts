@@ -148,4 +148,9 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
     const repo = new FakeConteoRepository();
     await expect(repo.confirmarSincronizacion("ses_1")).resolves.toBeUndefined();
   });
+
+  it("uidActual devuelve el uid del usuario fake inyectado", () => {
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    expect(repo.uidActual()).toBe("uid_ana");
+  });
 });
