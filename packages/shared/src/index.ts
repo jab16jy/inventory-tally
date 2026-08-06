@@ -5,6 +5,7 @@ export type { RolUsuario, Usuario } from "./models/usuario.js";
 export type { CategoriaValor } from "./models/categoria-valor.js";
 export type { Conectividad, Sucursal } from "./models/sucursal.js";
 
+export type { LineaSumable } from "./services/calculadora.js";
 export {
   cantidadTotalDesdeAportes,
   subtotal,

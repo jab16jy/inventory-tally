@@ -199,9 +199,17 @@ escritura.**
     "cat_5000": { "cantidad": 55, "subtotal": 275000, "actualizadaEn": "2026-08-02T09:14:33Z" }
   },
   "recalculadoEn": "2026-08-02T09:20:04Z",
-  "dirty": false
+  "dirty": false,
+  "marcaAportes": 12
 }
 ```
+
+`marcaAportes` (invariante I-M, [05 · Concurrencia](05-concurrencia-offline-tiempo-real.md#5-el-punto-caliente-del-documento-resumen)):
+contador monotónico que sube en la misma transacción que cualquier escritor de `lineas`
+(el trigger `onAporteEscrito`; también `reconciliarLineas`). `recalcularResumenes` lo usa
+para demostrar, sin bloquear `lineas` con una transacción de lectura, que ningún aporte
+se coló entre que leyó las líneas y escribió el resumen — si el marcador cambió, no
+limpia `dirty`. Ausente en documentos creados antes de este campo; se trata como `0`.
 
 ### `sesiones/{sesionId}/sincronizacion/estado` — nuevo en v2
 

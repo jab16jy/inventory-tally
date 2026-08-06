@@ -158,8 +158,15 @@ export const onAporteEscrito = onDocumentWritten(
         participantes: FieldValue.arrayUnion(uid),
       });
 
-      // El resumen monetario se recalcula agrupado (§5)
-      tx.set(resumenRef, { dirty: true }, { merge: true });
+      // El resumen monetario se recalcula agrupado (§5). `marcaAportes` sube
+      // en la MISMA transacción que muta `lineas` (invariante I-M, nuevo en
+      // slice 1 de `complete-cloud-functions`): es lo que le permite al cron
+      // (`recalcularResumenes`, §5) demostrar con un compare-and-clear que
+      // ningún aporte se coló entre su lectura de `lineas` y su escritura de
+      // `resumen`, sin bloquear `lineas` con una transacción de lectura.
+      // Cualquier otro escritor de `lineas` (hoy sólo `reconciliarLineas`)
+      // debe respetar la misma invariante.
+      tx.set(resumenRef, { dirty: true, marcaAportes: FieldValue.increment(1) }, { merge: true });
 
       // Rastro de sincronización para el cierre (RF-16)
       tx.set(
@@ -246,16 +253,21 @@ flowchart LR
     T1["trigger aporte"] --> D["resumen.dirty = true"]
     T2["trigger aporte"] --> D
     T3["trigger aporte"] --> D
-    D --> SCH["⏱️ Función programada<br/>cada 30 s"]
+    D --> SCH["⏱️ Función programada<br/>cada minuto"]
     SCH --> CALC["Recalcula desde las líneas"]
     CALC --> R["resumen actualizado<br/>dirty = false"]
 ```
 
-- Los triggers sólo escriben un booleano.
+- Los triggers sólo escriben un booleano (y suben `marcaAportes`, I-M).
 - Una función programada recalcula el resumen leyendo las **líneas** (60 lecturas), sólo
-  si `dirty == true`.
-- El dashboard del administrador admite 30 s de desfase; **la pantalla de conteo no
-  depende del resumen** —lee las líneas directamente— y sigue siendo tiempo real.
+  si `dirty == true` — y sólo limpia `dirty` si `marcaAportes` no cambió mientras leía
+  (compare-and-clear, doc 08 §4): la cadencia decide **cuándo** corre, nunca si el
+  resultado escrito es correcto.
+- **OQ-1 (resuelto):** Cloud Scheduler no acepta un gránulo menor a un minuto (ni cron
+  Unix ni sintaxis App Engine bajan de minutos), así que la cadencia es `every 1 minutes`,
+  no los 30 s originalmente propuestos.
+- El dashboard del administrador admite hasta ~1 min de desfase; **la pantalla de conteo
+  no depende del resumen** —lee las líneas directamente— y sigue siendo tiempo real.
 
 **Camino de crecimiento:** si el volumen creciera un orden de magnitud, migrar a
 contadores fragmentados (10 shards, suma al leer). Innecesario hoy.
@@ -291,7 +303,7 @@ Reglas de higiene:
 | T-2 | Cliente offline 10 min, otro cuenta mientras tanto                        | Al reconectar, total correcto                   |
 | T-3 | Trigger reejecutado dos veces                                             | Total no se duplica (idempotencia)              |
 | T-4 | Aporte enviado a sesión cerrada                                           | Rechazado por Security Rules                    |
-| T-5 | 200 categorías × 10 cajeros en 60 s                                       | Resumen converge en < 60 s                      |
+| T-5 | 200 categorías × 10 cajeros en 60 s                                       | Resumen converge en < 90 s _(OQ-1: cron cada 1 min no garantiza < 60 s)_ |
 | T-6 | Cliente manipulado intenta escribir `cantidadTotal`                       | Rechazado                                       |
 | T-7 | Cajero intenta leer `resumen/actual`                                      | Rechazado (I-9)                                 |
 | T-8 | **Aporte desde dos navegadores/dispositivos distintos en la misma línea** | Total = suma; ambos aportes quedan en auditoría |
