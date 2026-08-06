@@ -35,6 +35,16 @@ describe("crearCajeroSchema (doc 07 §3, doc 08 §3)", () => {
     expect(resultado.success).toBe(true);
   });
 
+  it("rechaza una contraseña temporal de 8+ caracteres sin ningún dígito (regla de dígito, doc 09 §2)", () => {
+    const resultado = crearCajeroSchema.safeParse({ ...valido, passwordTemporal: "abcdefgh" });
+    expect(resultado.success).toBe(false);
+  });
+
+  it("acepta una contraseña temporal de 8+ caracteres con al menos un dígito (afirmativo)", () => {
+    const resultado = crearCajeroSchema.safeParse({ ...valido, passwordTemporal: "abcdefg1" });
+    expect(resultado.success).toBe(true);
+  });
+
   it("rechaza un rol fuera del enum admin | cajero", () => {
     const resultado = crearCajeroSchema.safeParse({ ...valido, rol: "superadmin" });
     expect(resultado.success).toBe(false);
