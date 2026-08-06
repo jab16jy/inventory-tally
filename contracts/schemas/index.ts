@@ -6,3 +6,9 @@ export type { CerrarSesionInput } from "./cerrar-sesion.schema.js";
 
 export { crearCajeroSchema } from "./crear-cajero.schema.js";
 export type { CrearCajeroInput } from "./crear-cajero.schema.js";
+
+export { actualizarCajeroSchema } from "./actualizar-cajero.schema.js";
+export type { ActualizarCajeroInput } from "./actualizar-cajero.schema.js";
+
+export { desactivarCajeroSchema } from "./desactivar-cajero.schema.js";
+export type { DesactivarCajeroInput } from "./desactivar-cajero.schema.js";
