@@ -204,71 +204,86 @@ export const cerrarSesion = onCall(async (req) => {
     throw new HttpsError("failed-precondition", "La sesión no está abierta");
   }
 
-  // ── RF-16 / I-10: verificación de sincronización (predicado corregido) ──
+  // ── Fase A (fuera de cualquier transacción): RF-16 / I-10 ──
   // sincronizado(uid) ⟺ confirmadoEn != null && confirmadoEn >= (ultimoAporteServidor ?? 0)
-  // (implementado en `lib/sincronizacion.ts`). Un cajero que vuelve a aportar
-  // después de confirmar queda con una confirmación obsoleta y NO cuenta como
-  // sincronizado, aunque `confirmadoEn` sea verdadero — el chequeo de verdad
-  // (`!!confirmadoEn`) que este documento tenía era el error original.
-  // `usuarios/{uid}.activo === false` excluye al participante de este
-  // bloqueo (se audita como `excluidosPorInactivo`, pero no impide el cierre).
-  const sync = await db.doc(`sesiones/${sesionId}/sincronizacion/estado`).get();
+  // (`lib/sincronizacion.ts`, `verificarSincronizacion`). Un cajero que vuelve
+  // a aportar después de confirmar queda con una confirmación obsoleta y NO
+  // cuenta como sincronizado. `usuarios/{uid}.activo === false` excluye al
+  // participante de este bloqueo (se audita como `excluidosPorInactivo`, pero
+  // no impide el cierre). Un aporte que llegue entre la Fase A y la Fase B ya
+  // queda dentro de la instantánea que la Fase B lee.
   const participantes: string[] = sesion.get("participantes") ?? [];
-  const sinConfirmar = participantes.filter((uid) => {
-    const entrada = sync.get(`participantes.${uid}`) ?? {};
-    const confirmadoEn = entrada.confirmadoEn ?? null;
-    const ultimoAporteServidor = entrada.ultimoAporteServidor ?? null;
-    return !(confirmadoEn && confirmadoEn.toMillis() >= (ultimoAporteServidor?.toMillis() ?? 0));
-  });
+  const { sinConfirmar, excluidosPorInactivo } = await verificarSincronizacion(
+    db,
+    sesionId,
+    participantes,
+  );
 
   if (sinConfirmar.length > 0 && !forzar) {
-    await registrarAuditoria(db, {
-      tipo: "CIERRE_BLOQUEADO",
-      sesionId,
-      detalle: { sinConfirmar },
-      ejecutadoPor: req.auth!.uid,
-    });
+    await db.runTransaction((tx) =>
+      registrarAuditoria(tx, db, {
+        tipo: "CIERRE_BLOQUEADO",
+        sesionId,
+        sinConfirmar,
+        excluidosPorInactivo,
+      }),
+    );
     throw new HttpsError("failed-precondition", "Hay cajeros con conteos sin sincronizar", {
-      sinConfirmar: await nombresDe(db, sinConfirmar),
+      sinConfirmar,
     });
   }
   // ─────────────────────────────────────────────────────────────────
 
-  await recalcularResumen(sesionId); // recálculo final, sin esperar al cron
-  const resumen = await db.doc(`sesiones/${sesionId}/resumen/actual`).get();
+  // ── Fase B (UNA transacción): congela la sesión Y crea el snapshot
+  // histórico en el mismo commit — el recálculo YA NO corre antes de la
+  // transacción de congelamiento (bug corregido): un aporte que llegara en
+  // esa ventana dejaría `historicos/{sesionId}` en desacuerdo con la sesión
+  // congelada. Dos guardias hacen segura la reejecución de un cierre: la
+  // relectura de `estado` de abajo, y `tx.create(historicoRef)`.
+  return db.runTransaction(async (tx) => {
+    const sesionActual = await tx.get(sesionRef);
+    if (sesionActual.get("estado") !== "abierta") {
+      throw new HttpsError("failed-precondition", "La sesión no está abierta");
+    }
 
-  await db.runTransaction(async (tx) => {
+    const lineas = await tx.get(sesionRef.collection("lineas").where("cantidadTotal", ">", 0));
+    const resumenCalculado = calcularResumen(lineas.docs); // `lib/resumen.ts`
+    const sucursalRef = db.doc(`sucursales/${sesion.get("sucursalId")}`);
+
     tx.update(sesionRef, {
       estado: "cerrada",
       cerradaEn: FieldValue.serverTimestamp(),
       cerradaPor: req.auth!.uid,
-      forzado: sinConfirmar.length > 0,
+      forzado: forzar,
       sinConfirmarAlCerrar: sinConfirmar,
+      totalUnidades: resumenCalculado.totalUnidades,
     });
-    tx.update(db.doc(`sucursales/${sesion.get("sucursalId")}`), {
-      sesionAbiertaId: null,
-    });
-    tx.create(db.doc(`sucursales/${sesion.get("sucursalId")}/historicos/${sesionId}`), {
+    tx.update(sucursalRef, { sesionAbiertaId: null });
+    tx.create(sucursalRef.collection("historicos").doc(sesionId), {
       sesionId,
       cerradaEn: FieldValue.serverTimestamp(),
-      totalUnidades: resumen.get("totalUnidades"),
-      totalMonetario: resumen.get("totalMonetario"),
-      porCategoria: resumen.get("porCategoria"),
+      totalUnidades: resumenCalculado.totalUnidades,
+      totalMonetario: resumenCalculado.totalMonetario,
+      porCategoria: resumenCalculado.porCategoria,
     });
-  });
+    // `set` sin `merge` (`resumen` es 100% derivado); `marcaAportes` queda
+    // fuera: una sesión cerrada ya no entra en la consulta del cron.
+    tx.set(sesionRef.collection("resumen").doc("actual"), {
+      ...resumenCalculado,
+      recalculadoEn: FieldValue.serverTimestamp(),
+      dirty: false,
+    });
 
-  await registrarAuditoria(db, {
-    tipo: "SESION_CERRADA",
-    sesionId,
-    detalle: { forzado: sinConfirmar.length > 0, sinConfirmar },
-    ejecutadoPor: req.auth!.uid,
-  });
+    registrarAuditoria(tx, db, {
+      tipo: "SESION_CERRADA",
+      sesionId,
+      forzado: forzar,
+      sinConfirmar,
+      excluidosPorInactivo,
+    });
 
-  return {
-    cerrada: true,
-    totalUnidades: resumen.get("totalUnidades"),
-    totalMonetario: resumen.get("totalMonetario"),
-  };
+    return { sesionId };
+  });
 });
 ```
 
