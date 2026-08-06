@@ -164,6 +164,31 @@ describe("procesarAporteEscrito", () => {
     expect(eventos.docs[0]?.get("tipo")).toBe("APORTE_CREADO");
   });
 
+  it("I-M · marca resumen/actual dirty y sube marcaAportes de forma monotónica", async () => {
+    const sesionId = `ses_${randomUUID()}`;
+    const categoriaId = "cat_5000";
+    await crearSesionAbierta(sesionId);
+
+    await procesarAporteEscrito(db, { sesionId, categoriaId, uid: "uid_ana" }, undefined, {
+      uid: "uid_ana",
+      nombre: "Ana",
+      cantidad: 30,
+      version: 1,
+    });
+    const resumenTrasPrimero = await db.doc(`sesiones/${sesionId}/resumen/actual`).get();
+    expect(resumenTrasPrimero.get("dirty")).toBe(true);
+    expect(resumenTrasPrimero.get("marcaAportes")).toBe(1);
+
+    await procesarAporteEscrito(
+      db,
+      { sesionId, categoriaId, uid: "uid_ana" },
+      { uid: "uid_ana", nombre: "Ana", cantidad: 30, version: 1 },
+      { uid: "uid_ana", nombre: "Ana", cantidad: 28, version: 2 },
+    );
+    const resumenTrasSegundo = await db.doc(`sesiones/${sesionId}/resumen/actual`).get();
+    expect(resumenTrasSegundo.get("marcaAportes")).toBe(2); // sube, nunca se reinicia
+  });
+
   it("marca sesiones/{id}/sincronizacion/estado sin borrar la entrada de otro cajero", async () => {
     const sesionId = `ses_${randomUUID()}`;
     const categoriaId = "cat_5000";

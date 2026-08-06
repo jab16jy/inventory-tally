@@ -89,7 +89,10 @@ export async function procesarAporteEscrito(
 
     // El resumen monetario se recalcula agrupado (doc 05 §5): el trigger
     // sólo marca la bandera, nunca escribe `resumen` directamente.
-    tx.set(resumenRef, { dirty: true }, { merge: true });
+    // I-M: `marcaAportes` sube en la MISMA transacción que muta `lineas`, para
+    // que el cron (D-1) pueda demostrar con un compare-and-clear que ningún
+    // aporte se coló entre su lectura de `lineas` y su escritura de `resumen`.
+    tx.set(resumenRef, { dirty: true, marcaAportes: FieldValue.increment(1) }, { merge: true });
 
     // Rastro de sincronización para el cierre (RF-16).
     tx.set(

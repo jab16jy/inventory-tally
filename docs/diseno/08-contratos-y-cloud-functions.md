@@ -50,7 +50,7 @@ flowchart LR
 | `abrirSesion`         | callable     | admin     | Abre sesión garantizando unicidad; siembra líneas      |
 | `cerrarSesion`        | callable     | admin     | **Verifica sincronización**, congela y genera snapshot |
 | `onAporteEscrito`     | trigger      | Firestore | Agrega total, marca resumen, registra auditoría        |
-| `recalcularResumenes` | cron 30 s    | —         | Recalcula resúmenes marcados `dirty`                   |
+| `recalcularResumenes` | cron cada minuto | —     | Recalcula resúmenes marcados `dirty`                   |
 | `reconciliarLineas`   | cron semanal | —         | Detecta y corrige totales inconsistentes               |
 | `purgarAuditoria`     | cron mensual | —         | Exporta y purga auditoría > 12 meses                   |
 
@@ -277,51 +277,71 @@ await db.doc(`usuarios/${uid}`).update({ activo: false });
 
 ## 4. Funciones programadas
 
-### `recalcularResumenes` (cada 30 s)
+### `recalcularResumenes` (cada minuto)
+
+> **Corrección (slice 1 de `complete-cloud-functions`):** la versión anterior de este
+> pseudocódigo leía `lineas` y escribía `resumen` **fuera de cualquier transacción, sin
+> comparar nada**. Eso podía persistir `dirty: false` sobre un resumen que ya había
+> quedado desactualizado por un aporte concurrente — el defecto que este slice corrige.
+> La regla vigente es un compare-and-clear de tres pasos sobre un marcador monotónico
+> `resumen.marcaAportes` (ver invariante I-M en [05 · Concurrencia](05-concurrencia-offline-tiempo-real.md#3-implementación-del-trigger)):
 
 ```typescript
-export const recalcularResumenes = onSchedule("every 30 seconds", async () => {
-  const db = getFirestore();
+export const recalcularResumenes = onSchedule(
+  { schedule: "every 1 minutes", region: "us-central1" }, // Cloud Scheduler no baja de 1 min
+  async () => {
+    await recalcularResumenesImpl(getFirestore());
+  },
+);
+
+export async function recalcularResumenesImpl(db: Firestore): Promise<void> {
   const sesiones = await db.collection("sesiones").where("estado", "==", "abierta").get();
 
   for (const sesion of sesiones.docs) {
     const resumenRef = sesion.ref.collection("resumen").doc("actual");
-    if (!(await resumenRef.get()).get("dirty")) continue; // nada cambió
 
+    // Paso 1: capturar M = marcaAportes en el momento de leer `dirty`.
+    const resumenAntes = await resumenRef.get();
+    if (!resumenAntes.get("dirty")) continue; // nada cambió
+    const marca = resumenAntes.get("marcaAportes") ?? 0;
+
+    // Paso 2: leer `lineas` FUERA de cualquier transacción — un `.get()` ya
+    // es una instantánea consistente; una tx de sólo lectura no aporta nada
+    // aquí y SÍ bloquearía cada línea con un lock pesimista durante toda la
+    // ejecución (`Transaction.get(query)`), reintroduciendo la contención que
+    // `dirty` existe para evitar.
     const lineas = await sesion.ref.collection("lineas").where("cantidadTotal", ">", 0).get();
+    const resumenCalculado = calcularResumen(lineas.docs); // totales + porCategoria
 
-    const porCategoria: Record<string, unknown> = {};
-    let totalUnidades = 0,
-      totalMonetario = 0;
-    let mayor = null,
-      menor = null;
+    // Paso 3: comparar y limpiar. Si `marcaAportes` cambió entre el paso 1 y
+    // aquí, un aporte tocó `lineas` fuera de la ventana leída en el paso 2 —
+    // no se escribe nada y `dirty` sigue `true` para el próximo ciclo.
+    await db.runTransaction(async (tx) => {
+      const resumenActual = await tx.get(resumenRef);
+      if ((resumenActual.get("marcaAportes") ?? 0) !== marca) return; // nada
 
-    for (const l of lineas.docs) {
-      const cantidad = l.get("cantidadTotal");
-      const subtotal = cantidad * l.get("valorUnitario");
-      porCategoria[l.id] = { cantidad, subtotal, actualizadaEn: l.get("actualizadaEn") };
-      totalUnidades += cantidad;
-      totalMonetario += subtotal;
-      if (!mayor || cantidad > mayor.cantidad) mayor = { categoriaId: l.id, cantidad };
-      if (!menor || cantidad < menor.cantidad) menor = { categoriaId: l.id, cantidad };
-    }
-
-    await resumenRef.set(
-      {
-        totalUnidades,
-        totalMonetario,
-        numCategoriasConConteo: lineas.size,
-        categoriaMayor: mayor,
-        categoriaMenor: menor,
-        porCategoria,
+      tx.set(resumenRef, {
+        // set SIN merge: `resumen` es 100% derivado; con merge, una categoría
+        // cuyo cantidadTotal volvió a 0 dejaría una entrada `porCategoria`
+        // fantasma para siempre.
+        ...resumenCalculado,
         recalculadoEn: FieldValue.serverTimestamp(),
         dirty: false,
-      },
-      { merge: true },
-    );
+        marcaAportes: marca,
+      });
+    });
   }
-});
+}
 ```
+
+`M` sin cambios entre el paso 1 y el paso 3 demuestra que ninguna transacción con
+aportes se completó durante toda la ventana de lectura, porque el marcador sube
+**dentro** de la misma transacción que muta `lineas` (invariante I-M). Si `M` cambió, el
+cron no escribe nada y el próximo ciclo (≤1 min) recalcula; el resumen nunca se persiste
+desactualizado y `dirty: false` nunca miente. Fallo aceptado, nombrado: bajo aportes
+llegando más rápido que la ventana de lectura de `lineas` de forma sostenida, `dirty`
+nunca se limpia (inanición, nunca dato incorrecto) — techo aceptado con 1–2 conteos
+mensuales por sucursal.
 
 Con 1–2 conteos mensuales por sucursal, la mayoría de ejecuciones sale en la primera
 consulta sin hacer nada. Costo despreciable.
