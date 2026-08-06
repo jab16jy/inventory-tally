@@ -233,6 +233,10 @@ pendientes** (`!hasPendingWrites`). El administrador ve quién ha confirmado y q
 antes de cerrar. Es el único caso en que el cliente escribe fuera de `aportes`, y por
 eso su regla es estrecha: sólo puede escribir su propia entrada.
 
+El predicado de sincronización (RF-16, D-3) es
+`confirmadoEn != null && confirmadoEn >= (ultimoAporteServidor ?? 0)`: un aporte posterior
+a la confirmación la vuelve obsoleta aunque `confirmadoEn` siga siendo verdadero.
+
 ### `sucursales/{sucursalId}/historicos/{sesionId}` — sólo administrador
 
 ```json
