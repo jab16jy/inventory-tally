@@ -204,12 +204,22 @@ export const cerrarSesion = onCall(async (req) => {
     throw new HttpsError("failed-precondition", "La sesión no está abierta");
   }
 
-  // ── RF-16 / I-10: verificación de sincronización ─────────────────
+  // ── RF-16 / I-10: verificación de sincronización (predicado corregido) ──
+  // sincronizado(uid) ⟺ confirmadoEn != null && confirmadoEn >= (ultimoAporteServidor ?? 0)
+  // (implementado en `lib/sincronizacion.ts`). Un cajero que vuelve a aportar
+  // después de confirmar queda con una confirmación obsoleta y NO cuenta como
+  // sincronizado, aunque `confirmadoEn` sea verdadero — el chequeo de verdad
+  // (`!!confirmadoEn`) que este documento tenía era el error original.
+  // `usuarios/{uid}.activo === false` excluye al participante de este
+  // bloqueo (se audita como `excluidosPorInactivo`, pero no impide el cierre).
   const sync = await db.doc(`sesiones/${sesionId}/sincronizacion/estado`).get();
   const participantes: string[] = sesion.get("participantes") ?? [];
-  const sinConfirmar = participantes.filter(
-    (uid) => !sync.get(`participantes.${uid}.confirmadoEn`),
-  );
+  const sinConfirmar = participantes.filter((uid) => {
+    const entrada = sync.get(`participantes.${uid}`) ?? {};
+    const confirmadoEn = entrada.confirmadoEn ?? null;
+    const ultimoAporteServidor = entrada.ultimoAporteServidor ?? null;
+    return !(confirmadoEn && confirmadoEn.toMillis() >= (ultimoAporteServidor?.toMillis() ?? 0));
+  });
 
   if (sinConfirmar.length > 0 && !forzar) {
     await registrarAuditoria(db, {
