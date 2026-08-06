@@ -94,28 +94,35 @@ export const crearCajero = onCall({ region: "us-central1" }, async (req) => {
   });
 
   // Los claims son la fuente de verdad para las Security Rules
-  await auth.setCustomUserClaims(user.uid, {
-    rol: d.rol, // "admin" | "cajero"
-    sucursales: d.sucursalesAsignadas,
-  });
+  try {
+    await auth.setCustomUserClaims(user.uid, {
+      rol: d.rol, // "admin" | "cajero"
+      sucursales: d.sucursalesAsignadas,
+    });
 
-  const db = getFirestore();
-  await db.doc(`usuarios/${user.uid}`).set({
-    nombre: d.nombre,
-    correo: d.correo,
-    rol: d.rol,
-    sucursalesAsignadas: d.sucursalesAsignadas,
-    activo: true,
-    creadoEn: FieldValue.serverTimestamp(),
-    creadoPor: req.auth!.uid,
-  });
+    const db = getFirestore();
+    await db.doc(`usuarios/${user.uid}`).set({
+      nombre: d.nombre,
+      correo: d.correo,
+      rol: d.rol,
+      sucursalesAsignadas: d.sucursalesAsignadas,
+      activo: true,
+      creadoEn: FieldValue.serverTimestamp(),
+      creadoPor: req.auth!.uid,
+    });
 
-  await registrarAuditoria(db, {
-    tipo: "USUARIO_CREADO",
-    usuarioId: user.uid,
-    usuarioNombre: d.nombre,
-    ejecutadoPor: req.auth!.uid,
-  });
+    await registrarAuditoria(db, {
+      tipo: "USUARIO_CREADO",
+      usuarioId: user.uid,
+      usuarioNombre: d.nombre,
+      ejecutadoPor: req.auth!.uid,
+    });
+  } catch (error) {
+    // D-6: paso 1 no es idempotente (consumió el correo); sin compensar, todo
+    // reintento muere con already-exists y el huérfano queda sin claims.
+    await auth.deleteUser(user.uid);
+    throw error;
+  }
 
   return { uid: user.uid, creado: true };
 });
