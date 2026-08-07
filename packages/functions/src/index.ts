@@ -7,6 +7,8 @@ export { desactivarCajero } from "./callables/desactivar-cajero.js";
 export { reactivarCajero } from "./callables/reactivar-cajero.js";
 export { crearSucursal } from "./callables/crear-sucursal.js";
 export { actualizarSucursal } from "./callables/actualizar-sucursal.js";
+export { crearCategoria } from "./callables/crear-categoria.js";
+export { desactivarCategoria } from "./callables/desactivar-categoria.js";
 export { recalcularResumenes } from "./scheduled/recalcular-resumenes.js";
 export { reconciliarLineas } from "./scheduled/reconciliar-lineas.js";
 export { purgarAuditoria } from "./scheduled/purgar-auditoria.js";
