@@ -20,7 +20,9 @@ import { LoginScreen } from "../ui/LoginScreen.js";
 import { PrepararScreen } from "../ui/PrepararScreen.js";
 import { SucursalesScreen } from "../ui/SucursalesScreen.js";
 import { AdminLayout } from "../ui/admin/AdminLayout.js";
+import { CajerosScreen } from "../ui/admin/CajerosScreen.js";
 import { PanelScreen } from "../ui/admin/PanelScreen.js";
+import { SucursalesAdminScreen } from "../ui/admin/SucursalesAdminScreen.js";
 
 // Módulo, no componente: una sola instancia para todo el árbol de /admin,
 // igual que `auth`/`db` en lib/firebase.ts. Sin React.lazy — no hay ninguno
@@ -108,6 +110,8 @@ export function AppRouter(): ReactNode {
           }
         >
           <Route index element={<PanelScreen />} />
+          <Route path="cajeros" element={<CajerosScreen />} />
+          <Route path="sucursales" element={<SucursalesAdminScreen />} />
         </Route>
         <Route path="*" element={<StubScreen titulo="Próximamente" />} />
       </Routes>
