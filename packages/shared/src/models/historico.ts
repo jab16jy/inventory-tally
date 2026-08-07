@@ -13,5 +13,7 @@ export interface Historico {
   // ponytail: sólo cantidad/subtotal por categoría — `actualizadaEn` por
   // línea vive en el doc pero el comparativo (doc plan §5, F4) no lo
   // necesita; añadir si un consumidor futuro lo pide.
-  readonly porCategoria: Readonly<Record<string, { readonly cantidad: number; readonly subtotal: number }>>;
+  readonly porCategoria: Readonly<
+    Record<string, { readonly cantidad: number; readonly subtotal: number }>
+  >;
 }

@@ -141,7 +141,10 @@ interface CategoriaValorDoc {
   readonly creadaEn: Timestamp;
 }
 
-export function categoriaValorDesdeDoc(categoriaId: string, data: CategoriaValorDoc): CategoriaValor {
+export function categoriaValorDesdeDoc(
+  categoriaId: string,
+  data: CategoriaValorDoc,
+): CategoriaValor {
   return {
     categoriaId,
     valor: data.valor,

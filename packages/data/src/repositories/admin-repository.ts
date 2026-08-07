@@ -5,7 +5,10 @@
 // re-exporta `Config` (config/entorno.ts), que exige el ambient
 // `ImportMeta.env` de Vite.
 import type { CategoriaValor } from "@conteo/shared/models/categoria-valor.js";
-import type { EventoAuditoria, TipoEventoAuditoria } from "@conteo/shared/models/evento-auditoria.js";
+import type {
+  EventoAuditoria,
+  TipoEventoAuditoria,
+} from "@conteo/shared/models/evento-auditoria.js";
 import type { Historico } from "@conteo/shared/models/historico.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { EstadoSesion, SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
@@ -127,7 +130,9 @@ export interface AdminRepository {
    * SÓLO en producción, nunca en el emulador. No "optimizar" esto a un
    * collectionGroup.
    */
-  ultimoHistoricoPorSucursal(sucursalIds: readonly string[]): Promise<Map<string, Historico | null>>;
+  ultimoHistoricoPorSucursal(
+    sucursalIds: readonly string[],
+  ): Promise<Map<string, Historico | null>>;
 
   // ── escrituras: TODAS vía httpsCallable, ninguna escritura directa a
   // Firestore — las reglas son `if false` en cada ruta que toca el admin. ──

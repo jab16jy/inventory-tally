@@ -14,9 +14,7 @@ export function AdminRepositoryProvider({
   readonly repo: AdminRepository;
   readonly children: ReactNode;
 }) {
-  return (
-    <AdminRepositoryContext.Provider value={repo}>{children}</AdminRepositoryContext.Provider>
-  );
+  return <AdminRepositoryContext.Provider value={repo}>{children}</AdminRepositoryContext.Provider>;
 }
 
 export function useAdminRepository(): AdminRepository {
