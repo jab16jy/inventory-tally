@@ -2,9 +2,9 @@
 // /conteo/:sesionId; F3-B añadió /conteo/:sesionId/preparar y
 // /conteo/:sesionId/finalizar. F1 del panel admin
 // (docs/plan-panel-administrador.md §5) añade `/admin` con su propio
-// armazón (AdminLayout) y su primera pantalla real (PanelScreen); el resto
-// de las siete rutas de /admin sigue detrás de la ruta comodín, a la espera
-// de F2-F5.
+// armazón (AdminLayout); F2 sumó cajeros y sucursales; F3 suma categorías,
+// sesiones y auditoría. Comparativo y análisis de sesión siguen detrás de la
+// ruta comodín, a la espera de F4-F5.
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import type { ReactElement, ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
@@ -20,8 +20,11 @@ import { LoginScreen } from "../ui/LoginScreen.js";
 import { PrepararScreen } from "../ui/PrepararScreen.js";
 import { SucursalesScreen } from "../ui/SucursalesScreen.js";
 import { AdminLayout } from "../ui/admin/AdminLayout.js";
+import { AuditoriaScreen } from "../ui/admin/AuditoriaScreen.js";
 import { CajerosScreen } from "../ui/admin/CajerosScreen.js";
+import { CategoriasScreen } from "../ui/admin/CategoriasScreen.js";
 import { PanelScreen } from "../ui/admin/PanelScreen.js";
+import { SesionesScreen } from "../ui/admin/SesionesScreen.js";
 import { SucursalesAdminScreen } from "../ui/admin/SucursalesAdminScreen.js";
 
 // Módulo, no componente: una sola instancia para todo el árbol de /admin,
@@ -112,6 +115,9 @@ export function AppRouter(): ReactNode {
           <Route index element={<PanelScreen />} />
           <Route path="cajeros" element={<CajerosScreen />} />
           <Route path="sucursales" element={<SucursalesAdminScreen />} />
+          <Route path="categorias" element={<CategoriasScreen />} />
+          <Route path="sesiones" element={<SesionesScreen />} />
+          <Route path="auditoria" element={<AuditoriaScreen />} />
         </Route>
         <Route path="*" element={<StubScreen titulo="Próximamente" />} />
       </Routes>
