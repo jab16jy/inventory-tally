@@ -11,3 +11,23 @@ export { FirestoreConteoRepository } from "./firebase/firestore-conteo-repositor
 export type { ProveedorUsuarioActual } from "./firebase/firestore-conteo-repository.js";
 
 export { obtenerIdDispositivo } from "./firebase/dispositivo.js";
+
+export type {
+  AbrirSesionPayload,
+  ActualizarCajeroPayload,
+  ActualizarSucursalPayload,
+  AdminRepository,
+  CerrarSesionPayload,
+  CrearCajeroPayload,
+  CrearCategoriaPayload,
+  CrearSucursalPayload,
+  EstadoSincronizacion,
+  FiltroAuditoria,
+  FiltroSesiones,
+  Pagina,
+} from "./repositories/admin-repository.js";
+
+export { FakeAdminRepository } from "./fakes/fake-admin-repository.js";
+export type { LlamadaEscritura, OpcionesFakeAdmin } from "./fakes/fake-admin-repository.js";
+
+export { FirestoreAdminRepository } from "./firebase/firestore-admin-repository.js";
