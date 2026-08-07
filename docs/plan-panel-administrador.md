@@ -133,7 +133,7 @@ Lo que fija el patrón que copian las cuatro fases siguientes.
 | `feat(web): formateo de moneda es-CO y reúso en Deck` | `formato.test.ts` — *"formatea 1234500 como $ 1.234.500 sin decimales"* | `lib/formato.ts`, y **se mueve** el `Intl.NumberFormat` de `Deck.tsx:14` (es el único del repo) |
 | `feat(web): armazón del panel de administración y ruta /admin` | `AdminLayout.test.tsx` — *"marca como actual el enlace de la ruta activa"* | layout con sidebar fijo, `Icono` +5 paths, ruta anidada en `router.tsx` |
 | `feat(web): tablero de sesiones abiertas por sucursal` | `PanelScreen.test.tsx` — *"muestra un esqueleto con la forma final mientras carga"*, *"muestra el valor total en pesos calculado desde las líneas"* | `PanelScreen.tsx` |
-| `feat(data): lectura Firestore del panel admin` | — | `firestore-admin-repository.ts` + `lib/funciones.ts` (`getFunctions` + `connectFunctionsEmulator`; **hoy no existe ninguno en el repo**) |
+| `feat(data): lectura Firestore del panel admin` | `firestore-admin-repository.test.ts`, con `vi.mock("firebase/firestore")` — el patrón que ya usa `firestore-conteo-repository.test.ts` (320 líneas, 15 tests) | `firestore-admin-repository.ts` + `lib/funciones.ts` (`getFunctions` + `connectFunctionsEmulator`; **hoy no existe ninguno en el repo**) |
 
 **Cierra cuando:** `/admin` muestra sesiones reales con dinero; un cajero sigue siendo redirigido a `/sucursales` con `guardas.test.ts` intacto.
 
