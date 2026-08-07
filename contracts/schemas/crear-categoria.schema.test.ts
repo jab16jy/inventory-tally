@@ -1,0 +1,35 @@
+import { describe, expect, it } from "vitest";
+import { crearCategoriaSchema } from "./crear-categoria.schema.js";
+
+const valido = {
+  etiqueta: "Litro",
+  valor: 1000,
+  orden: 1,
+};
+
+describe("crearCategoriaSchema (docs/plan-panel-administrador.md §3)", () => {
+  it("acepta un objeto válido (afirmativo)", () => {
+    const resultado = crearCategoriaSchema.safeParse(valido);
+    expect(resultado.success).toBe(true);
+  });
+
+  it("rechaza etiqueta vacía (negativo)", () => {
+    const resultado = crearCategoriaSchema.safeParse({ ...valido, etiqueta: "" });
+    expect(resultado.success).toBe(false);
+  });
+
+  it("rechaza valor no entero (negativo)", () => {
+    const resultado = crearCategoriaSchema.safeParse({ ...valido, valor: 1.5 });
+    expect(resultado.success).toBe(false);
+  });
+
+  it("rechaza valor negativo (negativo)", () => {
+    const resultado = crearCategoriaSchema.safeParse({ ...valido, valor: -1 });
+    expect(resultado.success).toBe(false);
+  });
+
+  it("rechaza orden negativo (negativo)", () => {
+    const resultado = crearCategoriaSchema.safeParse({ ...valido, orden: -1 });
+    expect(resultado.success).toBe(false);
+  });
+});
