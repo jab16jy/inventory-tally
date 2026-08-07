@@ -5,6 +5,14 @@ on:
   push:
     branches: [main]
 
+# El permiso por defecto del repo es sólo "read", que en Actions equivale a
+# contents:read — no incluye pull-requests:read. Sin esto, dorny/paths-filter
+# no puede listar los ficheros del PR y falla con "Resource not accessible by
+# integration" en TODO pull_request, sea cual sea el contenido.
+permissions:
+  contents: read
+  pull-requests: read
+
 # Cancela ejecuciones previas de la misma rama: el monorepo tarda y no vale la
 # pena pagar dos veces por un commit que ya quedó obsoleto.
 concurrency:
