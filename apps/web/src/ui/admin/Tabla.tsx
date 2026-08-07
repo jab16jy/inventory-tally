@@ -1,0 +1,140 @@
+// apps/web/src/ui/admin/Tabla.tsx (docs/plan-panel-administrador.md §5, fase
+// F2): shell de tabla que reusan F2-F5. Vive en `ui/admin/`, no en
+// `ui/primitivos/` (doc plan §5, "aquí nace ui/admin/Tabla.tsx") — no tiene
+// acceso a repositorio, sólo props, pero no es un primitivo de la PWA de
+// cajero: es de escritorio y de "Placa de bodega · escritorio" (doc plan §1),
+// `text-base` en vez del numeral de 32px.
+//
+// ponytail: sin paginación, selección de filas, resize de columnas ni sticky
+// header — ninguna pantalla de F2-F5 los pide todavía. Añadir cuando una lo
+// haga.
+import clsx from "clsx";
+import { useMemo, useState, type ReactNode } from "react";
+import { Icono } from "../primitivos/Icono.js";
+
+export interface ColumnaTabla<T> {
+  readonly clave: string;
+  readonly etiqueta: string;
+  readonly render: (fila: T) => ReactNode;
+  /** Presente = columna ordenable, y esta función decide el valor de
+   *  comparación. Ausente = columna no ordenable, sin `aria-sort`. */
+  readonly valorOrden?: (fila: T) => string | number;
+  readonly alinearDerecha?: boolean;
+}
+
+export interface TablaProps<T> {
+  readonly columnas: readonly ColumnaTabla<T>[];
+  readonly filas: readonly T[];
+  readonly claveFila: (fila: T) => string;
+  /** Nombre accesible de la tabla (`aria-label`). */
+  readonly etiqueta: string;
+  readonly vacio?: ReactNode;
+}
+
+type Direccion = "asc" | "desc";
+interface Orden {
+  readonly clave: string;
+  readonly direccion: Direccion;
+}
+
+export function Tabla<T>({ columnas, filas, claveFila, etiqueta, vacio }: TablaProps<T>) {
+  const [orden, setOrden] = useState<Orden | null>(null);
+
+  const filasOrdenadas = useMemo(() => {
+    const columna = orden && columnas.find((c) => c.clave === orden.clave);
+    if (!orden || !columna?.valorOrden) return filas;
+    const { valorOrden } = columna;
+    const signo = orden.direccion === "asc" ? 1 : -1;
+    return [...filas].sort((a, b) => {
+      const va = valorOrden(a);
+      const vb = valorOrden(b);
+      if (va < vb) return -signo;
+      if (va > vb) return signo;
+      return 0;
+    });
+  }, [filas, orden, columnas]);
+
+  // Ciclo de 3 estados por columna: sin ordenar → ascendente → descendente →
+  // sin ordenar. Cada click cambia sólo la columna clicada.
+  function alternarOrden(clave: string): void {
+    setOrden((actual) => {
+      if (actual?.clave !== clave) return { clave, direccion: "asc" };
+      if (actual.direccion === "asc") return { clave, direccion: "desc" };
+      return null;
+    });
+  }
+
+  if (filas.length === 0) {
+    return <p className="text-base text-tenue">{vacio ?? "No hay datos."}</p>;
+  }
+
+  return (
+    <table className="w-full border border-borde text-base" aria-label={etiqueta}>
+      <thead>
+        <tr className="border-b border-borde bg-placa">
+          {columnas.map((columna) => {
+            const ordenable = columna.valorOrden !== undefined;
+            const activa = orden?.clave === columna.clave;
+            return (
+              <th
+                key={columna.clave}
+                scope="col"
+                aria-sort={
+                  !ordenable
+                    ? undefined
+                    : activa
+                      ? orden.direccion === "asc"
+                        ? "ascending"
+                        : "descending"
+                      : "none"
+                }
+                className={clsx(
+                  "px-3 py-2 text-left font-semibold text-tenue",
+                  columna.alinearDerecha && "text-right",
+                )}
+              >
+                {ordenable ? (
+                  <button
+                    type="button"
+                    onClick={() => alternarOrden(columna.clave)}
+                    className={clsx(
+                      "inline-flex items-center gap-1 hover:text-tinta",
+                      columna.alinearDerecha && "flex-row-reverse",
+                    )}
+                  >
+                    {columna.etiqueta}
+                    {activa && (
+                      <Icono
+                        nombre="chevron"
+                        className={clsx(
+                          "size-3 shrink-0",
+                          orden.direccion === "asc" ? "-rotate-90" : "rotate-90",
+                        )}
+                      />
+                    )}
+                  </button>
+                ) : (
+                  columna.etiqueta
+                )}
+              </th>
+            );
+          })}
+        </tr>
+      </thead>
+      <tbody>
+        {filasOrdenadas.map((fila) => (
+          <tr key={claveFila(fila)} className="border-b border-borde last:border-b-0">
+            {columnas.map((columna) => (
+              <td
+                key={columna.clave}
+                className={clsx("px-3 py-2 text-tinta", columna.alinearDerecha && "text-right")}
+              >
+                {columna.render(fila)}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
