@@ -2,9 +2,12 @@ import { Timestamp } from "firebase/firestore";
 import { describe, expect, it } from "vitest";
 import {
   aporteDesdeDoc,
+  categoriaValorDesdeDoc,
+  eventoAuditoriaDesdeDoc,
   lineaConteoDesdeDoc,
   sesionConteoDesdeDoc,
   sucursalDesdeDoc,
+  usuarioDesdeDoc,
 } from "./mappers.js";
 
 describe("aporteDesdeDoc (doc 04 §3)", () => {
@@ -146,5 +149,98 @@ describe("sesionConteoDesdeDoc (doc 04 §3)", () => {
 
     expect(sesion.cerradaEn).toEqual(cerradaEn.toDate());
     expect(sesion.cerradaPor).toBe("uid_admin");
+  });
+});
+
+describe("usuarioDesdeDoc (docs/plan-panel-administrador.md §4)", () => {
+  it("convierte creadoEn a Date y deja pwaInstalada/ultimoAccesoEn en undefined cuando el doc no los trae", () => {
+    const creadoEn = Timestamp.fromDate(new Date("2026-08-02T09:00:00Z"));
+    const usuario = usuarioDesdeDoc("uid_admin", {
+      nombre: "Admin Uno",
+      correo: "admin@ejemplo.com",
+      rol: "admin",
+      sucursalesAsignadas: ["suc_norte"],
+      activo: true,
+      creadoEn,
+      creadoPor: "uid_root",
+    });
+
+    expect(usuario).toEqual({
+      uid: "uid_admin",
+      nombre: "Admin Uno",
+      correo: "admin@ejemplo.com",
+      rol: "admin",
+      sucursalesAsignadas: ["suc_norte"],
+      activo: true,
+      creadoEn: creadoEn.toDate(),
+      creadoPor: "uid_root",
+      pwaInstalada: undefined,
+      ultimoAccesoEn: undefined,
+    });
+  });
+
+  it("convierte ultimoAccesoEn a Date cuando el doc lo trae", () => {
+    const creadoEn = Timestamp.fromDate(new Date("2026-08-02T09:00:00Z"));
+    const ultimoAccesoEn = Timestamp.fromDate(new Date("2026-08-05T14:30:00Z"));
+    const usuario = usuarioDesdeDoc("uid_cajero", {
+      nombre: "Cajero Uno",
+      correo: "cajero@ejemplo.com",
+      rol: "cajero",
+      sucursalesAsignadas: ["suc_norte"],
+      activo: true,
+      creadoEn,
+      creadoPor: "uid_admin",
+      pwaInstalada: true,
+      ultimoAccesoEn,
+    });
+
+    expect(usuario.pwaInstalada).toBe(true);
+    expect(usuario.ultimoAccesoEn).toEqual(ultimoAccesoEn.toDate());
+  });
+});
+
+describe("categoriaValorDesdeDoc (docs/plan-panel-administrador.md §4)", () => {
+  it("mapea con el id como categoriaId y creadaEn convertido a Date", () => {
+    const creadaEn = Timestamp.fromDate(new Date("2026-01-10T08:00:00Z"));
+    const categoria = categoriaValorDesdeDoc("cat_5000", {
+      valor: 5000,
+      etiqueta: "$5.000",
+      activa: true,
+      orden: 1,
+      creadaEn,
+    });
+
+    expect(categoria).toEqual({
+      categoriaId: "cat_5000",
+      valor: 5000,
+      etiqueta: "$5.000",
+      activa: true,
+      orden: 1,
+      creadaEn: creadaEn.toDate(),
+    });
+  });
+});
+
+describe("eventoAuditoriaDesdeDoc (docs/plan-panel-administrador.md §4)", () => {
+  it("usa el id del doc como eventoId, convierte ocurridoEn a Date y preserva los campos heterogéneos del tipo", () => {
+    const ocurridoEn = Timestamp.fromDate(new Date("2026-08-02T10:00:00Z"));
+    const evento = eventoAuditoriaDesdeDoc("evt_001", {
+      tipo: "SESION_ABIERTA",
+      ocurridoEn,
+      sesionId: "ses_20260802_norte_01",
+      sucursalId: "suc_norte",
+      sinConfirmar: false,
+      campos: { antes: 10, despues: 12 },
+    });
+
+    expect(evento).toEqual({
+      eventoId: "evt_001",
+      tipo: "SESION_ABIERTA",
+      ocurridoEn: ocurridoEn.toDate(),
+      sesionId: "ses_20260802_norte_01",
+      sucursalId: "suc_norte",
+      sinConfirmar: false,
+      campos: { antes: 10, despues: 12 },
+    });
   });
 });
