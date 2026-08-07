@@ -129,7 +129,31 @@ before `sdd-apply` starts slice 1, per the launch prompt.
 - [x] V.1 `sdd-verify` levantó un CRITICAL: `crearCajero` no cumplía `gestion-cajeros/spec.md` («THEN it throws `HttpsError("already-exists", ...)`») ni `design.md:439`. `auth.createUser` quedaba fuera del `try`, así que un correo duplicado propagaba el `FirebaseAuthError` crudo y `onCall` lo traducía a un `internal` genérico: el admin nunca sabía que el correo ya estaba registrado. Corregido mapeando `auth/email-already-exists` a `HttpsError("already-exists", ...)`.
 - [x] V.2 La causa de que no se detectara antes: el test asertaba `.rejects.toThrow()` sin tipo, que pasa con CUALQUIER error. Reforzado a `.rejects.toMatchObject({ code: "already-exists" })` y verificado quitando el mapeo — falla sólo ese caso (2/3 verdes), revertido.
 - [x] V.3 Marcadas las seis casillas de commit (1.12, 2a.6, 2b.6, 3.8, 4.14, 5.7), que `sdd-verify` confirmó contra `git log` como trabajo hecho y sólo pendiente de anotar.
-- [ ] V.4 Commit (`fix(functions): mapea correo duplicado a already-exists en crearCajero`).
+- [x] V.4 Commit (`fix(functions): mapea correo duplicado a already-exists en crearCajero`) — `1a9232f`. Marcada al archivar: una tarea que nombra su propio commit no puede marcarse dentro de él.
+
+## Cierre
+
+`sdd-verify` (pase acotado) devolvió PASS. Estado final: typecheck 0, lint 0,
+`prettier --check` limpio, 265/265 tests (web 109, data 37, functions 58,
+shared 36, contracts 25). Siete commits en `feat/resumen-sesion-recalculo`,
+cada uno con recibo RDD aprobado.
+
+Pendientes trasladados fuera de este cambio, cada uno con unidad de trabajo propia:
+
+1. `infra/firestore.rules` no acota `categoriaId` en la ruta de `aportes`. Un
+   aporte a una categoría no sembrada crea una línea sin `valorUnitario` ni
+   `etiqueta`, y el resumen de esa sesión queda `dirty:true` para siempre con
+   sólo un `console.error` por ciclo del cron.
+2. Compensaciones sin guarda propia, mismo riesgo estructural en dos almacenes
+   distintos: `crear-cajero.ts:56` espera `auth.deleteUser` dentro de su
+   `catch`, y `abrir-sesion.ts` hace un rollback de Firestore
+   (`sucursalRef.update` + `sesionRef.delete()`) igual de desprotegido. En
+   ambos, una compensación que falle reemplaza al error original.
+3. `desactivar-cajero.ts` muta Auth antes de comprobar que exista el perfil en
+   Firestore, así que un perfil a la deriva significa que `USUARIO_DESACTIVADO`
+   nunca se audita y quien llama recibe un `NOT_FOUND` sin traducir.
+4. Menor: la rama `not-found` de `cerrar-sesion.ts:43-45` (sesión inexistente)
+   no tiene test — los 7 casos siembran sesión antes.
 
 ---
 
