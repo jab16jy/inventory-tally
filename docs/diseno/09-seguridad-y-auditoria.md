@@ -343,7 +343,9 @@ niega. Sin eso, no se despliega ([12](12-despliegue-y-entornos.md)).
 
 `reconciliarLineas` compara semanalmente `cantidadTotal` contra la suma real de aportes.
 Una discrepancia indica un trigger fallido o una escritura anómala. Corrige recalculando
-desde los aportes y deja un evento `RECONCILIACION`.
+desde los aportes y deja un evento `RECONCILIACION`. La corrección también reescribe
+`aplicados`/`versiones` por completo, ajusta `sesiones.totalUnidades` y vuelve a marcar el
+resumen dirty.
 
 ---
 

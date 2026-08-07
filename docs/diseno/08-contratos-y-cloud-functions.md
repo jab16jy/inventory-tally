@@ -381,7 +381,9 @@ consulta sin hacer nada. Costo despreciable.
 ### `reconciliarLineas` (semanal)
 
 Recalcula `cantidadTotal` desde los aportes y compara. Una discrepancia indica un trigger
-fallido. Corrige y registra un evento `RECONCILIACION`.
+fallido. Corrige y registra un evento `RECONCILIACION`. La corrección reescribe también
+`aplicados`/`versiones` por completo (no `merge`), ajusta `sesiones.totalUnidades` con el
+delta y vuelve a marcar `resumen/actual.dirty=true`.
 
 > Esto es posible **porque los aportes son la fuente de verdad**. Si el diseño guardara
 > sólo el total, un dato corrupto sería irrecuperable.
