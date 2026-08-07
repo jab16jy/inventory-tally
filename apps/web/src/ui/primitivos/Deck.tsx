@@ -9,9 +9,8 @@
 // Deliberadamente "Tu aporte"/"Equipo" sin los dos puntos de la fila
 // ("Tú: N"): ConteoScreen.test.tsx busca /tú: 1/i y /equipo: 1/i, y con
 // coma el total del equipo bien podría empezar en "1" a mitad de sesión.
+import { numero } from "../../lib/formato.js";
 import { Numeral } from "./Numeral.js";
-
-const FORMATO_UNIDADES = new Intl.NumberFormat("es-CO");
 
 export interface DeckProps {
   readonly tuAporte: number;
@@ -26,13 +25,13 @@ export function Deck({ tuAporte, equipo, onFinalizar }: DeckProps) {
         <p>
           Tu aporte{" "}
           <Numeral tamano="medio" className="text-tinta normal-case">
-            {FORMATO_UNIDADES.format(tuAporte)} u
+            {numero(tuAporte)} u
           </Numeral>
         </p>
         <p>
           Equipo{" "}
           <Numeral tamano="medio" className="text-tinta normal-case">
-            {FORMATO_UNIDADES.format(equipo)} u
+            {numero(equipo)} u
           </Numeral>
         </p>
       </div>
