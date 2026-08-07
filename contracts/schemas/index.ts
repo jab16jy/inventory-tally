@@ -23,3 +23,9 @@ export type { CrearSucursalInput } from "./crear-sucursal.schema.js";
 
 export { actualizarSucursalSchema } from "./actualizar-sucursal.schema.js";
 export type { ActualizarSucursalInput } from "./actualizar-sucursal.schema.js";
+
+export { crearCategoriaSchema } from "./crear-categoria.schema.js";
+export type { CrearCategoriaInput } from "./crear-categoria.schema.js";
+
+export { desactivarCategoriaSchema } from "./desactivar-categoria.schema.js";
+export type { DesactivarCategoriaInput } from "./desactivar-categoria.schema.js";
