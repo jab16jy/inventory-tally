@@ -6,7 +6,9 @@
 // cubre lo que tiene lógica propia (el predicado RF-16, la paginación con
 // cursor opaco, el fan-out de históricos, el ruteo de escrituras). Los
 // `observar*` que son un onSnapshot + mapper sin ramas quedan sin test propio
-// aquí — el mapeo ya lo cubre mappers.test.ts.
+// aquí — es una decisión deliberada; cada mapper que usa este archivo
+// (incluidos usuarioDesdeDoc, categoriaValorDesdeDoc y
+// eventoAuditoriaDesdeDoc) sí tiene su propio caso en mappers.test.ts.
 import type { Functions } from "firebase/functions";
 import { httpsCallable } from "firebase/functions";
 import {
