@@ -27,10 +27,7 @@ describe("AdminLayout (F1)", () => {
   it("marca como actual el enlace de la ruta activa", () => {
     renderLayout("/admin/cajeros");
 
-    expect(screen.getByRole("link", { name: /cajeros/i })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    expect(screen.getByRole("link", { name: /cajeros/i })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: /^panel$/i })).not.toHaveAttribute("aria-current");
   });
 

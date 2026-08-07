@@ -59,7 +59,10 @@ export class FakeAdminRepository implements AdminRepository {
   private readonly listenersSesionesAbiertas = new Set<(s: SesionConteo[]) => void>();
   private readonly listenersSesion = new Map<string, Set<(s: SesionConteo | null) => void>>();
   private readonly listenersLineas = new Map<string, Set<(l: LineaConteo[]) => void>>();
-  private readonly listenersSincronizacion = new Map<string, Set<(e: EstadoSincronizacion) => void>>();
+  private readonly listenersSincronizacion = new Map<
+    string,
+    Set<(e: EstadoSincronizacion) => void>
+  >();
   private readonly listenersUsuarios = new Set<(u: Usuario[]) => void>();
   private readonly listenersSucursales = new Set<(s: Sucursal[]) => void>();
   private readonly listenersCategorias = new Set<(c: CategoriaValor[]) => void>();
@@ -171,7 +174,10 @@ export class FakeAdminRepository implements AdminRepository {
     return this.paginar(filtradas, cursor);
   }
 
-  async listarAuditoria(filtro: FiltroAuditoria, cursor?: unknown): Promise<Pagina<EventoAuditoria>> {
+  async listarAuditoria(
+    filtro: FiltroAuditoria,
+    cursor?: unknown,
+  ): Promise<Pagina<EventoAuditoria>> {
     const filtrados = this.auditoria
       .filter((e) => (filtro ? e[filtro.campo] === filtro.valor : true))
       .sort((a, b) => b.ocurridoEn.getTime() - a.ocurridoEn.getTime());
@@ -218,7 +224,9 @@ export class FakeAdminRepository implements AdminRepository {
     return { uid, reactivado: true };
   }
 
-  async crearSucursal(payload: CrearSucursalPayload): Promise<{ sucursalId: string; creada: true }> {
+  async crearSucursal(
+    payload: CrearSucursalPayload,
+  ): Promise<{ sucursalId: string; creada: true }> {
     this.registrar("crearSucursal", payload);
     return { sucursalId: "suc_fake", creada: true };
   }

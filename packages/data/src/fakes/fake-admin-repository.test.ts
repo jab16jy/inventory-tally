@@ -66,10 +66,12 @@ describe("FakeAdminRepository (implementación en memoria, docs/plan-panel-admin
     );
 
     expect(recibidas).toHaveLength(2);
-    expect(recibidas.at(-1)?.map((s) => s.sesionId).sort()).toEqual([
-      "ses_20260802_norte_01",
-      "ses_nueva",
-    ]);
+    expect(
+      recibidas
+        .at(-1)
+        ?.map((s) => s.sesionId)
+        .sort(),
+    ).toEqual(["ses_20260802_norte_01", "ses_nueva"]);
   });
 
   it("devuelve unsubscribe que corta las notificaciones", () => {
@@ -88,9 +90,15 @@ describe("FakeAdminRepository (implementación en memoria, docs/plan-panel-admin
 
   it("pagina la auditoría y devuelve cursor nulo en la última página", async () => {
     const repo = new FakeAdminRepository({ tamanoPagina: 2 });
-    repo.sembrarAuditoria(crearEvento({ eventoId: "evt_1", ocurridoEn: new Date("2026-08-01T00:00:00Z") }));
-    repo.sembrarAuditoria(crearEvento({ eventoId: "evt_2", ocurridoEn: new Date("2026-08-02T00:00:00Z") }));
-    repo.sembrarAuditoria(crearEvento({ eventoId: "evt_3", ocurridoEn: new Date("2026-08-03T00:00:00Z") }));
+    repo.sembrarAuditoria(
+      crearEvento({ eventoId: "evt_1", ocurridoEn: new Date("2026-08-01T00:00:00Z") }),
+    );
+    repo.sembrarAuditoria(
+      crearEvento({ eventoId: "evt_2", ocurridoEn: new Date("2026-08-02T00:00:00Z") }),
+    );
+    repo.sembrarAuditoria(
+      crearEvento({ eventoId: "evt_3", ocurridoEn: new Date("2026-08-03T00:00:00Z") }),
+    );
 
     const primera = await repo.listarAuditoria(null);
     expect(primera.items.map((e) => e.eventoId)).toEqual(["evt_3", "evt_2"]);

@@ -179,9 +179,16 @@ export class FirestoreAdminRepository implements AdminRepository {
     return this.paginar(base, cursor, (d) => sesionConteoDesdeDoc(d.id, d.data() as never));
   }
 
-  async listarAuditoria(filtro: FiltroAuditoria, cursor?: unknown): Promise<Pagina<EventoAuditoria>> {
+  async listarAuditoria(
+    filtro: FiltroAuditoria,
+    cursor?: unknown,
+  ): Promise<Pagina<EventoAuditoria>> {
     const clausulas = filtro ? [where(filtro.campo, "==", filtro.valor)] : [];
-    const base = query(collection(this.db, "auditoria"), ...clausulas, orderBy("ocurridoEn", "desc"));
+    const base = query(
+      collection(this.db, "auditoria"),
+      ...clausulas,
+      orderBy("ocurridoEn", "desc"),
+    );
     return this.paginar(base, cursor, (d) => eventoAuditoriaDesdeDoc(d.id, d.data()));
   }
 
@@ -239,7 +246,9 @@ export class FirestoreAdminRepository implements AdminRepository {
     return this.llamar("reactivarCajero", { uid });
   }
 
-  async crearSucursal(payload: CrearSucursalPayload): Promise<{ sucursalId: string; creada: true }> {
+  async crearSucursal(
+    payload: CrearSucursalPayload,
+  ): Promise<{ sucursalId: string; creada: true }> {
     return this.llamar("crearSucursal", payload);
   }
 

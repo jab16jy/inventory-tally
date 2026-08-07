@@ -76,7 +76,9 @@ describe("FirestoreAdminRepository.ultimoHistoricoPorSucursal (fan-out N+1 delib
   });
 
   it("una sucursal sin históricos mapea a null en el Map, no se omite de las claves", async () => {
-    getDocs.mockResolvedValueOnce(snapHistorico(historicoFalso("ses_a"))).mockResolvedValueOnce(snapVacio());
+    getDocs
+      .mockResolvedValueOnce(snapHistorico(historicoFalso("ses_a")))
+      .mockResolvedValueOnce(snapVacio());
     const repo = new FirestoreAdminRepository({} as never, {} as never);
 
     const historicos = await repo.ultimoHistoricoPorSucursal(["suc_a", "suc_b"]);
