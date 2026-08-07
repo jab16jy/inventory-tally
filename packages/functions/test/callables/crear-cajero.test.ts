@@ -53,11 +53,17 @@ describe("crearCajeroImpl", () => {
     expect(eventos.size).toBe(1);
   });
 
-  it("correo duplicado · rechaza sin crear un segundo perfil ni auditar de nuevo (negativo)", async () => {
+  it("correo duplicado · rechaza con already-exists, sin crear un segundo perfil ni auditar de nuevo (negativo)", async () => {
     const correo = `dup_${randomUUID()}@negocio.com`;
     const primero = await crearCajeroImpl(db, auth, "uid_admin", datosValidos(correo));
 
-    await expect(crearCajeroImpl(db, auth, "uid_admin", datosValidos(correo))).rejects.toThrow();
+    // El CÓDIGO importa, no sólo que lance: `onCall` traduce cualquier error
+    // que no sea `HttpsError` a un `internal` genérico, así que un
+    // `.rejects.toThrow()` a secas pasaría igual con el mapeo ausente y el
+    // admin vería un fallo opaco en vez de "el correo ya está registrado".
+    await expect(
+      crearCajeroImpl(db, auth, "uid_admin", datosValidos(correo)),
+    ).rejects.toMatchObject({ code: "already-exists" });
 
     const perfil = await db.doc(`usuarios/${primero.uid}`).get();
     expect(perfil.exists).toBe(true); // el original, sin tocar

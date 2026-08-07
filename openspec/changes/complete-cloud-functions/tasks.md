@@ -56,7 +56,7 @@ before `sdd-apply` starts slice 1, per the launch prompt.
 - [x] 1.9 Doc correction: `docs/diseno/04-modelo-de-datos-firestore.md` §3 `resumen/actual` — add `marcaAportes` field.
 - [x] 1.10 Doc correction: `docs/diseno/05-concurrencia-offline-tiempo-real.md` §3 line 162 trigger snippet — add the `marcaAportes` bump + state invariant I-M; §7 T-5 acceptance test "< 60 s" → "< 90 s" (OQ-1 fallout, 1-minute cron cannot guarantee 60 s).
 - [x] 1.11 Pre-close: `npm run typecheck && npm run lint && npm test` (root, covers `shared` + `functions`). All green — see apply-progress notes for the verbatim run.
-- [ ] 1.12 Commit (`fix(functions): calcula resumen de sesión y limpia dirty vía marcaAportes monotónico`) — NOT done by sdd-apply; RDD review + commit owned by the orchestrator per launch prompt.
+- [x] 1.12 Commit (`fix(functions): calcula resumen de sesión y limpia dirty vía marcaAportes monotónico`) — NOT done by sdd-apply; RDD review + commit owned by the orchestrator per launch prompt.
 
 ## Slice 2a — `verificarSincronizacion` / RF-16 predicate (~185 lines, depends on Slice 1)
 
@@ -65,7 +65,7 @@ before `sdd-apply` starts slice 1, per the launch prompt.
 - [x] 2a.3 Doc correction: `docs/diseno/08-contratos-y-cloud-functions.md` lines 209–212 — replace the `confirmadoEn`-truthiness check with the two-part predicate, and document the `usuarios/{uid}.activo === false` exclusion.
 - [x] 2a.4 Doc correction: `docs/diseno/04-modelo-de-datos-firestore.md` §3 `sincronizacion/estado` — one line defining the synchronized predicate.
 - [x] 2a.5 Pre-close: `npm run typecheck && npm run lint && npm test`. All green (typecheck: 0 errors across all workspaces; lint: 0 errors; test: 235/235 passed — functions 36/36 incl. the 6/6 in `sincronizacion.test.ts`).
-- [ ] 2a.6 Commit (`feat(functions): agrega verificarSincronizacion con predicado RF-16 corregido`).
+- [x] 2a.6 Commit (`feat(functions): agrega verificarSincronizacion con predicado RF-16 corregido`).
 
 ## Slice 2b — `cerrarSesion` freeze + snapshot (~220 lines, depends on Slice 2a)
 
@@ -74,7 +74,7 @@ before `sdd-apply` starts slice 1, per the launch prompt.
 - [x] 2b.3 Add export line for `cerrarSesion` to `packages/functions/src/index.ts`.
 - [x] 2b.4 Doc correction: `docs/diseno/08-contratos-y-cloud-functions.md` — replaced inline-recompute-before-freeze with the Phase A / Phase B shape; corrected the `registrarAuditoria(db, {...})` pseudocode call to the real transactional signature `registrarAuditoria(tx, db, evento)` (`packages/functions/src/lib/auditoria.ts`, doc 09 §5); also updated the RF-16 block comment to reference `verificarSincronizacion` by name and pass `excluidosPorInactivo` through to both audit events, matching the shipped code.
 - [x] 2b.5 Pre-close: `npm run typecheck && npm run lint && npm test`. All green (typecheck: 0 errors across all workspaces; lint: 0 errors; `npx prettier --check .`: clean; test: 242/242 passed — functions 43/43 incl. the new 7/7 in `cerrar-sesion.test.ts`; web 109, data 37, functions 43, shared 36, contracts 17).
-- [ ] 2b.6 Commit (`feat(functions): implementa cerrarSesion con verificación RF-16 y snapshot atómico`).
+- [x] 2b.6 Commit (`feat(functions): implementa cerrarSesion con verificación RF-16 y snapshot atómico`).
 
 ## Slice 3 — `crearCajero` (~290 lines, independent of 1/2; keep before Slice 4)
 
@@ -85,7 +85,7 @@ before `sdd-apply` starts slice 1, per the launch prompt.
 - [x] 3.5 Add export line for `crearCajero` to `packages/functions/src/index.ts`.
 - [x] 3.6 Doc correction: `docs/diseno/08-contratos-y-cloud-functions.md` `crearCajero` snippet — add the `auth.deleteUser` compensation on post-create failure.
 - [x] 3.7 Pre-close: `npm run typecheck && npm run lint && npm test`.
-- [ ] 3.8 Commit (`feat(functions): implementa crearCajero con compensación y valida contraseña con dígito`).
+- [x] 3.8 Commit (`feat(functions): implementa crearCajero con compensación y valida contraseña con dígito`).
 
 ## Slice 4 — `actualizarCajero` + `desactivarCajero` (~360 lines, independent of 1/2; depends on Slice 3 for the claims/token pattern)
 
@@ -112,7 +112,7 @@ before `sdd-apply` starts slice 1, per the launch prompt.
 - [x] 4.11 GREEN: create `packages/functions/src/callables/desactivar-cajero.ts` — `exigirAdmin` → `validar(desactivarCajeroSchema)` → `auth.updateUser(uid,{disabled:true})` (mapped to `HttpsError("not-found")` on `auth/user-not-found`) → `auth.revokeRefreshTokens(uid)` → one Firestore tx: `usuarios/{uid}.activo=false` + `registrarAuditoria(USUARIO_DESACTIVADO)` per D-6 (profile written last; claims untouched — `disabled` + revoked tokens already deny everything). 3/3 green after.
 - [x] 4.12 Added export lines for `actualizarCajero`/`desactivarCajero` to `packages/functions/src/index.ts`.
 - [x] 4.13 Pre-close: `npm run typecheck && npm run lint && npm test`. All green — see apply-progress for the verbatim run (typecheck 0 errors all workspaces; lint 0 errors; `npx prettier --check .` clean; tests 259/259 — web 109, data 37, functions 52 incl. new 3/3 actualizar-cajero + 3/3 desactivar-cajero callable tests, shared 36, contracts 25 incl. new 4/4 + 2/2 schema tests).
-- [ ] 4.14 Commit (`feat(functions): implementa actualizarCajero y desactivarCajero con auditoría de modificación`) — NOT done by sdd-apply; RDD review + commit owned by the orchestrator per launch prompt.
+- [x] 4.14 Commit (`feat(functions): implementa actualizarCajero y desactivarCajero con auditoría de modificación`) — NOT done by sdd-apply; RDD review + commit owned by the orchestrator per launch prompt.
 
 ## Slice 5 — `reconciliarLineas` (~300 lines, independent of 1–4)
 
@@ -122,7 +122,14 @@ before `sdd-apply` starts slice 1, per the launch prompt.
 - [x] 5.4 Doc correction: `docs/diseno/08-contratos-y-cloud-functions.md` §4 `reconciliarLineas` — document the `aplicados`/`versiones` rewrite, `totalUnidades` delta, and I-M re-mark (currently just says "corrige recalculando").
 - [x] 5.5 Doc correction: `docs/diseno/09-seguridad-y-auditoria.md` §5 "Detección de inconsistencias" — same completeness correction as 5.4.
 - [x] 5.6 Pre-close: `npm run typecheck && npm run lint && npm test`. Orchestrator verification added the missing assertion on the session's `totalUnidades` delta: the implementation increments it by `esperado - cantidadAnterior`, but no case asserted it, so inverting the sign or dropping the write left the whole suite green. Verified by inverting the sign, which failed only that case (5/6 still passed), then reverting.
-- [ ] 5.7 Commit (`feat(functions): implementa reconciliarLineas con reescritura completa de aplicados y versiones`).
+- [x] 5.7 Commit (`feat(functions): implementa reconciliarLineas con reescritura completa de aplicados y versiones`).
+
+## Corrección posterior a `sdd-verify`
+
+- [x] V.1 `sdd-verify` levantó un CRITICAL: `crearCajero` no cumplía `gestion-cajeros/spec.md` («THEN it throws `HttpsError("already-exists", ...)`») ni `design.md:439`. `auth.createUser` quedaba fuera del `try`, así que un correo duplicado propagaba el `FirebaseAuthError` crudo y `onCall` lo traducía a un `internal` genérico: el admin nunca sabía que el correo ya estaba registrado. Corregido mapeando `auth/email-already-exists` a `HttpsError("already-exists", ...)`.
+- [x] V.2 La causa de que no se detectara antes: el test asertaba `.rejects.toThrow()` sin tipo, que pasa con CUALQUIER error. Reforzado a `.rejects.toMatchObject({ code: "already-exists" })` y verificado quitando el mapeo — falla sólo ese caso (2/3 verdes), revertido.
+- [x] V.3 Marcadas las seis casillas de commit (1.12, 2a.6, 2b.6, 3.8, 4.14, 5.7), que `sdd-verify` confirmó contra `git log` como trabajo hecho y sólo pendiente de anotar.
+- [ ] V.4 Commit (`fix(functions): mapea correo duplicado a already-exists en crearCajero`).
 
 ---
 

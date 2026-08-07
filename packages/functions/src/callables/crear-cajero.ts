@@ -1,4 +1,4 @@
-import { onCall } from "firebase-functions/v2/https";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { type Auth, getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore, type Firestore } from "firebase-admin/firestore";
 import { crearCajeroSchema, type CrearCajeroInput } from "@conteo/contracts";
@@ -23,11 +23,23 @@ export async function crearCajeroImpl(
   ejecutadoPor: string,
   input: CrearCajeroInput,
 ): Promise<{ uid: string; creado: true }> {
-  const usuario = await auth.createUser({
-    email: input.correo,
-    password: input.passwordTemporal,
-    displayName: input.nombre,
-  });
+  // El correo duplicado es la única falla esperable del paso 1 y el spec le
+  // exige un código propio. Sin este mapeo, `onCall` convierte cualquier throw
+  // que no sea `HttpsError` en un `internal` genérico y el admin nunca se
+  // entera de que el correo ya estaba registrado.
+  let usuario;
+  try {
+    usuario = await auth.createUser({
+      email: input.correo,
+      password: input.passwordTemporal,
+      displayName: input.nombre,
+    });
+  } catch (error) {
+    if ((error as { code?: string }).code === "auth/email-already-exists") {
+      throw new HttpsError("already-exists", "El correo ya está registrado");
+    }
+    throw error;
+  }
 
   try {
     await auth.setCustomUserClaims(usuario.uid, {
