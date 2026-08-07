@@ -186,7 +186,7 @@ Y las dos que fijan la dirección visual: *"usa el numeral de 32px sólo en las 
 1. **Fuga de `categoriasValor` en F3.** Es una colección global y `abrirSesionImpl` siembra una línea por cada doc con `activa == true` de **toda** la colección. Con `fileParallelism:false` pero aislamiento por sufijo `randomUUID` (no `clearFirestore`), una categoría activa olvidada cambia en silencio lo que observan `abrir-sesion.test.ts` y `cerrar-sesion.test.ts` — **y sólo en la siguiente corrida**. Mitigación: borrado en `afterEach` en ambos tests de categoría y **dos corridas seguidas** de la suite de functions antes de fusionar.
 2. **Orden de escritura de `reactivarCajero`.** Detallado en §3. Firestore primero.
 3. **El enum de auditoría pasa de 12 a 14.** Si la pantalla de auditoría lista tipos literales, los dos eventos de sucursal quedan invisibles. Derivar del tipo exportado.
-4. **`router.tsx` no es un riesgo.** `AppRouter` sólo lo importa `main.tsx`, cada test web monta su propio `<MemoryRouter><Routes>`, y `guardas.test.ts` prueba la función pura. Añadir la ruta anidada no puede poner en rojo ninguno de los 5 archivos verdes.
+4. **`router.tsx` no es un riesgo.** `AppRouter` sólo lo importa `main.tsx`, cada test web monta su propio `<MemoryRouter><Routes>`, y `guardas.test.ts` prueba la función pura. Añadir la ruta anidada no puede poner en rojo ninguno de los archivos verdes.
 5. **El formateador de moneda va en `apps/web/src/lib/formato.ts`, no en `packages/shared`.** `shared` es dominio puro y sin locale; formatear es presentación. Y como `Deck.tsx:14` ya tiene el único `Intl.NumberFormat` del repo, se **mueve** en vez de duplicarse — `Deck.test.tsx` sale gratis como regresión.
 6. **Una sucursal recién creada es invisible para todo cajero** hasta que alguien edite sus asignaciones (`actualizarCajero` reescribe el claim `sucursales`). No es un bug nuevo, pero el mensaje de éxito debe decirlo o se reportará como uno.
 7. **Trampa de nombres de `tema.css:68-73`.** No se planean tokens nuevos, así que el riesgo es cero salvo que alguien añada un `--text-<nombre>` que colisione con un `--color-<nombre>`.
@@ -222,7 +222,7 @@ Obligatorio en los cinco PRs, sin excepción:
 
 Después de F5, y sólo entonces:
 
-- `npm test` — los 5 archivos de test web y los 13 de functions verdes, **más los nuevos**. Ningún test preexistente modificado.
+- `npm test` — los 25 archivos de test web y los 13 de functions verdes, **más los nuevos**. Ningún test preexistente modificado. (El "5" que citaba `plan-diseno-visual-pwa.md` quedó obsoleto: era cierto antes de que esa fase añadiera veinte.)
 - `npm run test:rules` — aparte, no entra en `npm test`.
 - Suite de `packages/functions` **dos veces seguidas**: es el detector de la fuga de categorías.
 - `npm run typecheck` y `npm run lint`.
