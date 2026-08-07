@@ -1,18 +1,32 @@
 // apps/web/src/lib/router.tsx (doc 11 §2). F3-A dejó /login, /sucursales y
-// /conteo/:sesionId; esta ola (F3-B) añade /conteo/:sesionId/preparar y
-// /conteo/:sesionId/finalizar. El resto del mapa (/admin/*, …) sigue como
-// stub detrás de la ruta comodín, a la espera de las próximas olas.
-import { signInWithEmailAndPassword } from "firebase/auth";
+// /conteo/:sesionId; F3-B añadió /conteo/:sesionId/preparar y
+// /conteo/:sesionId/finalizar. F1 del panel admin
+// (docs/plan-panel-administrador.md §5) añade `/admin` con su propio
+// armazón (AdminLayout) y su primera pantalla real (PanelScreen); el resto
+// de las siete rutas de /admin sigue detrás de la ruta comodín, a la espera
+// de F2-F5.
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import type { ReactElement, ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { FirestoreAdminRepository } from "@conteo/data";
 import { calcularRedireccion } from "./guardas.js";
-import { auth } from "./firebase.js";
+import { auth, db } from "./firebase.js";
+import { functions } from "./funciones.js";
 import { useAuthState } from "../state/useAuthState.js";
+import { AdminRepositoryProvider } from "../state/admin-contexto.js";
 import { ConteoScreenPorSesion } from "../ui/ConteoScreen.js";
 import { FinalizarScreen } from "../ui/FinalizarScreen.js";
 import { LoginScreen } from "../ui/LoginScreen.js";
 import { PrepararScreen } from "../ui/PrepararScreen.js";
 import { SucursalesScreen } from "../ui/SucursalesScreen.js";
+import { AdminLayout } from "../ui/admin/AdminLayout.js";
+import { PanelScreen } from "../ui/admin/PanelScreen.js";
+
+// Módulo, no componente: una sola instancia para todo el árbol de /admin,
+// igual que `auth`/`db` en lib/firebase.ts. Sin React.lazy — no hay ninguno
+// hoy en esta app y no se está sumando ninguna librería de gráficas que lo
+// justifique (doc plan §1); un `// ponytail:` si algún día hace falta.
+const adminRepo = new FirestoreAdminRepository(db, functions);
 
 function SplashScreen() {
   return <p>Cargando…</p>;
@@ -83,6 +97,18 @@ export function AppRouter(): ReactNode {
             </RequireAuth>
           }
         />
+        <Route
+          path="/admin"
+          element={
+            <RequireAuth>
+              <AdminRepositoryProvider repo={adminRepo}>
+                <AdminLayout onSalir={() => signOut(auth)} />
+              </AdminRepositoryProvider>
+            </RequireAuth>
+          }
+        >
+          <Route index element={<PanelScreen />} />
+        </Route>
         <Route path="*" element={<StubScreen titulo="Próximamente" />} />
       </Routes>
     </BrowserRouter>
