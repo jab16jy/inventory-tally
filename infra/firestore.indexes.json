@@ -4,6 +4,14 @@
       "collectionGroup": "auditoria",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "tipo", "order": "ASCENDING" },
+        { "fieldPath": "ocurridoEn", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditoria",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "sucursalId", "order": "ASCENDING" },
         { "fieldPath": "ocurridoEn", "order": "DESCENDING" }
       ]

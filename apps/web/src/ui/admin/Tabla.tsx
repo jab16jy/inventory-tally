@@ -29,7 +29,13 @@ export interface TablaProps<T> {
   /** Nombre accesible de la tabla (`aria-label`). */
   readonly etiqueta: string;
   readonly vacio?: ReactNode;
+  /** Mientras es `true`, ignora `filas`/`vacio` y pinta filas de esqueleto
+   *  dentro de la MISMA tabla (mismos `<th>`, misma forma) — nunca un
+   *  spinner (docs/plan-panel-administrador.md §5, no negociables). */
+  readonly cargando?: boolean;
 }
+
+const FILAS_ESQUELETO = 3;
 
 type Direccion = "asc" | "desc";
 interface Orden {
@@ -37,7 +43,14 @@ interface Orden {
   readonly direccion: Direccion;
 }
 
-export function Tabla<T>({ columnas, filas, claveFila, etiqueta, vacio }: TablaProps<T>) {
+export function Tabla<T>({
+  columnas,
+  filas,
+  claveFila,
+  etiqueta,
+  vacio,
+  cargando = false,
+}: TablaProps<T>) {
   const [orden, setOrden] = useState<Orden | null>(null);
 
   const filasOrdenadas = useMemo(() => {
@@ -64,7 +77,7 @@ export function Tabla<T>({ columnas, filas, claveFila, etiqueta, vacio }: TablaP
     });
   }
 
-  if (filas.length === 0) {
+  if (!cargando && filas.length === 0) {
     return <p className="text-base text-tenue">{vacio ?? "No hay datos."}</p>;
   }
 
@@ -122,18 +135,33 @@ export function Tabla<T>({ columnas, filas, claveFila, etiqueta, vacio }: TablaP
         </tr>
       </thead>
       <tbody>
-        {filasOrdenadas.map((fila) => (
-          <tr key={claveFila(fila)} className="border-b border-borde last:border-b-0">
-            {columnas.map((columna) => (
-              <td
-                key={columna.clave}
-                className={clsx("px-3 py-2 text-tinta", columna.alinearDerecha && "text-right")}
+        {cargando
+          ? Array.from({ length: FILAS_ESQUELETO }, (_, i) => (
+              <tr
+                key={`esqueleto-${i}`}
+                aria-hidden="true"
+                data-testid="fila-esqueleto"
+                className="border-b border-borde last:border-b-0"
               >
-                {columna.render(fila)}
-              </td>
+                {columnas.map((columna) => (
+                  <td key={columna.clave} className="px-3 py-2">
+                    <span className="block h-4 w-3/4 animate-pulse rounded-placa bg-placa-alta" />
+                  </td>
+                ))}
+              </tr>
+            ))
+          : filasOrdenadas.map((fila) => (
+              <tr key={claveFila(fila)} className="border-b border-borde last:border-b-0">
+                {columnas.map((columna) => (
+                  <td
+                    key={columna.clave}
+                    className={clsx("px-3 py-2 text-tinta", columna.alinearDerecha && "text-right")}
+                  >
+                    {columna.render(fila)}
+                  </td>
+                ))}
+              </tr>
             ))}
-          </tr>
-        ))}
       </tbody>
     </table>
   );
