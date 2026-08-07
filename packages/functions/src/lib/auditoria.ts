@@ -1,23 +1,18 @@
 import type { Firestore, Transaction } from "firebase-admin/firestore";
 import { FieldValue } from "firebase-admin/firestore";
 
-/**
- * Catálogo de eventos de auditoría (doc 04 §3).
- */
-export type TipoEventoAuditoria =
-  | "APORTE_CREADO"
-  | "APORTE_MODIFICADO"
-  | "SESION_ABIERTA"
-  | "SESION_CERRADA"
-  | "CIERRE_BLOQUEADO"
-  | "USUARIO_CREADO"
-  | "USUARIO_ACTUALIZADO"
-  | "USUARIO_DESACTIVADO"
-  | "CATEGORIA_CREADA"
-  | "CATEGORIA_DESACTIVADA"
-  | "RECONCILIACION"
-  | "AUDITORIA_PURGADA";
+// El catálogo vive en packages/shared: es el mismo vocabulario para quien
+// escribe (estas Functions) y para quien lee (el panel admin, vía
+// AdminRepository). Tenerlo dos veces obligaba a ampliarlo dos veces.
+export type { TipoEventoAuditoria } from "@conteo/shared/models/evento-auditoria.js";
+import type { TipoEventoAuditoria } from "@conteo/shared/models/evento-auditoria.js";
 
+/**
+ * Lado de ESCRITURA del evento. Distinto a propósito del `EventoAuditoria` de
+ * packages/shared, que es el de lectura: `eventoId` lo asigna Firestore y
+ * `ocurridoEn` lo pone `registrarAuditoria` con la hora del servidor, así que
+ * ninguno de los dos se recibe aquí.
+ */
 export interface EventoAuditoria {
   readonly tipo: TipoEventoAuditoria;
   readonly [campo: string]: unknown;

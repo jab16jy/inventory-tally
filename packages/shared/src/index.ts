@@ -4,6 +4,8 @@ export type { EstadoSesion, SesionConteo } from "./models/sesion-conteo.js";
 export type { RolUsuario, Usuario } from "./models/usuario.js";
 export type { CategoriaValor } from "./models/categoria-valor.js";
 export type { Conectividad, Sucursal } from "./models/sucursal.js";
+export type { EventoAuditoria, TipoEventoAuditoria } from "./models/evento-auditoria.js";
+export type { Historico } from "./models/historico.js";
 
 export type { LineaSumable } from "./services/calculadora.js";
 export {
