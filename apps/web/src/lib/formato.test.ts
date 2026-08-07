@@ -1,6 +1,6 @@
 // apps/web/src/lib/formato.test.ts (docs/plan-panel-administrador.md §5, F1)
 import { describe, expect, it } from "vitest";
-import { moneda, numero } from "./formato.js";
+import { fecha, moneda, numero } from "./formato.js";
 
 describe("formato (doc plan-panel-administrador §5, fase F1)", () => {
   it("formatea 1234500 como moneda es-CO sin decimales", () => {
@@ -11,5 +11,12 @@ describe("formato (doc plan-panel-administrador §5, fase F1)", () => {
 
   it("agrupa miles en el formato de número", () => {
     expect(numero(1234500)).toBe("1.234.500");
+  });
+
+  it("formatea una fecha UTC en hora de Bogotá (F2)", () => {
+    // 2026-08-01T15:30:00Z == 2026-08-01T10:30:00-05:00 en Bogotá (sin
+    // horario de verano) — cadena exacta verificada en el runtime real,
+    // no supuesta.
+    expect(fecha(new Date("2026-08-01T15:30:00Z"))).toBe("1/08/2026, 10:30 a. m.");
   });
 });

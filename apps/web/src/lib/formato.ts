@@ -12,6 +12,16 @@ const FORMATO_MONEDA = new Intl.NumberFormat("es-CO", {
 
 const FORMATO_NUMERO = new Intl.NumberFormat("es-CO");
 
+// `timeZone` fijo, no el del navegador: Colombia no tiene horario de verano
+// (UTC-5 constante), así que fijarlo es tan correcto como dejarlo implícito
+// y además hace el formato determinista sin importar dónde corra el cliente
+// o el test (docs/plan-panel-administrador.md §5, fase F2).
+const FORMATO_FECHA = new Intl.DateTimeFormat("es-CO", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "America/Bogota",
+});
+
 /** Dinero en pesos colombianos. `valorEnteroCOP` ya es entero en la unidad
  *  mínima (doc 03 §4: el dinero nunca es `double`), así que no hay
  *  decimales que perder. */
@@ -22,4 +32,10 @@ export function moneda(valorEnteroCOP: number): string {
 /** Agrupación de miles es-CO sin símbolo — unidades, conteos. */
 export function numero(n: number): string {
   return FORMATO_NUMERO.format(n);
+}
+
+/** Fecha y hora corta es-CO, hora de Bogotá — `ultimoAccesoEn` de un cajero,
+ *  eventos de auditoría, cierres de sesión. */
+export function fecha(valor: Date): string {
+  return FORMATO_FECHA.format(valor);
 }
