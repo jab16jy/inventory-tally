@@ -15,7 +15,8 @@ export type TipoEventoAuditoria =
   | "USUARIO_DESACTIVADO"
   | "CATEGORIA_CREADA"
   | "CATEGORIA_DESACTIVADA"
-  | "RECONCILIACION";
+  | "RECONCILIACION"
+  | "AUDITORIA_PURGADA";
 
 export interface EventoAuditoria {
   readonly tipo: TipoEventoAuditoria;

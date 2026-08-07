@@ -52,7 +52,7 @@ flowchart LR
 | `onAporteEscrito`     | trigger      | Firestore | Agrega total, marca resumen, registra auditoría        |
 | `recalcularResumenes` | cron cada minuto | —     | Recalcula resúmenes marcados `dirty`                   |
 | `reconciliarLineas`   | cron semanal | —         | Detecta y corrige totales inconsistentes               |
-| `purgarAuditoria`     | cron mensual | —         | Exporta y purga auditoría > 12 meses                   |
+| `purgarAuditoria`     | cron mensual | —         | Purga auditoría > 12 meses                             |
 
 ---
 
@@ -387,6 +387,44 @@ delta y vuelve a marcar `resumen/actual.dirty=true`.
 
 > Esto es posible **porque los aportes son la fuente de verdad**. Si el diseño guardara
 > sólo el total, un dato corrupto sería irrecuperable.
+
+### `purgarAuditoria` (mensual)
+
+Aplica la política de retención de [02 §7](02-estimaciones-y-restricciones.md): `auditoria`
+conserva **12 meses en caliente**. Sin ella la colección crece indefinidamente (≈64.800
+eventos al año) y el sistema nunca se estabiliza en el ~4 % de cuota que [02 §5](02-estimaciones-y-restricciones.md)
+proyecta.
+
+```typescript
+export const purgarAuditoria = onSchedule(
+  { schedule: "1 of month 04:00", region: "us-central1" }, // 03:00 del lunes ya es de reconciliarLineas
+  async () => {
+    await purgarAuditoriaImpl(getFirestore());
+  },
+);
+```
+
+`purgarAuditoriaImpl(db)` calcula `corte = ahora − 12 meses` y borra en lotes de 400
+(límite de 500 operaciones por batch, [02 §6](02-estimaciones-y-restricciones.md)) mientras
+la consulta siga devolviendo resultados. Al terminar, si eliminó algo, registra **un solo**
+evento `AUDITORIA_PURGADA` con el total — auditar documento a documento reescribiría la
+colección que se acaba de vaciar. Ese evento será purgado a su vez dentro de 12 meses.
+
+`where("ocurridoEn", "<", corte)` es un rango de campo único: lo resuelve el índice
+automático de Firestore, que `firestore.indexes.json` no deshabilita (`fieldOverrides: []`).
+No hace falta índice compuesto nuevo.
+
+> **No exporta, a diferencia de lo que decía la v1 de este documento.** El archivo
+> histórico ya existe y es la exportación diaria a Cloud Storage de
+> [12 §5](12-despliegue-y-entornos.md) (RPO 24 h). Un volcado propio dentro del cron
+> duplicaría un export gestionado que ya corre, y exigiría inventar una convención de
+> bucket y ruta que ningún documento define.
+
+A diferencia de `recalcularResumenes` y `reconciliarLineas`, **no** aísla cada elemento con
+un `try/catch`: allí el aislamiento protege elementos heterogéneos entre sí (una sesión
+corrupta no debe bloquear las demás), mientras que aquí la consulta es homogénea y la
+operación es idempotente por construcción — si una corrida falla a medias, la del mes
+siguiente vuelve a consultar por `ocurridoEn` y recoge lo que quedó.
 
 ---
 

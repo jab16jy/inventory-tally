@@ -6,3 +6,4 @@ export { actualizarCajero } from "./callables/actualizar-cajero.js";
 export { desactivarCajero } from "./callables/desactivar-cajero.js";
 export { recalcularResumenes } from "./scheduled/recalcular-resumenes.js";
 export { reconciliarLineas } from "./scheduled/reconciliar-lineas.js";
+export { purgarAuditoria } from "./scheduled/purgar-auditoria.js";

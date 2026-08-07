@@ -272,7 +272,8 @@ a la confirmación la vuelve obsoleta aunque `confirmadoEn` siga siendo verdader
 
 **Tipos de evento:** `APORTE_CREADO`, `APORTE_MODIFICADO`, `SESION_ABIERTA`,
 `SESION_CERRADA`, `CIERRE_BLOQUEADO`, `USUARIO_CREADO`, `USUARIO_ACTUALIZADO`,
-`USUARIO_DESACTIVADO`, `CATEGORIA_CREADA`, `CATEGORIA_DESACTIVADA`, `RECONCILIACION`.
+`USUARIO_DESACTIVADO`, `CATEGORIA_CREADA`, `CATEGORIA_DESACTIVADA`, `RECONCILIACION`,
+`AUDITORIA_PURGADA`.
 
 > **Denormalización deliberada:** el evento guarda nombres porque Firestore no tiene
 > joins y porque la auditoría debe reflejar el estado **del momento del hecho**. Si Ana

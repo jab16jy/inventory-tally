@@ -133,7 +133,7 @@ sistema se estabiliza cerca de ese valor sin crecer indefinidamente.
 
 | Colección                          | Retención            | Mecanismo                                        |
 | ---------------------------------- | -------------------- | ------------------------------------------------ |
-| `auditoria`                        | 12 meses en caliente | Función mensual: exporta a Cloud Storage y purga |
+| `auditoria`                        | 12 meses en caliente | `purgarAuditoria` (cron mensual) purga; el archivo histórico es la exportación diaria de [12 §5](12-despliegue-y-entornos.md) |
 | `aportes` de sesiones cerradas     | 6 meses              | Se conserva el snapshot agregado                 |
 | `sesiones` cerradas + `historicos` | Indefinido           | Registro de negocio; ocupan poco                 |
 
