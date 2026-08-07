@@ -51,6 +51,7 @@ export function CajerosScreen() {
 
   const [formulario, setFormulario] = useState<EstadoFormulario | null>(null);
   const [errorFormulario, setErrorFormulario] = useState<string | null>(null);
+  const [errorAccion, setErrorAccion] = useState<string | null>(null);
   // ponytail: confirmación inline de un paso (botón → "¿Confirmar?") en vez
   // de un <dialog>: desactivar es reversible (reactivarCajero existe), así
   // que no hace falta el foco atrapado que sí se gana ModalSesionCerrada.tsx
@@ -95,9 +96,28 @@ export function CajerosScreen() {
     }
   }
 
-  async function desactivar(uid: string): Promise<void> {
-    await repo.desactivarCajero(uid);
-    setConfirmandoUid(null);
+  async function desactivar(usuario: Usuario): Promise<void> {
+    setErrorAccion(null);
+    try {
+      await repo.desactivarCajero(usuario.uid);
+    } catch {
+      setErrorAccion(`No se pudo desactivar a ${usuario.nombre}. Intenta de nuevo.`);
+    } finally {
+      // `finally` a propósito: la confirmación inline ("¿Desactivar a X?") no
+      // puede quedar pegada en ningún desenlace. En éxito ya no hace falta;
+      // en error el admin necesita volver al botón "Desactivar" para
+      // reintentar en vez de ver los mismos "Confirmar"/"Cancelar" sin salida.
+      setConfirmandoUid(null);
+    }
+  }
+
+  async function reactivar(usuario: Usuario): Promise<void> {
+    setErrorAccion(null);
+    try {
+      await repo.reactivarCajero(usuario.uid);
+    } catch {
+      setErrorAccion(`No se pudo reactivar a ${usuario.nombre}. Intenta de nuevo.`);
+    }
   }
 
   const columnas: ColumnaTabla<Usuario>[] = [
@@ -154,7 +174,7 @@ export function CajerosScreen() {
                 <span className="text-micro text-tenue">¿Desactivar a {u.nombre}?</span>
                 <button
                   type="button"
-                  onClick={() => void desactivar(u.uid)}
+                  onClick={() => void desactivar(u)}
                   className="rounded-placa border border-riesgo px-2.5 py-1.5 text-micro text-tinta hover:bg-riesgo-placa"
                 >
                   Confirmar
@@ -179,7 +199,7 @@ export function CajerosScreen() {
           ) : (
             <button
               type="button"
-              onClick={() => void repo.reactivarCajero(u.uid)}
+              onClick={() => void reactivar(u)}
               className="rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-senal hover:text-senal"
             >
               Reactivar
@@ -202,6 +222,15 @@ export function CajerosScreen() {
           Nuevo cajero
         </button>
       </header>
+
+      {errorAccion && (
+        <p
+          role="alert"
+          className="mb-4 rounded-placa border border-riesgo bg-riesgo-placa px-3 py-2 text-micro text-tinta"
+        >
+          {errorAccion}
+        </p>
+      )}
 
       {formulario && (
         <FormularioCajero

@@ -101,4 +101,51 @@ describe("CajerosScreen (F2)", () => {
       /ya existe un cajero con ese correo/i,
     );
   });
+
+  it("muestra un error cuando falla desactivar al cajero", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarUsuario(usuarioBase());
+    repo.desactivarCajero = vi.fn().mockRejectedValue(new Error("network"));
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /^desactivar$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirmar/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /no se pudo desactivar a ana\. intenta de nuevo\./i,
+    );
+  });
+
+  it("cierra la confirmación cuando falla desactivar", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarUsuario(usuarioBase());
+    repo.desactivarCajero = vi.fn().mockRejectedValue(new Error("network"));
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /^desactivar$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirmar/i }));
+
+    await screen.findByRole("alert");
+
+    // La confirmación inline ("¿Desactivar a Ana?" / Confirmar / Cancelar) no
+    // debe quedar pegada en pantalla: el admin tiene que poder reintentar.
+    expect(screen.queryByText(/¿desactivar a ana\?/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^desactivar$/i })).toBeInTheDocument();
+  });
+
+  it("muestra un error cuando falla reactivar al cajero", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarUsuario(usuarioBase({ activo: false }));
+    repo.reactivarCajero = vi.fn().mockRejectedValue(new Error("network"));
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /^reactivar$/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /no se pudo reactivar a ana\. intenta de nuevo\./i,
+    );
+  });
 });
