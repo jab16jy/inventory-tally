@@ -34,6 +34,7 @@ import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import type { Usuario } from "@conteo/shared/models/usuario.js";
+import { participanteSincronizado } from "@conteo/shared/services/sincronizacion.js";
 import type {
   AbrirSesionPayload,
   ActualizarCajeroPayload,
@@ -102,10 +103,11 @@ export class FirestoreAdminRepository implements AdminRepository {
   }
 
   /**
-   * El predicado de "sincronizado" es el mismo de
-   * packages/functions/src/lib/sincronizacion.ts:67-68 (RF-16), NO
-   * re-derivado: confirmadoEn != null && confirmadoEn >= (ultimoAporteServidor ?? 0).
-   * Los nombres no viven en `sincronizacion/estado` (sólo uids): un `getDoc`
+   * El predicado de "sincronizado" es `participanteSincronizado` de
+   * `@conteo/shared/services/sincronizacion.js` (RF-16), NO re-derivado —
+   * mismo predicado que usa `verificarSincronizacion` en
+   * packages/functions/src/lib/sincronizacion.ts. Los nombres no viven en
+   * `sincronizacion/estado` (sólo uids): un `getDoc`
    * por participante contra `usuarios` en cada snapshot, igual de acotado
    * que el fan-out de `ultimoHistoricoPorSucursal` (participantes de una
    * sesión, no toda la colección).
@@ -130,14 +132,26 @@ export class FirestoreAdminRepository implements AdminRepository {
           const participantes = uids.map((uid, indice) => {
             const nombre = (usuarioSnaps[indice]?.data()?.nombre as string | undefined) ?? uid;
             const entrada = entradas[uid];
-            const confirmadoEn = entrada?.confirmadoEn ?? null;
-            const ultimoAporteServidor = entrada?.ultimoAporteServidor ?? null;
-            const sincronizado =
-              confirmadoEn != null &&
-              confirmadoEn.toMillis() >= (ultimoAporteServidor?.toMillis() ?? 0);
+            const sincronizado = participanteSincronizado(
+              entrada?.confirmadoEn?.toMillis() ?? null,
+              entrada?.ultimoAporteServidor?.toMillis() ?? null,
+            );
             return { uid, nombre, sincronizado };
           });
           onChange({ participantes });
+        },
+        () => {
+          // Un `getDoc(usuarios/{uid})` rechazó (permiso denegado, offline,
+          // doc borrado): se falla cerrado, mismo criterio conservador que
+          // `verificarSincronizacion` en
+          // packages/functions/src/lib/sincronizacion.ts ("un participante
+          // ausente se trata como sin sincronizar"). NUNCA `participantes: []`
+          // aquí — una lista vacía habilitaría "Cerrar conteo" sobre un
+          // estado que en realidad no se pudo leer.
+          onChange({
+            participantes: uids.map((uid) => ({ uid, nombre: uid, sincronizado: false })),
+            degradado: true,
+          });
         },
       );
     });

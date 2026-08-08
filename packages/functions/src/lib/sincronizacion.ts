@@ -1,4 +1,5 @@
 import type { Firestore } from "firebase-admin/firestore";
+import { participanteSincronizado } from "@conteo/shared/services/sincronizacion.js";
 
 export interface ParticipanteConNombre {
   readonly uid: string;
@@ -22,7 +23,11 @@ interface EntradaSincronizacion {
  * confirmación obsoleta y debe tratarse como sin sincronizar aunque
  * `confirmadoEn` sea verdadero.
  *
- * sincronizado(uid) ⟺ confirmadoEn != null && confirmadoEn >= (ultimoAporteServidor ?? 0)
+ * El predicado en sí (sincronizado(uid) ⟺ confirmadoEn != null &&
+ * confirmadoEn >= (ultimoAporteServidor ?? 0)) vive en
+ * `@conteo/shared/services/sincronizacion.js` como `participanteSincronizado`
+ * — mismo predicado que usa `observarSincronizacion` en
+ * `packages/data/src/firebase/firestore-admin-repository.ts`, no reescrito.
  *
  * Un participante ausente en `sincronizacion/estado` se trata como sin
  * sincronizar (conservador): en la práctica no ocurre porque el trigger
@@ -64,8 +69,10 @@ export async function verificarSincronizacion(
     const entrada = entradas[uid];
     const confirmadoEn = entrada?.confirmadoEn ?? null;
     const ultimoAporteServidor = entrada?.ultimoAporteServidor ?? null;
-    const sincronizado =
-      confirmadoEn != null && confirmadoEn.toMillis() >= (ultimoAporteServidor?.toMillis() ?? 0);
+    const sincronizado = participanteSincronizado(
+      confirmadoEn?.toMillis() ?? null,
+      ultimoAporteServidor?.toMillis() ?? null,
+    );
 
     if (sincronizado) return;
 

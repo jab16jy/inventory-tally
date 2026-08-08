@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Aporte } from "../models/aporte.js";
 import type { LineaConteo } from "../models/linea-conteo.js";
-import { aporteConfirmado } from "./sincronizacion.js";
+import { aporteConfirmado, participanteSincronizado } from "./sincronizacion.js";
 
 function linea(versiones: Record<string, number>): LineaConteo {
   return {
@@ -57,5 +57,29 @@ describe("aporteConfirmado (doc 05 §3 — RF-16)", () => {
     // Sin esto, el aporte de un compañero pondría la regla en sólido y el
     // cajero creería que su conteo está a salvo cuando no lo está.
     expect(aporteConfirmado(linea({ uid_beto: 9 }), aporte("uid_ana", 1))).toBe(false);
+  });
+});
+
+describe("participanteSincronizado (doc 05 §3 — RF-16, vista del admin)", () => {
+  it("confirmadoEn igual a ultimoAporteServidor cuenta como sincronizado (frontera >=)", () => {
+    expect(participanteSincronizado(2000, 2000)).toBe(true);
+  });
+
+  it("confirmadoEn posterior a ultimoAporteServidor está sincronizado", () => {
+    expect(participanteSincronizado(2000, 1000)).toBe(true);
+  });
+
+  it("confirmadoEn null nunca está sincronizado", () => {
+    expect(participanteSincronizado(null, 1000)).toBe(false);
+  });
+
+  it("ultimoAporteServidor ausente (null) se trata como 0: cualquier confirmación cuenta", () => {
+    expect(participanteSincronizado(0, null)).toBe(true);
+  });
+
+  it("confirmación obsoleta: confirmó y luego volvió a aportar → NO sincronizado", () => {
+    // confirmadoEn es verdadero (1000) pero un aporte posterior (2000) lo
+    // vuelve obsoleto: no basta con !!confirmadoEn.
+    expect(participanteSincronizado(1000, 2000)).toBe(false);
   });
 });
