@@ -22,6 +22,15 @@ const FORMATO_FECHA = new Intl.DateTimeFormat("es-CO", {
   timeZone: "America/Bogota",
 });
 
+// Un decimal fijo: es la misma escala de décimas que garantiza el invariante
+// de `distribuirRedondeo` (packages/shared/services/calculadora-analisis.ts),
+// así que el texto pintado nunca lleva más precisión de la que ese reparto
+// promete.
+const FORMATO_PORCENTAJE = new Intl.NumberFormat("es-CO", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
+
 /** Dinero en pesos colombianos. `valorEnteroCOP` ya es entero en la unidad
  *  mínima (doc 03 §4: el dinero nunca es `double`), así que no hay
  *  decimales que perder. */
@@ -38,4 +47,12 @@ export function numero(n: number): string {
  *  eventos de auditoría, cierres de sesión. */
 export function fecha(valor: Date): string {
   return FORMATO_FECHA.format(valor);
+}
+
+/** Porcentaje con un decimal fijo es-CO — participación de sucursal en el
+ *  comparativo (docs/plan-panel-administrador.md §5, fase F4). Espera un
+ *  valor ya en escala 0–100 (la salida de `distribuirRedondeo`), no una
+ *  fracción 0–1. */
+export function porcentaje(valor: number): string {
+  return `${FORMATO_PORCENTAJE.format(valor)}%`;
 }
