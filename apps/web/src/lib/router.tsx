@@ -3,8 +3,8 @@
 // /conteo/:sesionId/finalizar. F1 del panel admin
 // (docs/plan-panel-administrador.md §5) añade `/admin` con su propio
 // armazón (AdminLayout); F2 sumó cajeros y sucursales; F3 suma categorías,
-// sesiones y auditoría; F4 suma cierre y comparativo. Análisis de sesión
-// sigue detrás de la ruta comodín, a la espera de F5.
+// sesiones y auditoría; F4 suma cierre y comparativo; F5 suma el análisis de
+// una sesión, alcanzado desde el botón "Análisis →" de PanelScreen.
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import type { ReactElement, ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
@@ -20,6 +20,7 @@ import { LoginScreen } from "../ui/LoginScreen.js";
 import { PrepararScreen } from "../ui/PrepararScreen.js";
 import { SucursalesScreen } from "../ui/SucursalesScreen.js";
 import { AdminLayout } from "../ui/admin/AdminLayout.js";
+import { AnalisisScreen } from "../ui/admin/AnalisisScreen.js";
 import { AuditoriaScreen } from "../ui/admin/AuditoriaScreen.js";
 import { CajerosScreen } from "../ui/admin/CajerosScreen.js";
 import { CategoriasScreen } from "../ui/admin/CategoriasScreen.js";
@@ -122,6 +123,8 @@ export function AppRouter(): ReactNode {
           {/* Alcanzada desde el botón "Cerrar →" de PanelScreen (F1 ya lo
               anticipaba) — R5, la única pantalla del admin con wireframe. */}
           <Route path="sesiones/:sesionId/cerrar" element={<CierreScreen />} />
+          {/* Alcanzada desde el botón "Análisis →" de PanelScreen (F5). */}
+          <Route path="sesiones/:sesionId/analisis" element={<AnalisisScreen />} />
           <Route path="auditoria" element={<AuditoriaScreen />} />
           <Route path="comparativo" element={<ComparativoScreen />} />
         </Route>

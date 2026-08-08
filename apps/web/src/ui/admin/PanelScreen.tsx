@@ -111,6 +111,16 @@ export function PanelScreen() {
                     </Numeral>
                   </div>
 
+                  {/* Entrada al análisis (F5): navega, no calcula nada aquí. */}
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/admin/sesiones/${sesion.sesionId}/analisis`)}
+                    aria-label={`Análisis — ${sesion.sucursalNombre}`}
+                    className="shrink-0 rounded-placa border border-borde px-3 py-2 text-micro font-semibold text-tinta transition-colors duration-150 ease-out hover:border-senal hover:text-senal"
+                  >
+                    Análisis →
+                  </button>
+
                   {/* Entrada al cierre (F4): navega, no cierra desde aquí. */}
                   <button
                     type="button"
