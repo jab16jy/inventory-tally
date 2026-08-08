@@ -45,6 +45,12 @@ export interface EstadoSincronizacion {
     readonly nombre: string;
     readonly sincronizado: boolean;
   }[];
+  /** `true` cuando no se pudo leer `usuarios/{uid}` para algún participante
+   *  (permiso denegado, offline, doc borrado): `participantes` es el
+   *  fallback conservador (todos `sincronizado: false`), no la lectura real
+   *  — `CierreScreen` debe decirlo, no presentarlo como si fuera el estado
+   *  real (doc plan §5, F4). */
+  readonly degradado?: boolean;
 }
 
 // ── payloads de escritura ──

@@ -19,3 +19,27 @@ export function aporteConfirmado(linea: LineaConteo, aporte: Aporte | null): boo
   if (!aporte) return false;
   return (linea.versiones[aporte.uid] ?? 0) >= aporte.version;
 }
+
+/**
+ * participanteSincronizado — predicado RF-16 desde la vista del admin (doc
+ * 05 §3): ¿este participante está sincronizado, para efectos de la puerta de
+ * cierre? Vive en el mismo archivo que `aporteConfirmado` porque responde la
+ * misma pregunta de RF-16 —¿ya llegó al servidor?— desde otro ángulo: aquél
+ * es "¿MI aporte ya confirmó?" (un cajero sobre sí mismo); éste es "¿este
+ * participante está al día?" (el admin sobre cualquiera), y lo usan
+ * `verificarSincronizacion` (functions) y `observarSincronizacion` (data)
+ * para decidir si bloquean el cierre.
+ *
+ * sincronizado ⟺ confirmadoEn != null && confirmadoEn >= (ultimoAporteServidor ?? 0)
+ *
+ * `packages/shared` no puede importar `FirebaseFirestore.Timestamp` (SDK
+ * admin) ni `Timestamp` (SDK cliente) sin romper la regla de dependencia, así
+ * que recibe milisegundos planos: cada llamador convierte con `.toMillis()`
+ * en su propia frontera.
+ */
+export function participanteSincronizado(
+  confirmadoEnMillis: number | null,
+  ultimoAporteServidorMillis: number | null,
+): boolean {
+  return confirmadoEnMillis != null && confirmadoEnMillis >= (ultimoAporteServidorMillis ?? 0);
+}

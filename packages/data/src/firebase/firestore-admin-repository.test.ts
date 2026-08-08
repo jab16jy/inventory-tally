@@ -219,6 +219,36 @@ describe("FirestoreAdminRepository.observarSincronizacion (predicado RF-16, mirr
 
     expect(recibidos.at(-1)?.participantes[0]?.sincronizado).toBe(true);
   });
+
+  it("getDoc(usuarios/{uid}) rechazado → onChange SÍ se llama, falla cerrado (todos sin sincronizar, degradado)", async () => {
+    let callback: ((snap: unknown) => void) | undefined;
+    onSnapshot.mockImplementation((_ref: unknown, cb: (snap: unknown) => void) => {
+      callback = cb;
+      return vi.fn();
+    });
+    getDoc.mockRejectedValue(new Error("permission-denied"));
+
+    const repo = new FirestoreAdminRepository({} as never, {} as never);
+    const recibidos: EstadoSincronizacion[] = [];
+    repo.observarSincronizacion("ses_1", (e) => recibidos.push(e));
+
+    callback?.({
+      data: () => ({
+        participantes: {
+          uid_ana: { confirmadoEn: null, ultimoAporteServidor: null },
+          uid_luis: { confirmadoEn: null, ultimoAporteServidor: null },
+        },
+      }),
+    });
+    await esperarAsentamiento();
+
+    expect(recibidos).toHaveLength(1);
+    expect(recibidos[0]?.degradado).toBe(true);
+    expect(recibidos[0]?.participantes).toEqual([
+      { uid: "uid_ana", nombre: "uid_ana", sincronizado: false },
+      { uid: "uid_luis", nombre: "uid_luis", sincronizado: false },
+    ]);
+  });
 });
 
 describe("FirestoreAdminRepository.cerrarSesion (routing de escrituras vía httpsCallable)", () => {
