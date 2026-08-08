@@ -3,8 +3,8 @@
 // /conteo/:sesionId/finalizar. F1 del panel admin
 // (docs/plan-panel-administrador.md §5) añade `/admin` con su propio
 // armazón (AdminLayout); F2 sumó cajeros y sucursales; F3 suma categorías,
-// sesiones y auditoría. Comparativo y análisis de sesión siguen detrás de la
-// ruta comodín, a la espera de F4-F5.
+// sesiones y auditoría; F4 suma cierre y comparativo. Análisis de sesión
+// sigue detrás de la ruta comodín, a la espera de F5.
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import type { ReactElement, ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
@@ -23,6 +23,8 @@ import { AdminLayout } from "../ui/admin/AdminLayout.js";
 import { AuditoriaScreen } from "../ui/admin/AuditoriaScreen.js";
 import { CajerosScreen } from "../ui/admin/CajerosScreen.js";
 import { CategoriasScreen } from "../ui/admin/CategoriasScreen.js";
+import { CierreScreen } from "../ui/admin/CierreScreen.js";
+import { ComparativoScreen } from "../ui/admin/ComparativoScreen.js";
 import { PanelScreen } from "../ui/admin/PanelScreen.js";
 import { SesionesScreen } from "../ui/admin/SesionesScreen.js";
 import { SucursalesAdminScreen } from "../ui/admin/SucursalesAdminScreen.js";
@@ -117,7 +119,11 @@ export function AppRouter(): ReactNode {
           <Route path="sucursales" element={<SucursalesAdminScreen />} />
           <Route path="categorias" element={<CategoriasScreen />} />
           <Route path="sesiones" element={<SesionesScreen />} />
+          {/* Alcanzada desde el botón "Cerrar →" de PanelScreen (F1 ya lo
+              anticipaba) — R5, la única pantalla del admin con wireframe. */}
+          <Route path="sesiones/:sesionId/cerrar" element={<CierreScreen />} />
           <Route path="auditoria" element={<AuditoriaScreen />} />
+          <Route path="comparativo" element={<ComparativoScreen />} />
         </Route>
         <Route path="*" element={<StubScreen titulo="Próximamente" />} />
       </Routes>
