@@ -140,7 +140,27 @@ function BarraOTexto({ fila }: { readonly fila: FilaComparativo }) {
   );
 }
 
-export function ComparativoScreen() {
+export interface ComparativoScreenProps {
+  /**
+   * `true` cuando otra pantalla la compone como una sección más — hoy sólo
+   * `AnalisisScreen` (F5). Es UNA prop para UN concepto ("no soy la pantalla,
+   * soy una sección de otra"), porque anidarla cambia dos cosas a la vez:
+   *
+   * 1. **Encabezado**: pasa de `h1` a `h2`. Anidada sin esto el documento
+   *    quedaba con DOS `<h1>` y el comparativo —una subsección, hermana de
+   *    las demás `h2`— se anunciaba como par del título de la página al
+   *    navegar por encabezados con un lector de pantalla.
+   * 2. **Relleno**: se quita el `p-6`. La pantalla contenedora ya trae el
+   *    suyo, así que anidada sin esto el comparativo quedaba con 48 px de
+   *    relleno contra los 24 px de todas sus secciones hermanas — desalineado
+   *    justo en una pantalla cuyo trabajo es que se pueda barrer de un
+   *    vistazo.
+   */
+  readonly anidado?: boolean;
+}
+
+export function ComparativoScreen({ anidado = false }: ComparativoScreenProps = {}) {
+  const Encabezado = anidado ? "h2" : "h1";
   const sucursales = useSucursales();
   const sucursalIds = sucursales.map((s) => s.sucursalId);
   const { historicos, cargando, error } = useUltimosHistoricos(sucursalIds);
@@ -172,9 +192,11 @@ export function ComparativoScreen() {
   ];
 
   return (
-    <section className="p-6">
+    <section className={anidado ? undefined : "p-6"}>
       <header className="pb-4">
-        <h1 className="text-micro tracking-[0.18em] text-tenue uppercase">Comparativo</h1>
+        <Encabezado className="text-micro tracking-[0.18em] text-tenue uppercase">
+          Comparativo
+        </Encabezado>
       </header>
 
       {error && (
