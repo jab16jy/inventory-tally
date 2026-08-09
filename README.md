@@ -40,13 +40,18 @@ propuesta está mal, no la regla.
 ```bash
 npm install
 
+# Una sola vez: la web sólo usa los emuladores si esta variable existe
+# (doc 06 §4). Sin ella apunta al proyecto real y el login falla.
+#   apps/web/.env  →  VITE_USE_EMULATORS=true
+# (ver apps/web/.env.example)
+
 # Terminal 1 — emuladores (auth, firestore, functions, hosting)
 npm run emu
 
 # Terminal 2 — siembra: 1 admin, 2 cajeros, 1 sucursal, 60 categorías
 npm run seed
 
-# Terminal 3 — la PWA
+# Terminal 3 — la PWA (entra por /login; credenciales en tools/seed.ts)
 npm run dev
 ```
 

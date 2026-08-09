@@ -24,3 +24,8 @@ export function calcularRedireccion(auth: EstadoAuth, pathname: string): string 
   if (pathname.startsWith("/admin") && !auth.esAdmin) return "/sucursales";
   return null;
 }
+
+/** Ruta de inicio según el rol (doc 11 §2: SPLASH → HOME{rol}). */
+export function homePorRol(auth: UsuarioAutenticado): string {
+  return auth.esAdmin ? "/admin" : "/sucursales";
+}

@@ -9,7 +9,7 @@ import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import type { ReactElement, ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { FirestoreAdminRepository } from "@conteo/data";
-import { calcularRedireccion } from "./guardas.js";
+import { calcularRedireccion, homePorRol } from "./guardas.js";
 import { auth, db } from "./firebase.js";
 import { functions } from "./funciones.js";
 import { useAuthState } from "../state/useAuthState.js";
@@ -44,6 +44,25 @@ function StubScreen({ titulo }: { readonly titulo: string }) {
   return <p>{titulo} — próximamente</p>;
 }
 
+/** Raíz "/": sin sesión a /login, con sesión al home del rol (doc 11 §2). */
+function HomeSegunSesion(): ReactElement {
+  const estadoAuth = useAuthState(auth);
+
+  if (estadoAuth === undefined) return <SplashScreen />;
+  if (estadoAuth === null) return <Navigate to="/login" replace />;
+  return <Navigate to={homePorRol(estadoAuth)} replace />;
+}
+
+/** Versión de RequireAuth para /login: con sesión activa salta directo al
+ *  home del rol (doc 11 §2); sin sesión muestra el formulario. */
+function RequireAnonimo({ children }: { readonly children: ReactElement }): ReactElement {
+  const estadoAuth = useAuthState(auth);
+
+  if (estadoAuth === undefined) return <SplashScreen />;
+  if (estadoAuth !== null) return <Navigate to={homePorRol(estadoAuth)} replace />;
+  return children;
+}
+
 /** Guarda de conveniencia (doc 11 §2): la autorización real está en las
  *  Security Rules, no aquí. */
 function RequireAuth({ children }: { readonly children: ReactElement }): ReactElement {
@@ -60,17 +79,20 @@ export function AppRouter(): ReactNode {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<HomeSegunSesion />} />
         <Route
           path="/login"
           element={
-            <LoginScreen
-              // Se DEVUELVE la promesa (antes se descartaba con `void`): es
-              // lo que deja a LoginScreen mostrar el error inline y bloquear
-              // el botón mientras el intento está en vuelo.
-              onIniciarSesion={async (correo, password) => {
-                await signInWithEmailAndPassword(auth, correo, password);
-              }}
-            />
+            <RequireAnonimo>
+              <LoginScreen
+                // Se DEVUELVE la promesa (antes se descartaba con `void`): es
+                // lo que deja a LoginScreen mostrar el error inline y bloquear
+                // el botón mientras el intento está en vuelo.
+                onIniciarSesion={async (correo, password) => {
+                  await signInWithEmailAndPassword(auth, correo, password);
+                }}
+              />
+            </RequireAnonimo>
           }
         />
         <Route
