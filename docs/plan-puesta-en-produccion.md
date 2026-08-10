@@ -200,8 +200,8 @@ proyecto demo, así que la mitad del cableado existe.
 
 - `.firebaserc` con los IDs reales de los dos proyectos.
 - `apps/web/.env.dev.example` y `.env.prod.example` con las 6 claves
-  `VITE_FIREBASE_*` que consume `firebase.ts`. `.gitignore:14-15` ya permite
-  `.env.example`.
+  `VITE_FIREBASE_*` que consume `firebase.ts`. `.gitignore:12-13` ya permite
+  cualquier `.env*.example`.
 - `apps/web/package.json` — el script `build` es `vite build` a secas;
   `docs/diseno/12:22` exige `--mode prod`.
   `packages/shared/src/config/entorno.ts` ya deriva `Config.esProd` de

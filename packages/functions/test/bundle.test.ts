@@ -20,35 +20,53 @@ const SALIDA = join(RAIZ, "lib/index.js");
 // a `src/lib/` — que es donde ya viven los que no se despliegan.
 const CARPETAS_DE_FUNCIONES = ["callables", "scheduled", "triggers"];
 
-function exportsEsperados(): string[] {
-  const fuente = readFileSync(ENTRADA, "utf8");
+/**
+ * Reexportaciones que declara `src/index.ts`, en la forma
+ * `export { nombre } from "./ruta.js";`. Devuelve los nombres y las rutas por
+ * separado porque las dos comprobaciones de abajo necesitan una cada una, y
+ * ambas tienen que quedar ancladas a una sentencia `export` real: buscar la
+ * ruta como subcadena del archivo daría por buena una mención en un comentario
+ * o en un import sin export.
+ */
+function reexportaciones(): { nombres: string[]; rutas: string[] } {
   const nombres: string[] = [];
-  for (const linea of fuente.split("\n")) {
-    const nombre = /^export \{ (\w+) \}/.exec(linea)?.[1];
-    if (nombre) nombres.push(nombre);
+  const rutas: string[] = [];
+  for (const linea of readFileSync(ENTRADA, "utf8").split("\n")) {
+    const coincidencia = /^export \{ (\w+) \} from "([^"]+)";/.exec(linea);
+    if (!coincidencia) continue;
+    const [, nombre, ruta] = coincidencia;
+    if (!nombre || !ruta) continue;
+    nombres.push(nombre);
+    rutas.push(ruta);
   }
-  return nombres.sort();
+  return { nombres: nombres.sort(), rutas };
 }
 
 describe("bundle desplegable (lib/index.js)", () => {
   it("cada módulo de callables/scheduled/triggers está reexportado por src/index.ts", () => {
-    const fuente = readFileSync(ENTRADA, "utf8");
+    const { rutas } = reexportaciones();
     for (const carpeta of CARPETAS_DE_FUNCIONES) {
       const archivos = readdirSync(join(RAIZ, "src", carpeta)).filter((archivo) =>
         archivo.endsWith(".ts"),
       );
       for (const archivo of archivos) {
-        const modulo = archivo.replace(/\.ts$/, "");
-        expect(fuente, `${carpeta}/${archivo} no está reexportado en src/index.ts`).toContain(
-          `./${carpeta}/${modulo}.js`,
-        );
+        const ruta = `./${carpeta}/${archivo.replace(/\.ts$/, "")}.js`;
+        expect(rutas, `${carpeta}/${archivo} no está reexportado en src/index.ts`).toContain(ruta);
       }
     }
   });
 
   it("el script `build` produce lib/index.js con exactamente los exports de src/index.ts y pesa menos de 50 KB", async () => {
-    execSync("npm run build", { cwd: RAIZ });
+    // ponytail: el `timeout` va aquí y no basta con el de `it` — execSync
+    // bloquea el hilo único, así que el temporizador de Vitest no puede
+    // dispararse mientras el proceso hijo siga vivo. Sin esto, un build colgado
+    // cuelga también el job de CI.
+    execSync("npm run build", { cwd: RAIZ, timeout: 60_000 });
 
+    // 50 KB: el bundle propio pesa ~30 KB y sólo crece con código nuevo de este
+    // paquete. El umbral no vigila ese crecimiento, vigila el salto de orden de
+    // magnitud de volver a inlinar una dependencia — con zod dentro son 573 KB.
+    // Si el código propio llegara a acercarse, subir el número es lo correcto.
     expect(statSync(SALIDA).size).toBeLessThan(50 * 1024);
 
     // ponytail: specifier relativo, no `pathToFileURL(SALIDA).href` — con una
@@ -59,6 +77,6 @@ describe("bundle desplegable (lib/index.js)", () => {
     // @ts-expect-error -- lib/index.js es el artefacto de build (sin .d.ts); esta
     // prueba verifica su forma en runtime, no su tipado.
     const modulo: Record<string, unknown> = await import("../lib/index.js");
-    expect(Object.keys(modulo).sort()).toEqual(exportsEsperados());
-  }, 20_000);
+    expect(Object.keys(modulo).sort()).toEqual(reexportaciones().nombres);
+  }, 90_000);
 });
