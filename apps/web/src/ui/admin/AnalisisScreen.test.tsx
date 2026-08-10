@@ -1,17 +1,30 @@
 // apps/web/src/ui/admin/AnalisisScreen.test.tsx (docs/plan-panel-administrador.md
-// §5, fase F5) — dashboard de análisis de una sesión.
+// §5, fase F5; issue #20 item 3 para los 5 estados degradados de
+// docs/diseno/10-analisis-y-dashboards.md:220-228) — dashboard de análisis de
+// una sesión.
 import { FakeAdminRepository } from "@conteo/data";
 import type { EstadoSincronizacion } from "@conteo/data";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it } from "vitest";
-import { moneda } from "../../lib/formato.js";
+import { afterEach, describe, expect, it } from "vitest";
+import { fecha, moneda } from "../../lib/formato.js";
 import { AdminRepositoryProvider } from "../../state/admin-contexto.js";
 import { AnalisisScreen } from "./AnalisisScreen.js";
 
 const ESPACIO_NO_SEPARABLE = String.fromCharCode(0xa0);
+
+function fijarEnLinea(enLinea: boolean): void {
+  Object.defineProperty(window.navigator, "onLine", { configurable: true, value: enLinea });
+}
+
+afterEach(() => {
+  // `onLine` vive en el prototipo de Navigator, no como propiedad propia de
+  // la instancia: borrar la propia (la que puso `fijarEnLinea`) basta para
+  // que vuelva a resolverse por el getter original de jsdom (`true`).
+  delete (window.navigator as { onLine?: boolean }).onLine;
+});
 
 /** `moneda()` inserta un espacio de no separación que Testing Library
  *  colapsa a uno normal antes de comparar (verificado en formato.test.ts,
@@ -246,7 +259,7 @@ describe("AnalisisScreen (F5)", () => {
     );
   });
 
-  it("muestra un esqueleto con la forma final mientras carga, nunca un spinner", () => {
+  it("muestra un esqueleto con la forma final mientras carga, nunca un spinner (estado 'Cargando', doc 10 §220-228)", () => {
     const repo = new FakeAdminRepository();
     // Sin sembrar nada: el fake entrega su primer valor sincrónicamente en
     // `observarSesion`/`observarSincronizacion`, así que para capturar el
@@ -278,5 +291,91 @@ describe("AnalisisScreen (F5)", () => {
 
     expect(await screen.findByText(/no se encontró la sesión/i)).toBeInTheDocument();
     expect(screen.queryByTestId("fila-esqueleto")).not.toBeInTheDocument();
+  });
+});
+
+describe("AnalisisScreen · estados degradados (issue #20 item 3, doc 10 §220-228)", () => {
+  it("'Sesión sin aportes': sin líneas todavía, cada sección lo dice honesto en vez de un cero fabricado", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(sesionBase());
+    // Ninguna línea sembrada: sesión abierta pero sin ningún aporte todavía.
+    repo.sembrarSincronizacion("ses_1", todosSincronizados());
+
+    renderPantalla(repo);
+
+    await screen.findByText("Sucursal Norte", { exact: false });
+
+    expect(screen.getByText("0 / 0")).toBeInTheDocument();
+    expect(screen.getByText(/todavía no hay unidades contadas/i)).toBeInTheDocument();
+    expect(screen.getByText(/todavía no hay categorías contadas/i)).toBeInTheDocument();
+    // La tabla de detalle usa un texto ligeramente distinto ("No hay..." sin
+    // "Todavía"): coincide como subcadena con la línea de arriba, de ahí el
+    // ancla `^`.
+    expect(screen.getByText(/^No hay categorías contadas\.$/)).toBeInTheDocument();
+  });
+
+  it("'Sin conexión': con el navegador offline, muestra que los datos son de caché junto a su fecha", async () => {
+    fijarEnLinea(false);
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo);
+
+    renderPantalla(repo);
+
+    const aviso = await screen.findByRole("status");
+    expect(aviso).toHaveTextContent(/mostrando datos guardados/i);
+    // Reusa el mismo timestamp que ya calcula la cabecera (actualizadaEn más
+    // reciente de las líneas sembradas) — sin inventar un segundo reloj.
+    expect(aviso).toHaveTextContent(fecha(new Date("2026-08-01T10:05:00Z")));
+  });
+
+  it("'Sin conexión': en línea, el aviso de datos guardados no aparece", async () => {
+    fijarEnLinea(true);
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo);
+
+    renderPantalla(repo);
+
+    await screen.findByText("Sucursal Norte", { exact: false });
+    expect(screen.queryByText(/mostrando datos guardados/i)).not.toBeInTheDocument();
+  });
+
+  it("'Datos inconsistentes': con un evento RECONCILIACION de esta sesión, muestra un aviso discreto (no role=alert)", async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo);
+    repo.sembrarAuditoria({
+      eventoId: "ev_1",
+      tipo: "RECONCILIACION",
+      ocurridoEn: new Date("2026-08-01T09:00:00Z"),
+      sesionId: "ses_1",
+      categoriaId: "cat_a",
+      cantidadAnterior: 5,
+      cantidadNueva: 310,
+    });
+
+    renderPantalla(repo);
+
+    const aviso = await screen.findByText(/se corrigieron automáticamente/i);
+    expect(aviso).toHaveAttribute("role", "status");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("'Datos inconsistentes': sin ningún evento RECONCILIACION de esta sesión, no aparece el aviso", async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo);
+    // Un evento de OTRA sesión no debe activar el aviso de ésta.
+    repo.sembrarAuditoria({
+      eventoId: "ev_otra",
+      tipo: "RECONCILIACION",
+      ocurridoEn: new Date("2026-08-01T09:00:00Z"),
+      sesionId: "ses_2",
+      categoriaId: "cat_a",
+      cantidadAnterior: 5,
+      cantidadNueva: 310,
+    });
+
+    renderPantalla(repo);
+
+    await screen.findByText("Sucursal Norte", { exact: false });
+    expect(screen.queryByText(/se corrigieron automáticamente/i)).not.toBeInTheDocument();
   });
 });

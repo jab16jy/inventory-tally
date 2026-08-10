@@ -118,6 +118,25 @@ describe("ConteoScreen · Deck (F2)", () => {
   });
 });
 
+const PATRON_CONSUMO_DATOS = /^\d+([.,]\d+)? (KB|MB)$/;
+
+describe("ConteoScreen · consumo de datos (issue #20 item 2, doc 11 §24)", () => {
+  it("muestra un indicador de consumo de datos, visible junto al estado de sincronización", () => {
+    renderConteoScreen(repoConTresCategorias());
+    expect(screen.getByText(PATRON_CONSUMO_DATOS)).toBeInTheDocument();
+  });
+
+  it("el consumo estimado crece cuando llega una nueva emisión de líneas", () => {
+    renderConteoScreen(repoConTresCategorias());
+    const textoInicial = screen.getByText(PATRON_CONSUMO_DATOS).textContent;
+
+    fireEvent.click(screen.getByRole("button", { name: /sumar \$1\.000/i }));
+
+    const textoFinal = screen.getByText(PATRON_CONSUMO_DATOS).textContent;
+    expect(textoFinal).not.toBe(textoInicial);
+  });
+});
+
 describe("ConteoScreen · Hoja precargada (regresión R3-001)", () => {
   it("reabrir una categoría ya contada precarga la cantidad real, no cero", async () => {
     // La suscripción al aporte de la categoría en edición resuelve UN render

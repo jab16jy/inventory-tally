@@ -1,9 +1,20 @@
 // apps/web/src/ui/admin/AdminLayout.test.tsx
-// (docs/plan-panel-administrador.md §5, fase F1)
+// (docs/plan-panel-administrador.md §5, fase F1; issue #20 item 1 para los 3
+// breakpoints de doc 11 §298-304)
 import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdminLayout } from "./AdminLayout.js";
+
+const ANCHO_ORIGINAL = window.innerWidth;
+
+function fijarAncho(ancho: number): void {
+  Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: ancho });
+}
+
+afterEach(() => {
+  fijarAncho(ANCHO_ORIGINAL);
+});
 
 function renderLayout(rutaInicial: string) {
   return render(
@@ -57,5 +68,39 @@ describe("AdminLayout (F1)", () => {
     const boton = screen.getByRole("button", { name: /salir/i });
     expect(boton).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /cerrar sesión/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("AdminLayout · breakpoints (issue #20 item 1, doc 11 §298-304)", () => {
+  it("< 600px: navegación inferior, sin sidebar lateral", () => {
+    fijarAncho(375);
+    renderLayout("/admin");
+
+    const nav = screen.getByRole("navigation", { name: /panel de administrador/i });
+    expect(within(nav).getAllByRole("link")).toHaveLength(7);
+    // La cabecera "Panel administrador" sólo existe en el sidebar lateral.
+    expect(screen.queryByText("Panel administrador")).not.toBeInTheDocument();
+  });
+
+  it("600–1024px: sidebar de sólo íconos, sin etiquetas de texto", () => {
+    fijarAncho(800);
+    renderLayout("/admin");
+
+    const nav = screen.getByRole("navigation", { name: /panel de administrador/i });
+    expect(within(nav).getAllByRole("link")).toHaveLength(7);
+    // Las etiquetas de texto de los destinos no se pintan a este ancho.
+    expect(screen.queryByText("Cajeros")).not.toBeInTheDocument();
+    expect(screen.queryByText("Panel administrador")).not.toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: /cajeros/i })).toHaveAttribute("title", "Cajeros");
+  });
+
+  it("> 1024px: sidebar completo con etiquetas (comportamiento histórico)", () => {
+    fijarAncho(1440);
+    renderLayout("/admin");
+
+    const nav = screen.getByRole("navigation", { name: /panel de administrador/i });
+    expect(within(nav).getAllByRole("link")).toHaveLength(7);
+    expect(screen.getByText("Panel administrador")).toBeInTheDocument();
+    expect(within(nav).getByText("Cajeros")).toBeInTheDocument();
   });
 });

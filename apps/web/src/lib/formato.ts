@@ -56,3 +56,16 @@ export function fecha(valor: Date): string {
 export function porcentaje(valor: number): string {
   return `${FORMATO_PORCENTAJE.format(valor)}%`;
 }
+
+const FORMATO_DATOS = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 1 });
+
+/** Consumo de datos aproximado — issue #20 item 2 (doc 11 §24, fila "Datos
+ *  móviles": "consumo visible"). KB o MB, el que quede más legible. El valor
+ *  de entrada YA es una estimación (ver `useConsumoDatos.ts`), no una medida
+ *  exacta: no hay forma de leer bytes reales del canal WebSocket de
+ *  Firestore desde el cliente. */
+export function datos(bytes: number): string {
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${FORMATO_DATOS.format(kb)} KB`;
+  return `${FORMATO_DATOS.format(kb / 1024)} MB`;
+}

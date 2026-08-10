@@ -25,6 +25,7 @@ una decisión no examinada.
 | [13](#adr-13) | Monorepo                                            | ✅ Aceptada                |
 | [14](#adr-14) | Verificación de sincronización antes del cierre     | ✅ Aceptada                |
 | [15](#adr-15) | **React + Vite sobre continuar con Flutter Web**    | 🆕 Aceptada                |
+| [16](#adr-16) | Filtros de auditoría de uno en uno                  | 🆕 Aceptada                |
 
 ---
 
@@ -410,6 +411,28 @@ instalabilidad.
 - 🔁 De los documentos de este diseño, sólo [06](06-plataforma-web.md) y este ADR son
   específicos del framework de cliente; el resto describe contratos de datos y backend,
   que no cambiaron.
+
+---
+
+## ADR-16 {#adr-16}
+
+### Filtros de auditoría de uno en uno
+
+**Contexto.** [11](11-ux-y-navegacion.md) (§271) dibuja la tabla de auditoría con "filtros
+combinables". `listarAuditoria` sólo acepta un campo a la vez
+(`packages/data/src/repositories/admin-repository.ts`, `FiltroAuditoria`): no es un vacío
+sin examinar, sino un recorte con precio conocido desde el propio código.
+
+**Decisión.** Un solo filtro activo por consulta (`tipo`, `sucursalId`, `usuarioId` o
+`sesionId`), nunca combinados.
+
+**Consecuencias.** ✅ Cada campo usa su índice autoindexado de un solo campo, sin tocar
+`infra/firestore.indexes.json` · ⚠️ El admin no puede acotar por dos campos a la vez
+(p.ej. sucursal + tipo) en una sola consulta.
+
+**Detonante de reactivación:** si el negocio pide combinar filtros, cada combinación exige
+su propio índice compuesto de Firestore — evaluar ahí el costo real de infraestructura
+contra el beneficio, no antes.
 
 ---
 

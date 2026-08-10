@@ -29,6 +29,7 @@ import {
 import type { EstadoSincronizacion } from "@conteo/data";
 import { fecha, moneda, numero, porcentaje } from "../../lib/formato.js";
 import { useAdminRepository } from "../../state/admin-contexto.js";
+import { useConexion } from "../../state/useConexion.js";
 import { Icono } from "../primitivos/Icono.js";
 import { Numeral } from "../primitivos/Numeral.js";
 import { Placa } from "../primitivos/Placa.js";
@@ -78,6 +79,36 @@ function useLineas(sesionId: string): LineaConteo[] {
   const [lineas, setLineas] = useState<LineaConteo[]>([]);
   useEffect(() => repo.observarLineasSesion(sesionId, setLineas), [repo, sesionId]);
   return lineas;
+}
+
+/** issue #20 item 3 (doc 10 §220-228, fila "Datos inconsistentes"): ¿el cron
+ *  semanal `reconciliarLineas` (packages/functions/src/scheduled/reconciliar-lineas.ts)
+ *  corrigió alguna línea de ESTA sesión? Ese cron no expone nada que el
+ *  cliente pueda leer en vivo — sólo escribe un evento `RECONCILIACION` en
+ *  `auditoria` dentro de la misma transacción que corrige la línea — así que
+ *  ésa es la única señal honesta disponible aquí: una consulta puntual, no un
+ *  listener, sobre la misma `listarAuditoria` que ya usa AuditoriaScreen.tsx. */
+function useHayReconciliacion(sesionId: string): boolean {
+  const repo = useAdminRepository();
+  const [hay, setHay] = useState(false);
+  useEffect(() => {
+    let cancelado = false;
+    setHay(false);
+    repo
+      .listarAuditoria({ campo: "sesionId", valor: sesionId })
+      .then((pagina) => {
+        if (!cancelado) setHay(pagina.items.some((e) => e.tipo === "RECONCILIACION"));
+      })
+      .catch(() => {
+        // ponytail: aviso discreto y no bloqueante — si la consulta falla, se
+        // omite en silencio en vez de sumar un segundo estado de error a una
+        // pantalla cuyo fallo real (sesión/sincronización) ya tiene el suyo.
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [repo, sesionId]);
+  return hay;
 }
 
 /** Última escritura entre las líneas de la sesión. No hay `recalculadoEn`
@@ -155,6 +186,12 @@ export function AnalisisScreen() {
   const { sesion, cargando: cargandoSesion } = useSesion(sesionId);
   const { estado: sincronizacion, cargando: cargandoSync } = useSincronizacion(sesionId);
   const lineas = useLineas(sesionId);
+  // issue #20 item 3 (doc 10 §220-228): "sin conexión" y "datos
+  // inconsistentes" — ninguno de los dos bloquea el esqueleto de carga de
+  // arriba: son avisos que se suman sobre el dashboard ya cargado, no un
+  // reemplazo de pantalla como "sesión no encontrada".
+  const enLinea = useConexion();
+  const hayReconciliacion = useHayReconciliacion(sesionId);
 
   const cargando = cargandoSesion || cargandoSync;
 
@@ -215,6 +252,35 @@ export function AnalisisScreen() {
           {ultimaAct ? ` · Actualizado: ${fecha(ultimaAct)}` : " · Sin actividad todavía"}
         </p>
       </header>
+
+      {/* "Sin conexión" (doc 10 §226): datos en caché + timestamp. `enLinea`
+          es `navigator.onLine` (useConexion.ts, ya usado en la PWA de
+          cajero) — el propio dashboard ya renderizado abajo ES el dato en
+          caché, así que este aviso no cambia qué se pinta, sólo lo rotula
+          honesto. `ultimaAct` reusa el mismo timestamp de la cabecera (no
+          hay "hace X min" en este repo — `fecha()` es el único formateador
+          de fecha que existe, mismo criterio que la cabecera de arriba). */}
+      {!enLinea && (
+        <p
+          role="status"
+          className="mb-4 rounded-placa border border-borde bg-placa px-3 py-2 text-micro text-tenue"
+        >
+          Mostrando datos guardados
+          {ultimaAct ? ` · ${fecha(ultimaAct)}` : ""}
+        </p>
+      )}
+
+      {/* "Datos inconsistentes" (doc 10 §227): aviso discreto, nunca
+          role="alert" — a diferencia del banner de sincronización degradada
+          de más abajo, esto no bloquea ninguna acción del admin. */}
+      {hayReconciliacion && (
+        <p
+          role="status"
+          className="mb-4 rounded-placa border border-borde bg-placa px-3 py-2 text-micro text-tenue"
+        >
+          Algunos totales de esta sesión se corrigieron automáticamente.
+        </p>
+      )}
 
       <div data-seccion="kpis" className="mb-4 grid grid-cols-3 gap-3">
         <div className="rounded-placa border border-borde bg-placa p-4">

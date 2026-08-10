@@ -12,8 +12,10 @@ import {
   siguientePendiente,
   totalUnidadesSesion,
 } from "@conteo/shared";
+import { datos } from "../lib/formato.js";
 import { useConteoRepository } from "../state/repositorio-contexto.js";
 import { useConexion } from "../state/useConexion.js";
+import { useConsumoDatos } from "../state/useConsumoDatos.js";
 import { useLineasSesion } from "../state/useLineasSesion.js";
 import { useMiAporte } from "../state/useMiAporte.js";
 import { usePendientes } from "../state/usePendientes.js";
@@ -40,6 +42,9 @@ export function ConteoScreen() {
   const lineas = useLineasSesion(sesionId);
   const escriturasPendientes = usePendientes(sesionId);
   const enLinea = useConexion();
+  // issue #20 item 2 (doc 11 §24, "Datos móviles" · "consumo visible"):
+  // estimación, no medida exacta — ver el docstring de useConsumoDatos.ts.
+  const bytesConsumidos = useConsumoDatos(lineas);
   // Estado 4 del plan (§5, doc 11 §5): "estado != 'abierta'" es la condición
   // exacta de la fila de la tabla de estados. Exige `estado === "existe"`, así
   // que el modal NO se muestra mientras el listener no ha resuelto ni cuando
@@ -162,7 +167,16 @@ export function ConteoScreen() {
       <header className="flex flex-col gap-2 pb-2">
         <div className="flex items-center justify-between gap-2">
           <BarraProgreso contadas={contadas} total={total} />
-          <ChipEstado estado={estadoSync} />
+          <div className="flex shrink-0 items-center gap-2">
+            {/* Consumo de datos estimado de la sesión — issue #20 item 2. */}
+            <span className="flex items-center gap-1 text-micro text-tenue">
+              <Icono nombre="datos" className="size-3.5 shrink-0" aria-hidden="true" />
+              <span aria-label={`Datos consumidos en la sesión: ${datos(bytesConsumidos)}`}>
+                {datos(bytesConsumidos)}
+              </span>
+            </span>
+            <ChipEstado estado={estadoSync} />
+          </div>
         </div>
 
         <div className="flex items-center gap-2">

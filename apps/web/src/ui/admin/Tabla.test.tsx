@@ -1,9 +1,22 @@
 // apps/web/src/ui/admin/Tabla.test.tsx (docs/plan-panel-administrador.md §5,
 // fase F2). El shell es presentacional; lo único con lógica propia — y por
 // tanto lo único que este archivo cubre a fondo — es el ciclo de orden.
+//
+// issue #20 item 1 (doc 11 §298-304) añade el bloque de breakpoints al final:
+// < 600px pinta tarjetas en vez de `<table>`.
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { Tabla, type ColumnaTabla } from "./Tabla.js";
+
+const ANCHO_ORIGINAL = window.innerWidth;
+
+function fijarAncho(ancho: number): void {
+  Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: ancho });
+}
+
+afterEach(() => {
+  fijarAncho(ANCHO_ORIGINAL);
+});
 
 interface Fila {
   readonly id: string;
@@ -102,5 +115,42 @@ describe("Tabla (F2)", () => {
 
     expect(screen.getByText("Nada por aquí")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+});
+
+describe("Tabla · breakpoints (issue #20 item 1, doc 11 §298-304)", () => {
+  it("< 600px: pinta tarjetas etiqueta/valor en vez de <table>", () => {
+    fijarAncho(375);
+    render(<Tabla columnas={columnas()} filas={FILAS} claveFila={(f) => f.id} etiqueta="Prueba" />);
+
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    const lista = screen.getByRole("list", { name: "Prueba" });
+    expect(within(lista).getAllByRole("listitem")).toHaveLength(3);
+    // La tarjeta lleva la etiqueta de columna Y el valor de la fila, no sólo
+    // el valor — perdería la columna al no haber `<th>`. "Nombre" se repite
+    // una vez por tarjeta (sin encabezado compartido), de ahí `getAllByText`.
+    expect(within(lista).getAllByText("Nombre")).toHaveLength(FILAS.length);
+    expect(within(lista).getByText("Beatriz")).toBeInTheDocument();
+  });
+
+  it("< 600px con `cargando`: pinta tarjetas de esqueleto, no filas de tabla", () => {
+    fijarAncho(375);
+    render(
+      <Tabla columnas={columnas()} filas={[]} claveFila={(f) => f.id} etiqueta="Prueba" cargando />,
+    );
+
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("fila-esqueleto").length).toBeGreaterThan(0);
+  });
+
+  it("600–1024px: sigue usando <table>, envuelta para poder desplazarse en horizontal", () => {
+    fijarAncho(800);
+    const { container } = render(
+      <Tabla columnas={columnas()} filas={FILAS} claveFila={(f) => f.id} etiqueta="Prueba" />,
+    );
+
+    const tabla = screen.getByRole("table", { name: "Prueba" });
+    expect(tabla.parentElement).toHaveClass("overflow-x-auto");
+    expect(container.querySelector("ul")).not.toBeInTheDocument();
   });
 });
