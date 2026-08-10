@@ -107,14 +107,19 @@ listener local ya actualizó la pantalla. No lo "arregles".
 Esto es un **esqueleto caminante**, no el sistema completo: demuestra la cadena
 aporte → trigger → total en tiempo real, con offline, reglas reales y auditoría.
 
-| Implementado                                               | Pendiente                                             |
-| ---------------------------------------------------------- | ----------------------------------------------------- |
-| Security Rules completas + 27 tests                        | `crearCajero`, `actualizarCajero`, `desactivarCajero` |
-| `onAporteEscrito` idempotente y tolerante a reordenamiento | `cerrarSesion` con verificación RF-16                 |
-| `abrirSesion` transaccional con rollback de siembra        | Crons: resúmenes, reconciliación, purga               |
-| PWA: login, conteo en tiempo real, banner de pendientes    | Panel de administrador y análisis                     |
-| Detección de degradación de persistencia                   | Pantallas `/preparar` y `/finalizar`                  |
-| CI por rutas afectadas                                     | App Check, control de versión mínima, E2E             |
+| Implementado                                                 | Pendiente                                  |
+| -------------------------------------------------------------| ------------------------------------------- |
+| Security Rules completas + 27 tests                          | App Check, control de versión mínima, E2E |
+| `onAporteEscrito` idempotente y tolerante a reordenamiento   |                                             |
+| `abrirSesion` transaccional con rollback de siembra          |                                             |
+| PWA: login, conteo en tiempo real, banner de pendientes      |                                             |
+| Detección de degradación de persistencia                     |                                             |
+| CI por rutas afectadas                                       |                                             |
+| `crearCajero`, `actualizarCajero`, `desactivarCajero`        |                                             |
+| `cerrarSesion` con verificación RF-16                        |                                             |
+| Crons: resúmenes, reconciliación, purga                      |                                             |
+| Panel de administrador y análisis                            |                                             |
+| Pantallas `/preparar` y `/finalizar`                          |                                             |
 
 También faltan los iconos de la PWA (`apps/web/public/icons/*.png`): el manifest
 los referencia pero no existen todavía.

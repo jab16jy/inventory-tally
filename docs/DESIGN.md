@@ -67,7 +67,7 @@ La dirección la impone el escenario físico, no la preferencia: un cajero de pi
 
 El contrato de dirección completo — THESIS / OWN-WORLD / STORY / FIRST VIEWPORT / FORM — vive como comentario en `apps/web/src/estilos/tema.css` y en el `<head>` de `apps/web/index.html`, y está desarrollado con su razonamiento completo en [`docs/plan-diseno-visual-pwa.md`](plan-diseno-visual-pwa.md). Este documento no lo repite entero; documenta cómo quedó **implementado**.
 
-**Alcance actual.** Sólo el sistema de diseño base y el flujo móvil del cajero (fases F0–F1 del plan): los tokens, la fuente, y tres primitivos vestidos (`Placa`, `Numeral`, `BotonPaso`) aplicados a `LoginScreen`, `ConteoScreen`, `FilaCategoria` y los dos banners de riesgo. Las fases F2–F4 del plan — cabecera, `ChipEstado`, `BarraProgreso`, búsqueda, `Deck`, `Hoja` (bottom sheet), `Icono`, y las tres rutas nuevas (`/sucursales`, `/preparar`, `/finalizar`) — están **especificadas pero no construidas todavía**; no hay código que documentar para ellas más allá de lo que ya fija `docs/plan-diseno-visual-pwa.md#5-pantallas`. El panel de administrador queda fuera de todo el esfuerzo visual: depende de callables que no existen.
+**Alcance actual.** Sistema de diseño base y flujo móvil del cajero completos (fases F0–F4 del plan): los tokens, la fuente, y los ocho primitivos vestidos (`Placa`, `Numeral`, `BotonPaso`, `BarraProgreso`, `ChipEstado`, `Deck`, `Hoja`, `Icono`) aplicados a `LoginScreen`, `ConteoScreen`, `FilaCategoria`, los dos banners de riesgo y las tres rutas nuevas (`/sucursales`, `/preparar`, `/finalizar`). Única pieza especificada por F4 que no se construyó: el detector de impeccable (ver `docs/plan-diseno-visual-pwa.md#7-ejecución`). El panel de administrador está construido y aplica los mismos tokens (`docs/plan-panel-administrador.md`); su propio catálogo de pantallas no se documenta en este archivo.
 
 **Key Characteristics:**
 - Fondo casi negro (`#0F1115`), una sola señal ámbar de alta visibilidad, rojo reservado exclusivamente a riesgo real de pérdida de datos.
@@ -127,7 +127,7 @@ Modo *Operate* (el visitante completa una tarea, no explora): escala tipográfic
 
 **Virtualización nativa, no una librería.** Cada `<li>` de fila lleva `content-visibility: auto` y `contain-intrinsic-size: auto 5rem`: el navegador se salta el layout de las filas fuera de pantalla sin añadir `@tanstack/react-virtual` ni `react-window`. Se añadirá una librería sólo si un perfil con 200 filas incumple los 20 ms/frame de RNF-05; no verificado en este documento.
 
-**Deck fijo inferior.** Especificado por el plan como tercio inferior fijo con totales y `FINALIZAR CONTEO`, siempre bajo el pulgar — **no implementado todavía** (primitivo `Deck` pendiente de F2). Documentado aquí como invariante de layout para cuando se construya, no como estado actual.
+**Deck fijo inferior.** Tercio inferior fijo con totales y `FINALIZAR CONTEO`, siempre bajo el pulgar — implementado en el primitivo `Deck` (ver Components). `sticky bottom-0` dentro del contenedor de la pantalla de conteo, no un portal.
 
 **Safe area.** `body` lleva `padding-top: env(safe-area-inset-top)` porque `viewport-fit=cover` en `index.html` mete la UI bajo el notch; sin el padding la cabecera queda debajo de la barra de estado en un iPhone real.
 
@@ -146,7 +146,7 @@ El bloque-rótulo (`Placa`) lleva `border-l-0` deliberado: sin borde izquierdo p
 
 ## Components
 
-Tres primitivos existen hoy en `apps/web/src/ui/primitivos/`. El plan especifica cuatro más (`ChipEstado`, `Deck`, `Hoja`, `Icono`) para las fases F2–F3 que **no están construidas todavía**; no se documentan aquí porque no hay implementación que describir — ver `docs/plan-diseno-visual-pwa.md#4-arquitectura-de-componentes` para su contrato previsto.
+Los ocho primitivos del plan existen hoy en `apps/web/src/ui/primitivos/`: `Placa`, `Numeral`, `BotonPaso` (F1) y `BarraProgreso`, `ChipEstado`, `Deck`, `Hoja`, `Icono` (F2–F3).
 
 ### Placa (contenedor / tarjeta de fila)
 - **Corner Style:** 2 px (`--radius-placa`).
@@ -168,6 +168,34 @@ Tres primitivos existen hoy en `apps/web/src/ui/primitivos/`. El plan especifica
 - **Disabled:** texto `--color-tenue` al 40 % de opacidad — nunca ámbar a saturación plena inactivo, para no entrenar al cajero a ignorar el color de la señal.
 - **Nombre accesible:** siempre `Sumar {etiqueta}` / `Restar {etiqueta}` con la etiqueta real de la categoría (p. ej. "Sumar $5.000"); es una restricción fija por los tests, no una convención libre.
 - **Glifos:** signo menos real (`−`, U+2212) y más (`+`, U+002B) — nunca el guion de teclado, que se ve corto y desalineado a este tamaño.
+
+### BarraProgreso (progreso de la cabecera)
+- **Uso:** progreso de categorías contadas por el cajero actual sobre el total de la sesión (`47/60`), en la cabecera de `ConteoScreen`.
+- **Anatomía:** numeral micro `contadas/total` (`data-numeral`) + pista `role="progressbar"` con `aria-valuenow`/`aria-valuemin`/`aria-valuemax` y `aria-valuetext` en texto ("N de M categorías") para lector de pantalla.
+- **Relleno:** ancho en `%` sobre `--color-senal`, con `transition-[width] duration-200 ease-out`.
+- **Sin estado propio:** recibe `contadas`/`total` ya calculados; nunca deriva del repositorio.
+
+### ChipEstado (chip de sincronización)
+- **Uso:** estado global de sincronización en la cabecera — `sincronizado` | `pendiente` | `sin-conexion`.
+- **Eje de relleno:** mismo lenguaje que la regla de tinta de `Placa` — punto sólido = a salvo, punto hueco (borde) = en tránsito — más rojo (`--color-riesgo`) reservado al tercer estado, nunca verde (The No-Green Rule).
+- **Accesibilidad:** `aria-live="polite"` (no `assertive`: ese nivel queda reservado a los banners de riesgo real de pérdida de datos).
+
+### Deck (tercio inferior fijo)
+- **Uso:** totales de unidades del cajero y del equipo, más el botón `Finalizar conteo`, siempre bajo el pulgar (ver Layout).
+- **Datos:** sólo unidades — nunca dinero (I-9); recibe `tuAporte`/`equipo` ya calculados y un callback `onFinalizar`.
+- **Posición:** `sticky bottom-0` dentro del contenedor de la pantalla de conteo, no un portal — respeta `env(safe-area-inset-bottom)`.
+- **Prop distintiva:** ninguna variante de estado — el botón siempre está habilitado; el bloqueo hasta cero pendientes vive en `/conteo/:id/finalizar`, no aquí.
+
+### Hoja (bottom sheet con teclado numérico)
+- **Base:** `<dialog>` nativo (foco atrapado, `Escape`, backdrop gratis) — sube desde abajo, sobre el deck, sin cubrir la fila que se edita.
+- **Captura:** teclado numérico de 12 teclas es el camino principal; el stepper `−`/`+` de la fila queda como alternativo.
+- **Confirmación suave:** si la cantidad tecleada supera 10× el promedio de la categoría (`cantidadEsAbsurda`), sustituye el teclado por una segunda vista (`role="status"`, nunca `role="alert"`) con "Corregir" / "Sí, guardar" — nunca un segundo `<dialog>`.
+- **Nombre accesible:** siempre "Volver", nunca "Cerrar" — restricción fija por `ConteoScreen.test.tsx` (ningún botón ahí puede matchear `/cerrar|descartar/i`).
+
+### Icono (paths SVG inline)
+- **Uso:** los ~12 glifos que la app necesita (búsqueda, filtro, conectividad, navegación del admin) — cero dependencia de icon pack.
+- **Gramática fija:** `strokeLinecap: "square"`, `strokeLinejoin: "miter"`, `viewBox 0 0 24 24` — trazo duro sin curva de esquina, nunca emoji (evita el reemplazo por el set de Apple en iOS).
+- **Prop distintiva:** `nombre` selecciona el path del catálogo (`buscar`, `filtro`, `wifi`, `datos`, `visto`, más los ocho de navegación del panel admin); el resto de props son las de un `<svg>` nativo (`aria-hidden` por defecto).
 
 ### Botón primario (patrón, aún sin extraer a primitivo)
 Usado hoy inline en `LoginScreen.tsx` ("Entrar") y previsto para "Finalizar conteo": ancho completo, alto mínimo 56 px, radio 2 px, fondo `--color-senal` / texto `--color-fondo`. Estado de envío: fondo al 40 % de opacidad, texto ámbar apagado — nunca un spinner reemplazando el texto.

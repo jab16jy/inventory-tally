@@ -1,6 +1,6 @@
 # Plan de diseño e implementación — PWA móvil del cajero
 
-> Estado: **aprobado, pendiente de ejecutar**.
+> Estado: **ejecutado (F0–F4)**.
 > Alcance: sistema de diseño + flujo móvil del cajero. El panel de administrador queda fuera.
 > Complementa la serie [`docs/diseno/`](diseno/README.md); no la reemplaza.
 
@@ -232,6 +232,8 @@ Presupuestos: **< 20 ms/frame** con 200 categorías · **bundle < 500 KB** compr
 **F3 · Las tres rutas nuevas.** `/sucursales`, `/preparar`, `/finalizar` + rutas en `router.tsx`.
 
 **F4 · Estados y acabado.** Los estados degradados que faltan, skeletons, paso de accesibilidad, detector de impeccable.
+
+> El detector de impeccable **no se construyó**: no hay código, test ni referencia en CI para él. Queda pendiente/fuera de alcance, no ejecutado.
 
 ---
 

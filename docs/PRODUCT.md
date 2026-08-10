@@ -11,7 +11,9 @@ web
 Dos roles, sin un tercero (`docs/diseno/01-requisitos-y-alcance.md#2-actores`):
 
 - **Cajero** — el usuario de este documento y del alcance actual. Está de pie en una bodega con poca luz, sostiene el teléfono en una mano a unos 40 cm de la cara y a veces lleva guantes. Cuenta durante 2 a 4 horas seguidas, la misma acción repetida decenas de veces. Usa la app **una vez cada quince o treinta días**, así que no recuerda el flujo de una sesión a la siguiente. La conectividad es mixta: WiFi en algunas sucursales, datos móviles en otras, y a veces se pierde señal a mitad del conteo. El cajero puede tener varias sucursales asignadas, pero cuenta **una sucursal a la vez**. No ve valores monetarios: sólo unidades.
-- **Administrador** — gestiona cajeros, sucursales y categorías; abre y cierra sesiones de conteo; ve el dashboard analítico con dinero y comparativo entre sucursales. También puede contar. **Fuera del alcance visual actual**: su panel es de escritorio, depende de callables que todavía no existen (`cerrarSesion`, `crearCajero`) y queda excluido de `docs/plan-diseno-visual-pwa.md`.
+- **Administrador** — gestiona cajeros, sucursales y categorías; abre y cierra sesiones de conteo; ve el dashboard analítico con dinero y comparativo entre sucursales. También puede contar. Su panel es de escritorio (`/admin`, `docs/plan-panel-administrador.md`) y está construido: `cerrarSesion`, `crearCajero` y el resto de callables que necesita ya existen. Queda excluido de `docs/plan-diseno-visual-pwa.md`, que es sólo el flujo móvil del cajero.
+
+> **Desambiguación:** "Salir" en el panel admin llama a `signOut` de Firebase — cierra la *sesión de autenticación* del navegador. Es un concepto distinto de la callable `cerrarSesion`, que cierra una *sesión de conteo* (una sesión abierta en `/sucursales` con verificación RF-16). Comparten la palabra "sesión" en español pero no se refieren a lo mismo.
 
 ## Product Purpose
 

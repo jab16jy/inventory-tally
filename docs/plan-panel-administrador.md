@@ -1,6 +1,6 @@
 # Plan de implementación — Panel de administrador
 
-> Estado: **aprobado, pendiente de ejecutar**.
+> Estado: **ejecutado (F1–F5)**.
 > Alcance: las 9 pantallas de `/admin` en escritorio, más las 5 callables que faltan para operarlas.
 > Continúa [`plan-diseno-visual-pwa.md`](plan-diseno-visual-pwa.md), que dejó el admin explícitamente fuera.
 
