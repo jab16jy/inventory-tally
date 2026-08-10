@@ -147,3 +147,31 @@ Las que más aplican en este repositorio:
 - Después de una decisión, un bug arreglado, una convención nueva o un hallazgo no
   obvio: `mem_save`. Sin esperar a que lo pidan.
 - Antes de decir "listo": `mem_session_summary`.
+
+---
+
+## 8. Agent skills
+
+Configuración por repositorio que asumen las skills de ingeniería. La §6 indexa
+_qué_ skills existen; esta sección les dice _dónde_ trabajar.
+
+### Issue tracker
+
+Issues de GitHub en `jab16jy/inventory-tally`, vía la CLI `gh`. Cuerpos en
+español. Los PRs **no** entran en la cola de triage.
+Ver `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Las cinco etiquetas canónicas sin renombrar: `needs-triage`, `needs-info`,
+`ready-for-agent`, `ready-for-human`, `wontfix`. Sólo `ready-for-agent` y
+`wontfix` existen hoy en el repo; las otras tres se crean al primer uso.
+Ver `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: un `CONTEXT.md` en la raíz, sin `CONTEXT-MAP.md` — los siete
+workspaces son capas de un mismo dominio. **Los ADRs viven en
+`docs/diseno/13-decisiones-adr.md`**, un solo archivo con entradas `ADR-NN`, no
+en `docs/adr/`. Un ADR nuevo se añade ahí.
+Ver `docs/agents/domain.md`.
