@@ -130,6 +130,12 @@ service cloud.firestore {
       allow write: if false;                              // ← A-2, sin excepciones
     }
 
+    // ─────────── config: bloqueo por versión mínima ───────────
+    match /config/{docId} {
+      allow read:  if autenticado();
+      allow write: if false;
+    }
+
     // ─────────── denegación por defecto ───────────
     match /{document=**} {
       allow read, write: if false;
