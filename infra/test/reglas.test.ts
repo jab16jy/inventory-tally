@@ -53,6 +53,8 @@ beforeEach(async () => {
       .doc("categoriasValor/cat_5000")
       .set({ valor: 5000, etiqueta: "$5.000", activa: true, orden: 1 });
 
+    await db.doc("config/app").set({ versionMinima: "1.0.0" });
+
     await db.doc("sesiones/ses1").set({
       sucursalId: "suc_norte",
       sucursalNombre: "Sucursal Norte",
@@ -308,6 +310,21 @@ describe("A-11 · sincronización acotada a la propia entrada", () => {
           "participantes.uid_ana.confirmadoEn": new Date(),
           actualizadoEn: new Date(),
         }),
+    );
+  });
+});
+
+describe("config/app · bloqueo por versión mínima", () => {
+  it("un cajero SÍ puede leer config/app", async () => {
+    await assertSucceeds(cajero("uid_ana", ["suc_norte"]).firestore().doc("config/app").get());
+  });
+
+  it("un cajero NO puede escribir config/app", async () => {
+    await assertFails(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .doc("config/app")
+        .update({ versionMinima: "2.0.0" }),
     );
   });
 });
