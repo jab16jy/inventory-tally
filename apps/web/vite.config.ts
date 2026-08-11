@@ -1,11 +1,33 @@
 // apps/web/vite.config.ts (doc 06 §4)
+import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig } from "vitest/config";
 
+// issue #12 (D1/D7, corregido en RDD — R4-001): versión actual = tag de git
+// exacto sobre HEAD, sin prefijo "v". `--always` hace que sin tags (caso
+// real hoy: `git tag -l` vacío, o CI con checkout superficial que no trae
+// tags) devuelva el hash corto en vez de fallar; un tag con sufijo "-N-hash"
+// (commits después del tag) o "-dirty" tampoco matchea el regex. Sin tag
+// exacto la versión es DESCONOCIDA (`null`), no un sentinel numérico: un
+// "0.0.0" comparable se trataba como versión real siempre-desactualizada y
+// bloqueaba a todos los usuarios apenas alguien fijara un `versionMinima`
+// real, sin salida (hallazgo R4-001 del review-resilience).
+function versionDeBuild(): string | null {
+  try {
+    const salida = execSync("git describe --tags --always").toString().trim();
+    return /^v\d+\.\d+\.\d+$/.test(salida) ? salida.slice(1) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default defineConfig({
+  define: {
+    __VERSION_APP__: JSON.stringify(versionDeBuild()),
+  },
   resolve: {
     alias: [
       // `packages/data` importa `@conteo/shared` por submódulo (evita el
