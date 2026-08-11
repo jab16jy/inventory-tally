@@ -8,6 +8,7 @@ import { AppRouter } from "./lib/router.js";
 import { ConteoRepositoryProvider } from "./state/repositorio-contexto.js";
 import { BannerInstalarPwa } from "./ui/BannerInstalarPwa.js";
 import { BannerPersistenciaDegradada } from "./ui/BannerPersistenciaDegradada.js";
+import { BloqueoVersionMinima } from "./ui/BloqueoVersionMinima.js";
 import { ModalActualizacionDisponible } from "./ui/ModalActualizacionDisponible.js";
 
 const usuarioActual: ProveedorUsuarioActual = {
@@ -29,7 +30,9 @@ createRoot(raiz).render(
       <ModalActualizacionDisponible />
       <BannerPersistenciaDegradada monitor={monitorPersistencia} />
       <BannerInstalarPwa />
-      <AppRouter />
+      <BloqueoVersionMinima>
+        <AppRouter />
+      </BloqueoVersionMinima>
     </ConteoRepositoryProvider>
   </StrictMode>,
 );
