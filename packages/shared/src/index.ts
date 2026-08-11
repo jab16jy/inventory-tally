@@ -17,6 +17,8 @@ export {
 
 export { aporteConfirmado } from "./services/sincronizacion.js";
 
+export { requiereActualizacion } from "./services/version.js";
+
 export { estaPendiente, siguientePendiente } from "./services/progreso.js";
 
 export { cantidadEsAbsurda, promedioCategoria } from "./services/riesgo.js";
