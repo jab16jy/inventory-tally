@@ -1,6 +1,6 @@
 {
   "projects": {
-    "dev": "",
-    "prod": ""
+    "dev": "sistema-inventario-b7592",
+    "prod": "e-inventario"
   }
 }

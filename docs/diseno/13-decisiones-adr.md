@@ -26,6 +26,7 @@ una decisión no examinada.
 | [14](#adr-14) | Verificación de sincronización antes del cierre     | ✅ Aceptada                |
 | [15](#adr-15) | **React + Vite sobre continuar con Flutter Web**    | 🆕 Aceptada                |
 | [16](#adr-16) | Filtros de auditoría de uno en uno                  | 🆕 Aceptada                |
+| [17](#adr-17) | IDs de proyecto Firebase reales, no `conteo-eficiente-*` | 🆕 Aceptada           |
 
 ---
 
@@ -433,6 +434,30 @@ sin examinar, sino un recorte con precio conocido desde el propio código.
 **Detonante de reactivación:** si el negocio pide combinar filtros, cada combinación exige
 su propio índice compuesto de Firestore — evaluar ahí el costo real de infraestructura
 contra el beneficio, no antes.
+
+---
+
+## ADR-17 {#adr-17}
+
+### IDs de proyecto Firebase reales, no `conteo-eficiente-*`
+
+**Contexto.** [12](12-despliegue-y-entornos.md) §1 fijaba `conteo-eficiente-dev` /
+`conteo-eficiente-prod` como los IDs de los proyectos Firebase (Ticket 4, issue #13). Al
+crearlos en la consola, esos nombres no quedaron disponibles y Firebase asignó
+`sistema-inventario-b7592` (dev) y `e-inventario` (prod). El `project_id` de Firebase es
+inmutable una vez creado el proyecto.
+
+**Decisión.** Conservar los proyectos con sus IDs reales y actualizar `.firebaserc` y el
+doc 12 a esos valores, en vez de borrar y recrear los proyectos para forzar el nombre
+`conteo-eficiente-*`.
+
+**Consecuencias.** ✅ Cero fricción de recrear proyectos y reconfigurar Auth, Blaze y
+service accounts desde cero · ⚠️ cualquier doc o script que asuma el patrón
+`conteo-eficiente-*` — en particular los dominios de hosting por defecto que [12](12-despliegue-y-entornos.md)
+§1 nombraba `conteo.web.app`/`conteo-dev.web.app` — debe leer el ID real desde
+`.firebaserc`, no inferirlo del nombre del producto. Pendiente de resolver en el ticket de
+deploy (5/6/7): usar los dominios `*.web.app` por defecto o crear sitios de Hosting con
+alias custom.
 
 ---
 

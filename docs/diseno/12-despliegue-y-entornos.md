@@ -9,11 +9,11 @@
 Tres proyectos de Firebase separados. Compartir un proyecto entre desarrollo y producción
 es la vía más rápida a corromper datos reales de inventario.
 
-| Entorno | Proyecto Firebase       | Uso                                | Plan                         |
-| ------- | ----------------------- | ---------------------------------- | ---------------------------- |
-| Local   | Emulator Suite          | Desarrollo y pruebas automatizadas | —                            |
-| Dev     | `conteo-eficiente-dev`  | Pruebas con dispositivos reales    | Blaze, tope bajo             |
-| Prod    | `conteo-eficiente-prod` | Negocio real                       | Blaze, alerta de presupuesto |
+| Entorno | Proyecto Firebase          | Uso                                | Plan                                          |
+| ------- | --------------------------- | ---------------------------------- | ---------------------------------------------- |
+| Local   | Emulator Suite              | Desarrollo y pruebas automatizadas | —                                              |
+| Dev     | `sistema-inventario-b7592`  | Pruebas con dispositivos reales    | Blaze, tope USD 5/mes                          |
+| Prod    | `e-inventario`               | Negocio real                       | Blaze, alerta USD 10/mes (50/90/100%, a orgcolesmanis@gmail.com) |
 
 ### Modos de build
 

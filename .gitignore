@@ -20,3 +20,9 @@ ui-debug.log
 # recibo de revision en cada cambio de tooling, sin aportar nada al proyecto.
 .atl/
 .codegraph/
+
+# Worktrees de trabajo dentro del propio repositorio. Cada rama de la cadena de
+# PRs de una migracion vive en su propio directorio aqui; el contenido ya esta
+# versionado en su rama, versionar la ruta duplicaria el arbol.
+.worktrees/
+.claude/
