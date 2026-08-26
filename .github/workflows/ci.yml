@@ -119,3 +119,56 @@ jobs:
           java-version: "17"
       - run: npm ci
       - run: npm run test:rules
+
+  # Este job corre siempre en cada push a main, sin importar qué cambió: los
+  # índices, las reglas, las functions y el hosting de dev deben avanzar
+  # juntos, porque desplegar sólo el trozo que cambió los dejaría desalineados
+  # entre sí (p. ej. una function nueva que depende de un índice que no se
+  # desplegó).
+  #
+  # `if: !cancelled() && !failure()` en vez de confiar en el `needs:` a secas:
+  # la condición por defecto de un job es `success()`, que da false si
+  # cualquier dependencia de `needs` quedó en estado `skipped` (no sólo
+  # `failure`). Como dorny/paths-filter salta `web`/`contratos`/`functions`
+  # en un push que sólo toca `infra/`, un `needs:` a secas saltaría también
+  # este job de deploy en silencio. `!failure()` sigue bloqueando ante un
+  # fallo real (p. ej. `reglas` fallando su `test:rules`); `!cancelled()`
+  # bloquea si el run quedó obsoleto por un push más nuevo (el `concurrency`
+  # del propio workflow cancela ejecuciones en curso).
+  deploy-dev:
+    needs: [cambios, web, contratos, functions, reglas]
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      !cancelled() && !failure()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Autenticar con la service account de dev
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT_DEV" > "$RUNNER_TEMP/firebase-sa-dev.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-sa-dev.json" >> "$GITHUB_ENV"
+        env:
+          FIREBASE_SERVICE_ACCOUNT_DEV: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_DEV }}
+      # ponytail: sin --force, un índice/regla huérfano se limpia a mano;
+      # revisar si los huérfanos se acumulan. Auto-borrar sin --force sería
+      # riesgo de perder algo que un humano puso ahí a propósito.
+      - run: npx firebase deploy --only firestore:indexes --project dev --non-interactive
+      - run: npx firebase deploy --only firestore:rules --project dev --non-interactive
+      - run: npx firebase deploy --only functions --project dev --non-interactive
+      - run: npm run build --workspace apps/web -- --mode dev
+        env:
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY_DEV }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN_DEV }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID_DEV }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET_DEV }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID_DEV }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID_DEV }}
+      - run: npx firebase deploy --only hosting --project dev --non-interactive
+      # ponytail: sin retry/notificación/rollback automático — no lo pide el
+      # issue #14, y un deploy fallido debe quedar en rojo para que lo mire
+      # una persona, no reintentar solo hacia un estado a medias.
