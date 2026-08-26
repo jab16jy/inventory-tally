@@ -7,6 +7,7 @@
   "scripts": {
     "seed": "node --experimental-strip-types seed.ts",
     "crear-admin": "node --experimental-strip-types crear-admin.ts",
+    "abrir-conteo": "node --experimental-strip-types abrir-conteo.ts",
     "sembrar-prueba": "node --experimental-strip-types sembrar-datos-prueba.ts",
     "borrar-prueba": "node --experimental-strip-types borrar-datos-prueba.ts",
     "sembrar-conteos": "node --experimental-strip-types sembrar-conteos-prueba.ts",
