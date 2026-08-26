@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --tsconfig=tsconfig.json --outfile=lib/index.js --external:firebase-admin --external:firebase-functions --external:zod",
-    "test": "firebase emulators:exec --config ../../infra/firebase.json --project demo-conteo-eficiente --only firestore,auth \"vitest run\"",
+    "test": "firebase emulators:exec --project demo-conteo-eficiente --only firestore,auth \"vitest run\"",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {

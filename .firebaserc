@@ -1,6 +1,23 @@
 {
   "projects": {
-    "dev": "sistema-inventario-b7592",
-    "prod": "e-inventario"
-  }
+    "dev": "proyectoinvdev",
+    "prod": "proyectoconteoinv"
+  },
+  "targets": {
+    "proyectoinvdev": {
+      "hosting": {
+        "web": [
+          "proyectoinvdev-f80af"
+        ]
+      }
+    },
+    "proyectoconteoinv": {
+      "hosting": {
+        "web": [
+          "proyectoconteoinv-d017a"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
