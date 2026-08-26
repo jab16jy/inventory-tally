@@ -2,7 +2,12 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "."
+    "rootDir": ".",
+    // Node's type-stripping (`--experimental-strip-types`) resuelve módulos
+    // locales por su extensión real en disco (.ts), a diferencia de la
+    // convención NodeNext de escribir ".js" para un archivo fuente ".ts".
+    "allowImportingTsExtensions": true,
+    "noEmit": true
   },
   "include": ["**/*.ts"],
   "exclude": ["dist", "node_modules"]
