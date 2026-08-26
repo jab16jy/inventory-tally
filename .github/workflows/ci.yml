@@ -192,10 +192,14 @@ jobs:
       !cancelled() && !failure()
     runs-on: ubuntu-latest
     # El repo sólo da pull-requests:read por defecto (línea 14); esta action
-    # comenta la URL de preview en el PR y necesita write.
+    # comenta la URL de preview en el PR (pull-requests: write) y publica un
+    # check-run "Deploy Preview" del progreso del deploy (checks: write) —
+    # sin este último falla con 403 "Resource not accessible by integration"
+    # al crear el check-run, confirmado en el log del run que falló.
     permissions:
       contents: read
       pull-requests: write
+      checks: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
