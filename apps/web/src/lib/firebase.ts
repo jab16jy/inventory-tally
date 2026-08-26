@@ -1,5 +1,5 @@
 // apps/web/src/lib/firebase.ts (doc 06 §4)
-import { initializeApp } from "firebase/app";
+import { initializeApp, type FirebaseOptions } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
 import {
   connectFirestoreEmulator,
@@ -9,19 +9,43 @@ import {
 } from "firebase/firestore";
 import { instalarMonitorPersistencia } from "./persistencia-monitor.js";
 
-// Decisión de esta ola: los docs no fijan la config real de Firebase (eso es
-// del doc 12, fuera de alcance). Se usan valores mínimos válidos para el
-// proyecto demo de los emuladores (`--project demo-conteo-eficiente`, ver
-// infra/firebase.json); producción los sobrescribe con VITE_FIREBASE_*.
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? "demo-api-key",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? "demo-conteo-eficiente.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? "demo-conteo-eficiente",
-  storageBucket:
-    import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? "demo-conteo-eficiente.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? "0",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID ?? "1:0:web:0",
-};
+// Los valores demo sólo son válidos bajo el Emulator Suite (`--project
+// demo-conteo-eficiente`, ver infra/firebase.json). En un build real
+// (`vite build`, PROD=true) sin emuladores, una VITE_FIREBASE_* faltante
+// debe tumbar el build en vez de publicar en silencio una app que apunta a
+// un proyecto de Firebase inexistente. `esBuildReal` distingue esto de
+// `vite dev`/vitest (PROD=false), donde el demo sigue siendo válido.
+export function construirFirebaseConfig(
+  env: Record<string, string | undefined>,
+  opciones: { usaEmuladores: boolean; esBuildReal: boolean },
+): FirebaseOptions {
+  function valor(nombreVar: string, demo: string): string {
+    const real = env[nombreVar];
+    if (!real) {
+      if (opciones.esBuildReal && !opciones.usaEmuladores) {
+        throw new Error(
+          `Falta ${nombreVar}: sin emuladores, un build real no puede arrancar sin la config real de Firebase (doc 12 §1).`,
+        );
+      }
+      return demo;
+    }
+    return real;
+  }
+  return {
+    apiKey: valor("VITE_FIREBASE_API_KEY", "demo-api-key"),
+    authDomain: valor("VITE_FIREBASE_AUTH_DOMAIN", "demo-conteo-eficiente.firebaseapp.com"),
+    projectId: valor("VITE_FIREBASE_PROJECT_ID", "demo-conteo-eficiente"),
+    storageBucket: valor("VITE_FIREBASE_STORAGE_BUCKET", "demo-conteo-eficiente.appspot.com"),
+    messagingSenderId: valor("VITE_FIREBASE_MESSAGING_SENDER_ID", "0"),
+    appId: valor("VITE_FIREBASE_APP_ID", "1:0:web:0"),
+  };
+}
+
+const usaEmuladores = import.meta.env.VITE_USE_EMULATORS === "true";
+const firebaseConfig = construirFirebaseConfig(import.meta.env, {
+  usaEmuladores,
+  esBuildReal: import.meta.env.PROD,
+});
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
@@ -46,7 +70,7 @@ export const db = initializeFirestore(app, {
   }),
 });
 
-if (import.meta.env.VITE_USE_EMULATORS === "true") {
+if (usaEmuladores) {
   connectFirestoreEmulator(db, "127.0.0.1", 8080);
   connectAuthEmulator(auth, "http://127.0.0.1:9099");
 }
