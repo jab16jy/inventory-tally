@@ -154,12 +154,19 @@ jobs:
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-sa-dev.json" >> "$GITHUB_ENV"
         env:
           FIREBASE_SERVICE_ACCOUNT_DEV: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_DEV }}
-      # ponytail: sin --force, un índice/regla huérfano se limpia a mano;
-      # revisar si los huérfanos se acumulan. Auto-borrar sin --force sería
-      # riesgo de perder algo que un humano puso ahí a propósito.
+      # ponytail: sin --force en indexes/rules — un huérfano se limpia a
+      # mano; revisar si se acumulan. Auto-borrar sin --force sería riesgo de
+      # perder algo que un humano puso ahí a propósito.
       - run: npx firebase deploy --only firestore:indexes --project dev --non-interactive
       - run: npx firebase deploy --only firestore:rules --project dev --non-interactive
-      - run: npx firebase deploy --only functions --project dev --non-interactive
+      # `functions` sí necesita --force: `onAporteEscrito` tiene política de
+      # reintento (`retry: true`), y en modo no-interactivo el CLI corta el
+      # deploy pidiendo --force para confirmarla (confirmado en el código
+      # fuente de firebase-tools, promptForFailurePolicies). --force también
+      # habilita borrar sin preguntar una function que ya no esté en el
+      # código — a diferencia de indexes/rules, eso es el comportamiento
+      # correcto para functions: una function huérfana sigue facturando.
+      - run: npx firebase deploy --only functions --project dev --non-interactive --force
       - run: npm run build --workspace apps/web -- --mode dev
         env:
           VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY_DEV }}
