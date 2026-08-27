@@ -1,6 +1,7 @@
 // apps/web/src/ui/admin/CategoriasScreen.test.tsx
 // (docs/plan-panel-administrador.md §5, fase F3; ticket #39 D4/D6)
 import { FakeAdminRepository } from "@conteo/data";
+import type { Area } from "@conteo/shared/models/area.js";
 import type { CategoriaValor } from "@conteo/shared/models/categoria-valor.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -28,6 +29,16 @@ function categoriaBase(overrides: Partial<CategoriaValor> = {}): CategoriaValor 
     valor: 5000,
     activa: true,
     orden: 1,
+    creadaEn: new Date("2026-01-01T00:00:00Z"),
+    ...overrides,
+  };
+}
+
+function areaBase(overrides: Partial<Area> = {}): Area {
+  return {
+    areaId: "area_aseo",
+    nombre: "Aseo",
+    activa: true,
     creadaEn: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
   };
@@ -116,6 +127,32 @@ describe("CategoriasScreen (F3)", () => {
             orden: 1,
             sucursalesAsignadas: ["suc_norte"],
           },
+        },
+      ]);
+    });
+  });
+
+  it("crea una categoría con área seleccionada y resuelve el nombre en la tabla", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarArea(areaBase());
+    repo.sembrarCategoria(categoriaBase({ areaId: "area_aseo" }));
+
+    renderPantalla(repo);
+
+    expect(screen.getByText("Aseo")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /nueva categoría/i }));
+    fireEvent.change(screen.getByLabelText(/etiqueta/i), { target: { value: "$10.000" } });
+    fireEvent.change(screen.getByLabelText(/^valor$/i), { target: { value: "10000" } });
+    fireEvent.change(screen.getByLabelText(/orden/i), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText(/área/i), { target: { value: "area_aseo" } });
+    fireEvent.click(screen.getByRole("button", { name: /crear categoría/i }));
+
+    await vi.waitFor(() => {
+      expect(repo.llamadas).toEqual([
+        {
+          metodo: "crearCategoria",
+          payload: { etiqueta: "$10.000", valor: 10000, orden: 2, areaId: "area_aseo" },
         },
       ]);
     });

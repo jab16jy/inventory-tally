@@ -25,6 +25,7 @@ function renderLayout(rutaInicial: string) {
           <Route path="cajeros" element={<p>Cajeros — contenido</p>} />
           <Route path="sucursales" element={<p>Sucursales — contenido</p>} />
           <Route path="categorias" element={<p>Categorías — contenido</p>} />
+          <Route path="areas" element={<p>Áreas — contenido</p>} />
           <Route path="sesiones" element={<p>Sesiones — contenido</p>} />
           <Route path="auditoria" element={<p>Auditoría — contenido</p>} />
           <Route path="comparativo" element={<p>Comparativo — contenido</p>} />
@@ -42,18 +43,19 @@ describe("AdminLayout (F1)", () => {
     expect(screen.getByRole("link", { name: /^panel$/i })).not.toHaveAttribute("aria-current");
   });
 
-  it("lista los siete destinos del panel", () => {
+  it("lista los ocho destinos del panel", () => {
     renderLayout("/admin");
 
     const nav = screen.getByRole("navigation", { name: /panel de administrador/i });
     const enlaces = within(nav).getAllByRole("link");
-    expect(enlaces).toHaveLength(7);
+    expect(enlaces).toHaveLength(8);
 
     for (const nombre of [
       "Panel",
       "Cajeros",
       "Sucursales",
       "Categorías",
+      "Áreas",
       "Sesiones",
       "Auditoría",
       "Comparativo",
@@ -77,7 +79,7 @@ describe("AdminLayout · breakpoints (issue #20 item 1, doc 11 §298-304)", () =
     renderLayout("/admin");
 
     const nav = screen.getByRole("navigation", { name: /panel de administrador/i });
-    expect(within(nav).getAllByRole("link")).toHaveLength(7);
+    expect(within(nav).getAllByRole("link")).toHaveLength(8);
     // La cabecera "Panel administrador" sólo existe en el sidebar lateral.
     expect(screen.queryByText("Panel administrador")).not.toBeInTheDocument();
   });
@@ -87,7 +89,7 @@ describe("AdminLayout · breakpoints (issue #20 item 1, doc 11 §298-304)", () =
     renderLayout("/admin");
 
     const nav = screen.getByRole("navigation", { name: /panel de administrador/i });
-    expect(within(nav).getAllByRole("link")).toHaveLength(7);
+    expect(within(nav).getAllByRole("link")).toHaveLength(8);
     // Las etiquetas de texto de los destinos no se pintan a este ancho.
     expect(screen.queryByText("Cajeros")).not.toBeInTheDocument();
     expect(screen.queryByText("Panel administrador")).not.toBeInTheDocument();
@@ -99,7 +101,7 @@ describe("AdminLayout · breakpoints (issue #20 item 1, doc 11 §298-304)", () =
     renderLayout("/admin");
 
     const nav = screen.getByRole("navigation", { name: /panel de administrador/i });
-    expect(within(nav).getAllByRole("link")).toHaveLength(7);
+    expect(within(nav).getAllByRole("link")).toHaveLength(8);
     expect(screen.getByText("Panel administrador")).toBeInTheDocument();
     expect(within(nav).getByText("Cajeros")).toBeInTheDocument();
   });

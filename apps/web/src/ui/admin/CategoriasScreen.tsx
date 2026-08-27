@@ -4,6 +4,7 @@
 // ofrece ninguna acción — invariante I-7: ninguna de las dos callables toca
 // `sesiones/*/lineas`, se prueba en `packages/functions`, no aquí.
 import { useEffect, useId, useState, type FormEvent } from "react";
+import type { Area } from "@conteo/shared/models/area.js";
 import type { CategoriaValor } from "@conteo/shared/models/categoria-valor.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import type { CrearCategoriaPayload } from "@conteo/data";
@@ -24,6 +25,15 @@ function useSucursales(): Sucursal[] {
   return sucursales;
 }
 
+// Mismo patrón que useSucursales de arriba: se necesita tanto en la tabla
+// (resolver areaId → nombre) como en el formulario (poblar el <select>).
+function useAreas(): Area[] {
+  const repo = useAdminRepository();
+  const [areas, setAreas] = useState<Area[]>([]);
+  useEffect(() => repo.observarAreas(setAreas), [repo]);
+  return areas;
+}
+
 function useCategorias(): { categorias: CategoriaValor[]; cargando: boolean } {
   const repo = useAdminRepository();
   const [categorias, setCategorias] = useState<CategoriaValor[]>([]);
@@ -42,6 +52,7 @@ function useCategorias(): { categorias: CategoriaValor[]; cargando: boolean } {
 export function CategoriasScreen() {
   const repo = useAdminRepository();
   const { categorias, cargando } = useCategorias();
+  const areas = useAreas();
 
   const [formularioAbierto, setFormularioAbierto] = useState(false);
   const [errorFormulario, setErrorFormulario] = useState<string | null>(null);
@@ -81,6 +92,12 @@ export function CategoriasScreen() {
       alinearDerecha: true,
     },
     { clave: "orden", etiqueta: "Orden", render: (c) => c.orden, valorOrden: (c) => c.orden },
+    {
+      clave: "area",
+      etiqueta: "Área",
+      render: (c) => areas.find((a) => a.areaId === c.areaId)?.nombre ?? "Sin área",
+      valorOrden: (c) => areas.find((a) => a.areaId === c.areaId)?.nombre ?? "",
+    },
     {
       clave: "activa",
       etiqueta: "Activa",
@@ -158,15 +175,18 @@ interface FormularioCategoriaProps {
 
 function FormularioCategoria({ error, onCancelar, onCrear }: FormularioCategoriaProps) {
   const sucursales = useSucursales();
+  const areas = useAreas();
   const [etiqueta, setEtiqueta] = useState("");
   const [valor, setValor] = useState("");
   const [orden, setOrden] = useState("");
+  const [areaId, setAreaId] = useState("");
   const [sucursalesAsignadas, setSucursalesAsignadas] = useState<string[]>([]);
   const [enviando, setEnviando] = useState(false);
 
   const idEtiqueta = useId();
   const idValor = useId();
   const idOrden = useId();
+  const idArea = useId();
 
   // D6: la sola presencia de sucursales marcadas ES la distinción entre
   // categoría global y "nombrada" — no hay un toggle aparte de tipo.
@@ -186,6 +206,7 @@ function FormularioCategoria({ error, onCancelar, onCrear }: FormularioCategoria
         etiqueta,
         valor: Number(valor),
         orden: Number(orden),
+        ...(areaId && { areaId }),
         ...(sucursalesAsignadas.length > 0 && { sucursalesAsignadas }),
       });
     } finally {
@@ -198,7 +219,7 @@ function FormularioCategoria({ error, onCancelar, onCrear }: FormularioCategoria
       onSubmit={(evento) => void manejarEnvio(evento)}
       className="mb-6 flex flex-col gap-4 rounded-placa border border-borde bg-placa p-4"
     >
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div>
           <label htmlFor={idEtiqueta} className="mb-1.5 block text-micro text-tenue">
             Etiqueta
@@ -242,6 +263,25 @@ function FormularioCategoria({ error, onCancelar, onCrear }: FormularioCategoria
             required
             className={CAMPO}
           />
+        </div>
+
+        <div>
+          <label htmlFor={idArea} className="mb-1.5 block text-micro text-tenue">
+            Área
+          </label>
+          <select
+            id={idArea}
+            value={areaId}
+            onChange={(e) => setAreaId(e.target.value)}
+            className={CAMPO}
+          >
+            <option value="">Sin área</option>
+            {areas.map((a) => (
+              <option key={a.areaId} value={a.areaId}>
+                {a.nombre}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
