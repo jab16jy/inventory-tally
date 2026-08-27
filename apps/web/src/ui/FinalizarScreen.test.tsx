@@ -121,4 +121,25 @@ describe("FinalizarScreen (F3-B, doc 11 §6)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/no se pudo confirmar/i);
     expect(screen.queryByText("Pantalla de sucursales")).not.toBeInTheDocument();
   });
+
+  it("issue #41: tras agotar los reintentos automáticos, ofrece un botón de reintento manual que habilita 'Confirmar y salir'", async () => {
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarLinea("ses_1", lineaBase("cat_1000", "$1.000", 1000));
+    // MAX_REINTENTOS + 1 rechazos: agota los reintentos automáticos una sola
+    // vez y no deja rechazos sembrados para el reintento manual siguiente.
+    repo.sembrarRechazosAporte("ses_1", "cat_1000", 4);
+    void repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_1000", cantidad: 3 });
+
+    renderPantalla(repo);
+
+    const botonReintentar = await screen.findByRole("button", { name: /reintentar envío/i });
+    expect(screen.getByRole("button", { name: /esperando conexión/i })).toBeDisabled();
+
+    fireEvent.click(botonReintentar);
+
+    expect(
+      await screen.findByRole("button", { name: /confirmar y salir/i }),
+    ).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /reintentar envío/i })).not.toBeInTheDocument();
+  });
 });

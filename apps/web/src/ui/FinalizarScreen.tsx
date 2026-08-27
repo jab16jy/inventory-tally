@@ -16,6 +16,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { estaPendiente } from "@conteo/shared";
 import { useConteoRepository } from "../state/repositorio-contexto.js";
+import { useEscriturasConError } from "../state/useEscriturasConError.js";
 import { useLineasSesion } from "../state/useLineasSesion.js";
 import { usePendientes } from "../state/usePendientes.js";
 import { CabeceraCajero } from "./CabeceraCajero.js";
@@ -37,6 +38,7 @@ export function FinalizarScreen({ onSalir }: FinalizarScreenProps) {
 
   const lineas = useLineasSesion(sesionId);
   const pendientes = usePendientes(sesionId);
+  const escriturasConError = useEscriturasConError(sesionId);
 
   // ponytail: total en CATEGORÍAS, no en unidades — el techo es la falta de
   // una vía de agregación en el repositorio (ver comentario de archivo).
@@ -113,6 +115,26 @@ export function FinalizarScreen({ onSalir }: FinalizarScreenProps) {
         <p role="alert" className="mt-4 text-base text-tinta">
           No se pudo confirmar. Tu conteo está guardado; vuelve a intentarlo.
         </p>
+      )}
+
+      {/* Issue #41: un rechazo del servidor que agotó sus reintentos
+          automáticos ya no queda mudo dentro de "pendientes" — se distingue
+          para que el cajero pueda reintentarlo a mano en vez de quedar
+          varado para siempre en "Esperando conexión". */}
+      {escriturasConError > 0 && (
+        <div role="alert" className="mt-4 flex flex-col gap-2 border border-borde bg-placa rounded-placa px-3 py-2.5">
+          <p className="text-base text-tinta">
+            No se pudo enviar {escriturasConError}{" "}
+            {escriturasConError === 1 ? "conteo" : "conteos"}. Tu conteo está guardado.
+          </p>
+          <button
+            type="button"
+            onClick={() => repo.reintentarEscriturasFallidas(sesionId)}
+            className="min-h-[var(--size-toque)] w-full rounded-placa border border-borde font-semibold text-tinta transition-colors duration-150 ease-out active:bg-borde/40"
+          >
+            Reintentar envío
+          </button>
+        </div>
       )}
 
       {/* Deshabilitado SIN atenuar el ámbar, mismo criterio que la fila sin
