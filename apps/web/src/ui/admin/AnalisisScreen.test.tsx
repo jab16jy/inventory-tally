@@ -60,6 +60,7 @@ function lineaBase(
     categoriaId,
     valorUnitario,
     etiqueta: `$${valorUnitario}`,
+    area: "Aseo",
     cantidadTotal,
     numAportantes: 1,
     versiones: {},

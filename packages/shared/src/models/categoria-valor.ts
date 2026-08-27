@@ -20,4 +20,5 @@ export interface CategoriaValor {
   readonly orden: number;
   readonly creadaEn: Date;
   readonly sucursalesAsignadas?: readonly string[];
+  readonly areaId?: string;
 }

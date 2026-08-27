@@ -34,6 +34,7 @@ function lineaBase(overrides: Partial<LineaConteo> = {}): LineaConteo {
     categoriaId: "cat_5000",
     valorUnitario: 5000,
     etiqueta: "$5.000",
+    area: "Aseo",
     cantidadTotal: 10,
     numAportantes: 1,
     versiones: {},

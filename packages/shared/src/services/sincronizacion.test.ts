@@ -8,6 +8,7 @@ function linea(versiones: Record<string, number>): LineaConteo {
     categoriaId: "cat_5000",
     valorUnitario: 5000,
     etiqueta: "$5.000",
+    area: "Aseo",
     cantidadTotal: 0,
     numAportantes: 0,
     versiones,
