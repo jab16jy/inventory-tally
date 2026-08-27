@@ -1,46 +1,67 @@
 # Plan de implementación — Puesta en producción
 
-> Estado: **aprobado, pendiente de ejecutar**.
+> Estado: **ejecutado parcial (tickets 1–6 de 9)**.
 > Alcance: `docs/diseno/12-despliegue-y-entornos.md` completo — entornos,
 > despliegue, observabilidad y respaldo — más el blocker de empaquetado que
 > ningún documento anterior anticipó.
 > Continúa [`plan-panel-administrador.md`](plan-panel-administrador.md), que
 > cerró la última funcionalidad pendiente del producto.
+>
+> Verificado contra `gh issue list`, no supuesto: los tickets 1–6 (issues
+> [#10](https://github.com/jab16jy/inventory-tally/issues/10)–[#15](https://github.com/jab16jy/inventory-tally/issues/15))
+> están cerrados y su código está en el repo — docs sincronizados, bundle de
+> Functions desplegable, bloqueo por versión mínima, entornos dev/prod
+> provisionados, deploy a dev en merge y canal de preview por PR. Quedan
+> abiertos el ticket 7 (issue [#16](https://github.com/jab16jy/inventory-tally/issues/16),
+> deploy a prod por tag), el 8 (issue [#17](https://github.com/jab16jy/inventory-tally/issues/17),
+> observabilidad del cliente) y el 9 (issue [#18](https://github.com/jab16jy/inventory-tally/issues/18),
+> respaldo diario). Ninguno de los tres tiene código en el repo hoy
+> (`apps/web/src/lib/analitica.ts` no existe, no hay wizard de respaldo, no
+> hay job de deploy por tag en `ci.yml`).
 
 ## Contexto
 
-El repositorio está funcionalmente terminado. 15 rutas, 14 Cloud Functions,
-79 archivos de test con 451 casos, 27 tests de Security Rules, cero
-`TODO`/`FIXME`. Los RF-01 a RF-16 están implementados.
+El repositorio está funcionalmente terminado. Los RF-01 a RF-16 están
+implementados. Los números de esta sección eran ciertos al aprobar este plan,
+antes de ejecutar los tickets 1–6; hoy (tras esos tickets) son 15 rutas, 14
+Cloud Functions, 89 archivos de test con 545 casos, 32 tests de Security
+Rules, cero `TODO`/`FIXME` — verificado de nuevo al auditar este documento
+(issue #43). Las rutas y las Cloud Functions no cambiaron; el resto de
+archivos y casos de test creció con el trabajo de los tickets 1–6.
 
 Lo que no existe es **el doc 12 entero**. El sistema no se puede poner en manos
 de un cajero hoy: no hay proyectos de Firebase, no hay un solo job de deploy, no
 hay una sola línea de telemetría, y no hay respaldo.
 
-### El blocker: `packages/functions` no es desplegable
+### El blocker: `packages/functions` no era desplegable (resuelto por el ticket 2 / issue #11)
 
-Verificado en `packages/functions/package.json`, no supuesto:
+Verificado en `packages/functions/package.json` al aprobar este plan, no supuesto:
 
-- `"main": "src/index.ts"` y **no hay script `build`**. `firebase deploy`
-  subiría TypeScript a un runtime Node 22 que no lo ejecuta.
-- Sus dependencias son de workspace: `"@conteo/contracts": "*"` y
+- `"main": "src/index.ts"` y **no había script `build`**. `firebase deploy`
+  habría subido TypeScript a un runtime Node 22 que no lo ejecuta.
+- Sus dependencias eran de workspace: `"@conteo/contracts": "*"` y
   `"@conteo/shared": "*"`. Firebase empaqueta **sólo** el directorio de
-  `functions.source`; esos symlinks a `packages/` y `contracts/` no viajan.
+  `functions.source`; esos symlinks a `packages/` y `contracts/` no viajaban.
 - El código importa por submódulo (`@conteo/shared/services/sincronizacion.js`),
-  resuelto hoy por los paths de `tsconfig.base.json` y por el alias de
-  `packages/functions/vitest.config.ts`. En runtime no existe ninguno de los dos.
+  resuelto entonces sólo por los paths de `tsconfig.base.json` y por el alias
+  de `packages/functions/vitest.config.ts`. En runtime no existía ninguno de
+  los dos.
 
-Los 79 archivos de test están verdes porque Vitest resuelve los alias. El deploy
-no los tiene. Por eso el ticket 2 va primero: sin él, nada de lo demás importa.
+Los archivos de test estaban verdes porque Vitest resuelve los alias; el
+deploy no los tenía. Por eso el ticket 2 iba primero. Hoy `package.json` ya
+tiene `"main": "lib/index.js"` y un script `build` con esbuild que bundlea
+`shared`/`contracts` (`packages/functions/test/bundle.test.ts` lo prueba) —
+verificado, el blocker ya no existe.
 
-### Cuatro documentos que hoy mienten
+### Cuatro documentos que mentían (resuelto por el ticket 1 / issue #10)
 
-`plan-diseno-visual-pwa.md:3` y `plan-panel-administrador.md:3` siguen diciendo
+`plan-diseno-visual-pwa.md:3` y `plan-panel-administrador.md:3` decían
 "aprobado, pendiente de ejecutar" sobre trabajo terminado; `DESIGN.md:130,149`
-declara `Deck`, `ChipEstado`, `Hoja` e `Icono` como no construidos cuando los
-ocho primitivos existen; `PRODUCT.md:14` afirma que `cerrarSesion` y
-`crearCajero` "todavía no existen" cuando ambas están exportadas. El ticket 1 lo
-corrige antes de que un agente planifique trabajo ya hecho.
+declaraba `Deck`, `ChipEstado`, `Hoja` e `Icono` como no construidos cuando los
+ocho primitivos existían; `PRODUCT.md:14` afirmaba que `cerrarSesion` y
+`crearCajero` "todavía no existen" cuando ambas estaban exportadas. El ticket 1
+(issue #10, cerrado) ya lo corrigió — los cuatro documentos reflejan hoy el
+código real.
 
 ---
 
@@ -77,20 +98,21 @@ Obligatorio en los 9 tickets, sin excepción:
 
 ## 3. Los 9 tickets
 
-Nueve rebanadas verticales, cada una verificable por sí sola. Cuatro arrancan de
-inmediato: **1, 2, 3 y 4**.
+Nueve rebanadas verticales, cada una verificable por sí sola. Cuatro arrancaron de
+inmediato: **1, 2, 3 y 4**. Verificado contra `gh issue list` (issue #43): los
+tickets 1–6 están cerrados y su código está en el repo; 7, 8 y 9 siguen abiertos.
 
-| # | Ticket | Bloqueado por |
-|---|---|---|
-| 1 | Sincronizar los cuatro docs con el código | — |
-| 2 | Bundle desplegable de Cloud Functions | — |
-| 3 | Bloqueo por versión mínima | — |
-| 4 | Provisión de entornos dev y prod | — |
-| 5 | Deploy a dev en merge a `main` | 2, 4 |
-| 6 | Canal de preview por PR | 5 |
-| 7 | Deploy a prod por tag `v*` | 5 |
-| 8 | Observabilidad del cliente | 4 |
-| 9 | Respaldo diario a Cloud Storage | 4 |
+| # | Ticket | Bloqueado por | Estado | Issue |
+|---|---|---|---|---|
+| 1 | Sincronizar los cuatro docs con el código | — | cerrado | #10 |
+| 2 | Bundle desplegable de Cloud Functions | — | cerrado | #11 |
+| 3 | Bloqueo por versión mínima | — | cerrado | #12 |
+| 4 | Provisión de entornos dev y prod | — | cerrado | #13 |
+| 5 | Deploy a dev en merge a `main` | 2, 4 | cerrado | #14 |
+| 6 | Canal de preview por PR | 5 | cerrado | #15 |
+| 7 | Deploy a prod por tag `v*` | 5 | **abierto** | #16 |
+| 8 | Observabilidad del cliente | 4 | **abierto** | #17 |
+| 9 | Respaldo diario a Cloud Storage | 4 | **abierto** | #18 |
 
 Tres decisiones de granularidad, confirmadas:
 
@@ -108,7 +130,7 @@ rebanada aterrizar en verde.
 
 ---
 
-### Ticket 1 · Sincronizar los cuatro docs con el código
+### Ticket 1 · Sincronizar los cuatro docs con el código — cerrado (issue #10)
 
 **Bloqueado por:** nada.
 
@@ -127,7 +149,7 @@ rebanada aterrizar en verde.
 
 ---
 
-### Ticket 2 · Bundle desplegable de Cloud Functions
+### Ticket 2 · Bundle desplegable de Cloud Functions — cerrado (issue #11)
 
 **Bloqueado por:** nada. **Es el blocker de todo lo demás.**
 
@@ -155,7 +177,7 @@ dependencia transitiva de Vite; no se añade nada nuevo.
 
 ---
 
-### Ticket 3 · Bloqueo por versión mínima
+### Ticket 3 · Bloqueo por versión mínima — cerrado (issue #12)
 
 **Bloqueado por:** nada.
 
@@ -190,7 +212,7 @@ app, y la única salida es editar Firestore a mano. Candidato claro para
 
 ---
 
-### Ticket 4 · Provisión de entornos dev y prod
+### Ticket 4 · Provisión de entornos dev y prod — cerrado (issue #13)
 
 **Bloqueado por:** nada.
 
@@ -221,7 +243,7 @@ secretos en GitHub y volcar la config en los `.env`.
 
 ---
 
-### Ticket 5 · Deploy a dev en merge a `main`
+### Ticket 5 · Deploy a dev en merge a `main` — cerrado (issue #14)
 
 **Bloqueado por:** 2, 4.
 
@@ -252,7 +274,7 @@ comprobación explícita de resultado, o quitar el filtro en la rama `main`.
 
 ---
 
-### Ticket 6 · Canal de preview por PR
+### Ticket 6 · Canal de preview por PR — cerrado (issue #15)
 
 **Bloqueado por:** 5.
 
@@ -266,7 +288,7 @@ Reusa el job compuesto del ticket 5.
 
 ---
 
-### Ticket 7 · Deploy a prod por tag `v*`
+### Ticket 7 · Deploy a prod por tag `v*` — abierto (issue #16)
 
 **Bloqueado por:** 5.
 
@@ -280,7 +302,7 @@ candidato a `judgment-day`.
 
 ---
 
-### Ticket 8 · Observabilidad del cliente
+### Ticket 8 · Observabilidad del cliente — abierto (issue #17)
 
 **Bloqueado por:** 4 (necesita el `measurementId` de los `.env`).
 
@@ -313,7 +335,7 @@ a haber dos.
 
 ---
 
-### Ticket 9 · Respaldo diario a Cloud Storage
+### Ticket 9 · Respaldo diario a Cloud Storage — abierto (issue #18)
 
 **Bloqueado por:** 4.
 
