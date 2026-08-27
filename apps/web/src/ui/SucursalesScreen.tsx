@@ -31,6 +31,7 @@ import { useNavigate } from "react-router-dom";
 import type { Sucursal } from "@conteo/shared";
 import { useConteoRepository } from "../state/repositorio-contexto.js";
 import { useAuthState } from "../state/useAuthState.js";
+import { CabeceraCajero } from "./CabeceraCajero.js";
 import { Icono } from "./primitivos/Icono.js";
 import { Placa } from "./primitivos/Placa.js";
 
@@ -42,9 +43,12 @@ const SIN_SUCURSALES: readonly string[] = [];
 
 export interface SucursalesScreenProps {
   readonly auth: Auth;
+  // issue #40: "Salir" (variante A, decidida vía /prototype) entra por prop
+  // igual que `auth` — la pantalla no importa `signOut` directo.
+  readonly onSalir: () => void | Promise<void>;
 }
 
-export function SucursalesScreen({ auth }: SucursalesScreenProps) {
+export function SucursalesScreen({ auth, onSalir }: SucursalesScreenProps) {
   const estadoAuth = useAuthState(auth);
   const sucursalIds = estadoAuth?.sucursales ?? SIN_SUCURSALES;
   const repo = useConteoRepository();
@@ -75,16 +79,7 @@ export function SucursalesScreen({ auth }: SucursalesScreenProps) {
 
   return (
     <section className="mx-auto flex min-h-dvh max-w-md flex-col px-3 pt-3">
-      {/* Cabecera callada a propósito. El primer borrador puso el h1 en
-          `text-numeral` (2rem): ese token es el outlier deliberado de la
-          escala y DESIGN.md lo reserva a la denominación de categoría —
-          "el numeral es lo único que grita". Gastarlo en una palabra que
-          no es una cifra diluye la única jerarquía audaz del sistema, y
-          además dejaba el título compitiendo con las placas, que SON el
-          contenido de esta pantalla. */}
-      <header className="pb-3">
-        <h1 className="text-micro tracking-[0.18em] text-tenue uppercase">Sucursales</h1>
-      </header>
+      <CabeceraCajero titulo="Sucursales" onSalir={onSalir} />
 
       {/* El claim es la autoridad sobre "no tienes sucursales", NO la lista
           de snapshots: `useAuthState` arranca en `undefined` y `sucursales`

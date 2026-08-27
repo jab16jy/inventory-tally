@@ -99,7 +99,7 @@ export function AppRouter(): ReactNode {
           path="/sucursales"
           element={
             <RequireAuth>
-              <SucursalesScreen auth={auth} />
+              <SucursalesScreen auth={auth} onSalir={() => signOut(auth)} />
             </RequireAuth>
           }
         />

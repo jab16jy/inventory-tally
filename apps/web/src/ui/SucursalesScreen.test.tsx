@@ -36,7 +36,11 @@ function crearSucursal(overrides: Partial<Sucursal> = {}): Sucursal {
   };
 }
 
-function renderPantalla(repo: FakeConteoRepository, sucursalesDelClaim: string[]) {
+function renderPantalla(
+  repo: FakeConteoRepository,
+  sucursalesDelClaim: string[],
+  onSalir: () => void = vi.fn(),
+) {
   onAuthStateChanged.mockImplementation((_auth: unknown, cb: (u: unknown) => void) => {
     cb(usuarioFake(sucursalesDelClaim));
     return () => {};
@@ -46,7 +50,10 @@ function renderPantalla(repo: FakeConteoRepository, sucursalesDelClaim: string[]
     <MemoryRouter initialEntries={["/sucursales"]}>
       <ConteoRepositoryProvider repo={repo}>
         <Routes>
-          <Route path="/sucursales" element={<SucursalesScreen auth={{} as never} />} />
+          <Route
+            path="/sucursales"
+            element={<SucursalesScreen auth={{} as never} onSalir={onSalir} />}
+          />
           <Route path="/conteo/:sesionId/preparar" element={<p>Pantalla de preparación</p>} />
           <Route path="/conteo/:sesionId" element={<p>Pantalla de conteo</p>} />
         </Routes>
@@ -139,7 +146,26 @@ describe("SucursalesScreen (F3-A)", () => {
 
     renderPantalla(repo, ids);
 
-    expect(await screen.findAllByRole("button")).toHaveLength(10);
+    // Nombre accesible con prefijo "Sucursal …": distingue las filas del
+    // nuevo botón "Salir" de la cabecera (issue #40), que también cuenta
+    // como <button> pero está siempre presente, incluso antes de que las
+    // sucursales terminen de cargar.
+    const filasSucursal = await screen.findAllByRole("button", { name: /^sucursal /i });
+    expect(filasSucursal).toHaveLength(10);
+  });
+
+  it("ofrece un control de salida visible que no se llama 'Cerrar sesión'", async () => {
+    const onSalir = vi.fn();
+    const repo = new FakeConteoRepository();
+    repo.sembrarSucursal(crearSucursal({ sucursalId: "suc_norte" }));
+
+    renderPantalla(repo, ["suc_norte"], onSalir);
+
+    const boton = await screen.findByRole("button", { name: /^salir$/i });
+    expect(screen.queryByRole("button", { name: /cerrar sesión/i })).not.toBeInTheDocument();
+
+    fireEvent.click(boton);
+    expect(onSalir).toHaveBeenCalledTimes(1);
   });
 
   it("F4-B: con el claim resuelto y IDs, pero los snapshots de sucursal aún en vuelo, pinta un esqueleto en vez de nada", async () => {
@@ -155,7 +181,10 @@ describe("SucursalesScreen (F3-A)", () => {
 
     expect(await screen.findAllByTestId("fila-esqueleto")).toHaveLength(2);
     expect(screen.queryByText(/no tienes sucursales/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    // El esqueleto no tiene filas tocables — sólo el botón "Salir" de la
+    // cabecera es interactivo mientras carga.
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: /^salir$/i })).toBeInTheDocument();
   });
 
   it("F4-B: el esqueleto desaparece en cuanto llegan las sucursales reales", async () => {
