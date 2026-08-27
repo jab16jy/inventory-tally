@@ -27,6 +27,7 @@ import {
   type QueryDocumentSnapshot,
   type Timestamp,
 } from "firebase/firestore";
+import type { Area } from "@conteo/shared/models/area.js";
 import type { CategoriaValor } from "@conteo/shared/models/categoria-valor.js";
 import type { EventoAuditoria } from "@conteo/shared/models/evento-auditoria.js";
 import type { Historico } from "@conteo/shared/models/historico.js";
@@ -41,6 +42,7 @@ import type {
   ActualizarSucursalPayload,
   AdminRepository,
   CerrarSesionPayload,
+  CrearAreaPayload,
   CrearCajeroPayload,
   CrearCategoriaPayload,
   CrearSucursalPayload,
@@ -51,6 +53,7 @@ import type {
   Unsubscribe,
 } from "../repositories/admin-repository.js";
 import {
+  areaDesdeDoc,
   categoriaValorDesdeDoc,
   eventoAuditoriaDesdeDoc,
   historicoDesdeDoc,
@@ -182,6 +185,14 @@ export class FirestoreAdminRepository implements AdminRepository {
     });
   }
 
+  observarAreas(onChange: (areas: Area[]) => void): Unsubscribe {
+    // Sin campo `orden` (a diferencia de categoriasValor): ordena por nombre.
+    const q = query(collection(this.db, "areas"), orderBy("nombre"));
+    return onSnapshot(q, (snap) => {
+      onChange(snap.docs.map((d) => areaDesdeDoc(d.id, d.data() as never)));
+    });
+  }
+
   // ─────────── paginadas ───────────
 
   async listarSesiones(filtro: FiltroSesiones, cursor?: unknown): Promise<Pagina<SesionConteo>> {
@@ -282,6 +293,14 @@ export class FirestoreAdminRepository implements AdminRepository {
     categoriaId: string,
   ): Promise<{ categoriaId: string; desactivada: true }> {
     return this.llamar("desactivarCategoria", { categoriaId });
+  }
+
+  async crearArea(payload: CrearAreaPayload): Promise<{ areaId: string; creada: true }> {
+    return this.llamar("crearArea", payload);
+  }
+
+  async desactivarArea(areaId: string): Promise<{ areaId: string; desactivada: true }> {
+    return this.llamar("desactivarArea", { areaId });
   }
 
   // ─────────── helpers privados ───────────

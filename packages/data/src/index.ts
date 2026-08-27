@@ -18,6 +18,7 @@ export type {
   ActualizarSucursalPayload,
   AdminRepository,
   CerrarSesionPayload,
+  CrearAreaPayload,
   CrearCajeroPayload,
   CrearCategoriaPayload,
   CrearSucursalPayload,

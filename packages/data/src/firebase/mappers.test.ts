@@ -2,6 +2,7 @@ import { Timestamp } from "firebase/firestore";
 import { describe, expect, it } from "vitest";
 import {
   aporteDesdeDoc,
+  areaDesdeDoc,
   categoriaValorDesdeDoc,
   eventoAuditoriaDesdeDoc,
   lineaConteoDesdeDoc,
@@ -39,6 +40,7 @@ describe("lineaConteoDesdeDoc (doc 04 §3)", () => {
     const linea = lineaConteoDesdeDoc("cat_5000", {
       valorUnitario: 5000,
       etiqueta: "$5.000",
+      area: "Efectivo",
       cantidadTotal: 55,
       numAportantes: 2,
       versiones: { uid_ana: 3, uid_luis: 1 },
@@ -50,6 +52,7 @@ describe("lineaConteoDesdeDoc (doc 04 §3)", () => {
       categoriaId: "cat_5000",
       valorUnitario: 5000,
       etiqueta: "$5.000",
+      area: "Efectivo",
       cantidadTotal: 55,
       numAportantes: 2,
       versiones: { uid_ana: 3, uid_luis: 1 },
@@ -218,6 +221,7 @@ describe("categoriaValorDesdeDoc (docs/plan-panel-administrador.md §4)", () => 
       orden: 1,
       creadaEn: creadaEn.toDate(),
       sucursalesAsignadas: undefined,
+      areaId: undefined,
     });
   });
 
@@ -233,6 +237,38 @@ describe("categoriaValorDesdeDoc (docs/plan-panel-administrador.md §4)", () => 
     });
 
     expect(categoria.sucursalesAsignadas).toEqual(["suc_norte"]);
+  });
+
+  it("mapea areaId cuando está presente (agrupación de categorías por área)", () => {
+    const creadaEn = Timestamp.fromDate(new Date("2026-01-10T08:00:00Z"));
+    const categoria = categoriaValorDesdeDoc("cat_5000", {
+      valor: 5000,
+      etiqueta: "$5.000",
+      activa: true,
+      orden: 1,
+      creadaEn,
+      areaId: "area_efectivo",
+    });
+
+    expect(categoria.areaId).toBe("area_efectivo");
+  });
+});
+
+describe("areaDesdeDoc (docs/plan-panel-administrador.md §4)", () => {
+  it("mapea con el id como areaId y creadaEn convertido a Date", () => {
+    const creadaEn = Timestamp.fromDate(new Date("2026-01-10T08:00:00Z"));
+    const area = areaDesdeDoc("area_efectivo", {
+      nombre: "Efectivo",
+      activa: true,
+      creadaEn,
+    });
+
+    expect(area).toEqual({
+      areaId: "area_efectivo",
+      nombre: "Efectivo",
+      activa: true,
+      creadaEn: creadaEn.toDate(),
+    });
   });
 });
 

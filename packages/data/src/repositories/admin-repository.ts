@@ -4,6 +4,7 @@
 // barrel `@conteo/shared` — misma razón que conteo-repository.ts: el barrel
 // re-exporta `Config` (config/entorno.ts), que exige el ambient
 // `ImportMeta.env` de Vite.
+import type { Area } from "@conteo/shared/models/area.js";
 import type { CategoriaValor } from "@conteo/shared/models/categoria-valor.js";
 import type {
   EventoAuditoria,
@@ -111,6 +112,12 @@ export interface CrearCategoriaPayload {
   readonly valor: number;
   readonly orden: number;
   readonly sucursalesAsignadas?: readonly string[];
+  readonly areaId?: string;
+}
+
+// Espejo de contracts/schemas/crear-area.schema.ts.
+export interface CrearAreaPayload {
+  readonly nombre: string;
 }
 
 export interface AdminRepository {
@@ -127,6 +134,7 @@ export interface AdminRepository {
    *  el admin no está acotado por el claim `sucursales` (doc plan §4). */
   observarSucursales(onChange: (sucursales: Sucursal[]) => void): Unsubscribe;
   observarCategorias(onChange: (categorias: CategoriaValor[]) => void): Unsubscribe;
+  observarAreas(onChange: (areas: Area[]) => void): Unsubscribe;
 
   // ── paginadas ──
   listarSesiones(filtro: FiltroSesiones, cursor?: unknown): Promise<Pagina<SesionConteo>>;
@@ -158,4 +166,6 @@ export interface AdminRepository {
   ): Promise<{ sucursalId: string; actualizada: true }>;
   crearCategoria(payload: CrearCategoriaPayload): Promise<{ categoriaId: string; creada: true }>;
   desactivarCategoria(categoriaId: string): Promise<{ categoriaId: string; desactivada: true }>;
+  crearArea(payload: CrearAreaPayload): Promise<{ areaId: string; creada: true }>;
+  desactivarArea(areaId: string): Promise<{ areaId: string; desactivada: true }>;
 }

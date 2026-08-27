@@ -3,6 +3,7 @@
 // `packages/shared` (doc 07 §2/§6: shared no puede importar Firebase).
 import type { DocumentData, Timestamp } from "firebase/firestore";
 import type { Aporte } from "@conteo/shared/models/aporte.js";
+import type { Area } from "@conteo/shared/models/area.js";
 import type { CategoriaValor } from "@conteo/shared/models/categoria-valor.js";
 import type { EventoAuditoria } from "@conteo/shared/models/evento-auditoria.js";
 import type { Historico } from "@conteo/shared/models/historico.js";
@@ -34,6 +35,7 @@ export function aporteDesdeDoc(data: AporteDoc): Aporte {
 interface LineaConteoDoc {
   readonly valorUnitario: number;
   readonly etiqueta: string;
+  readonly area: string;
   readonly cantidadTotal: number;
   readonly numAportantes: number;
   readonly versiones: Record<string, number>;
@@ -46,6 +48,7 @@ export function lineaConteoDesdeDoc(categoriaId: string, data: LineaConteoDoc): 
     categoriaId,
     valorUnitario: data.valorUnitario,
     etiqueta: data.etiqueta,
+    area: data.area,
     cantidadTotal: data.cantidadTotal,
     numAportantes: data.numAportantes,
     versiones: data.versiones,
@@ -140,6 +143,7 @@ interface CategoriaValorDoc {
   readonly orden: number;
   readonly creadaEn: Timestamp;
   readonly sucursalesAsignadas?: readonly string[];
+  readonly areaId?: string;
 }
 
 export function categoriaValorDesdeDoc(
@@ -154,6 +158,22 @@ export function categoriaValorDesdeDoc(
     orden: data.orden,
     creadaEn: data.creadaEn.toDate(),
     sucursalesAsignadas: data.sucursalesAsignadas,
+    areaId: data.areaId,
+  };
+}
+
+interface AreaDoc {
+  readonly nombre: string;
+  readonly activa: boolean;
+  readonly creadaEn: Timestamp;
+}
+
+export function areaDesdeDoc(areaId: string, data: AreaDoc): Area {
+  return {
+    areaId,
+    nombre: data.nombre,
+    activa: data.activa,
+    creadaEn: data.creadaEn.toDate(),
   };
 }
 

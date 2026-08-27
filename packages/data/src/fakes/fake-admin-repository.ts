@@ -2,6 +2,7 @@
 // memoria de AdminRepository (docs/plan-panel-administrador.md §4), espejo
 // de fake-conteo-repository.ts para los tests de UI del panel admin en
 // `apps/web` sin tocar el SDK de Firebase ni el emulador.
+import type { Area } from "@conteo/shared/models/area.js";
 import type { CategoriaValor } from "@conteo/shared/models/categoria-valor.js";
 import type { EventoAuditoria } from "@conteo/shared/models/evento-auditoria.js";
 import type { Historico } from "@conteo/shared/models/historico.js";
@@ -15,6 +16,7 @@ import type {
   ActualizarSucursalPayload,
   AdminRepository,
   CerrarSesionPayload,
+  CrearAreaPayload,
   CrearCajeroPayload,
   CrearCategoriaPayload,
   CrearSucursalPayload,
@@ -53,6 +55,7 @@ export class FakeAdminRepository implements AdminRepository {
   private readonly usuarios = new Map<string, Usuario>();
   private readonly sucursales = new Map<string, Sucursal>();
   private readonly categorias = new Map<string, CategoriaValor>();
+  private readonly areas = new Map<string, Area>();
   private readonly auditoria: EventoAuditoria[] = [];
   private readonly historicos = new Map<string, Historico>();
 
@@ -66,6 +69,7 @@ export class FakeAdminRepository implements AdminRepository {
   private readonly listenersUsuarios = new Set<(u: Usuario[]) => void>();
   private readonly listenersSucursales = new Set<(s: Sucursal[]) => void>();
   private readonly listenersCategorias = new Set<(c: CategoriaValor[]) => void>();
+  private readonly listenersAreas = new Set<(a: Area[]) => void>();
 
   readonly llamadas: LlamadaEscritura[] = [];
 
@@ -104,6 +108,11 @@ export class FakeAdminRepository implements AdminRepository {
   sembrarCategoria(categoria: CategoriaValor): void {
     this.categorias.set(categoria.categoriaId, categoria);
     this.emitirCategorias();
+  }
+
+  sembrarArea(area: Area): void {
+    this.areas.set(area.areaId, area);
+    this.emitirAreas();
   }
 
   sembrarAuditoria(evento: EventoAuditoria): void {
@@ -162,6 +171,12 @@ export class FakeAdminRepository implements AdminRepository {
     this.listenersCategorias.add(onChange);
     onChange(this.categoriasOrdenadas());
     return () => this.listenersCategorias.delete(onChange);
+  }
+
+  observarAreas(onChange: (areas: Area[]) => void): Unsubscribe {
+    this.listenersAreas.add(onChange);
+    onChange(this.areasOrdenadas());
+    return () => this.listenersAreas.delete(onChange);
   }
 
   // ─────────── AdminRepository — paginadas ───────────
@@ -252,6 +267,16 @@ export class FakeAdminRepository implements AdminRepository {
     return { categoriaId, desactivada: true };
   }
 
+  async crearArea(payload: CrearAreaPayload): Promise<{ areaId: string; creada: true }> {
+    this.registrar("crearArea", payload);
+    return { areaId: "area_fake", creada: true };
+  }
+
+  async desactivarArea(areaId: string): Promise<{ areaId: string; desactivada: true }> {
+    this.registrar("desactivarArea", { areaId });
+    return { areaId, desactivada: true };
+  }
+
   // ─────────── helpers privados ───────────
 
   private registrar(metodo: string, payload: unknown): void {
@@ -277,6 +302,10 @@ export class FakeAdminRepository implements AdminRepository {
 
   private categoriasOrdenadas(): CategoriaValor[] {
     return [...this.categorias.values()].sort((a, b) => a.orden - b.orden);
+  }
+
+  private areasOrdenadas(): Area[] {
+    return [...this.areas.values()].sort((a, b) => a.nombre.localeCompare(b.nombre));
   }
 
   private lineasDeSesion(sesionId: string): Map<string, LineaConteo> {
@@ -319,5 +348,10 @@ export class FakeAdminRepository implements AdminRepository {
   private emitirCategorias(): void {
     const valor = this.categoriasOrdenadas();
     this.listenersCategorias.forEach((cb) => cb(valor));
+  }
+
+  private emitirAreas(): void {
+    const valor = this.areasOrdenadas();
+    this.listenersAreas.forEach((cb) => cb(valor));
   }
 }
