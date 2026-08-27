@@ -56,4 +56,14 @@ describe("crearCategoriaSchema (docs/plan-panel-administrador.md §3)", () => {
     const resultado = crearCategoriaSchema.safeParse({ ...valido, sucursalesAsignadas });
     expect(resultado.success).toBe(false);
   });
+
+  it("acepta sin areaId (categoría sin área, comportamiento válido)", () => {
+    const resultado = crearCategoriaSchema.safeParse(valido);
+    expect(resultado.success).toBe(true);
+  });
+
+  it("acepta areaId cuando se especifica", () => {
+    const resultado = crearCategoriaSchema.safeParse({ ...valido, areaId: "area_aseo" });
+    expect(resultado.success).toBe(true);
+  });
 });
