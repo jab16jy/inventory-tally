@@ -19,10 +19,19 @@ async function crearSucursal(sucursalId: string, sesionAbiertaId: string | null 
   await db.doc(`sucursales/${sucursalId}`).set({ nombre: "Sucursal de prueba", sesionAbiertaId });
 }
 
-async function crearCategoria(categoriaId: string, valor: number, activa = true) {
-  await db
-    .doc(`categoriasValor/${categoriaId}`)
-    .set({ valor, etiqueta: `$${valor}`, activa, orden: 1 });
+async function crearCategoria(
+  categoriaId: string,
+  valor: number,
+  activa = true,
+  sucursalesAsignadas?: readonly string[],
+) {
+  await db.doc(`categoriasValor/${categoriaId}`).set({
+    valor,
+    etiqueta: `$${valor}`,
+    activa,
+    orden: 1,
+    ...(sucursalesAsignadas !== undefined && { sucursalesAsignadas }),
+  });
 }
 
 describe("abrirSesionImpl", () => {
@@ -100,6 +109,39 @@ describe("abrirSesionImpl", () => {
     const { sesionId } = await abrirSesionImpl(db, "uid_admin", { sucursalId });
     const sesion = await db.doc(`sesiones/${sesionId}`).get();
     expect(sesion.get("estado")).toBe("abierta");
+  });
+
+  it("D4/D6 · siembra una categoría sin sucursalesAsignadas en cualquier sucursal (global, regresión)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const catId = `cat_${randomUUID()}`;
+    await crearSucursal(sucursalId);
+    await crearCategoria(catId, 5000); // sin sucursalesAsignadas
+
+    const { sesionId } = await abrirSesionImpl(db, "uid_admin", { sucursalId });
+
+    const linea = await db.doc(`sesiones/${sesionId}/lineas/${catId}`).get();
+    expect(linea.exists).toBe(true);
+  });
+
+  it("D4/D6 · siembra una categoría con sucursalesAsignadas sólo en las sucursales incluidas", async () => {
+    const sucursalDentro = `suc_${randomUUID()}`;
+    const sucursalFuera = `suc_${randomUUID()}`;
+    const catId = `cat_${randomUUID()}`;
+    await crearSucursal(sucursalDentro);
+    await crearSucursal(sucursalFuera);
+    await crearCategoria(catId, 15000, true, [sucursalDentro]);
+
+    const { sesionId: sesionDentro } = await abrirSesionImpl(db, "uid_admin", {
+      sucursalId: sucursalDentro,
+    });
+    const lineaDentro = await db.doc(`sesiones/${sesionDentro}/lineas/${catId}`).get();
+    expect(lineaDentro.exists).toBe(true);
+
+    const { sesionId: sesionFuera } = await abrirSesionImpl(db, "uid_admin", {
+      sucursalId: sucursalFuera,
+    });
+    const lineaFuera = await db.doc(`sesiones/${sesionFuera}/lineas/${catId}`).get();
+    expect(lineaFuera.exists).toBe(false);
   });
 
   it("registra un evento de auditoría SESION_ABIERTA", async () => {

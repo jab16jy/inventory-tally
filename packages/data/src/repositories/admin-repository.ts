@@ -103,10 +103,14 @@ export interface ActualizarSucursalPayload {
   readonly activa: boolean;
 }
 
+// Espejo de contracts/schemas/crear-categoria.schema.ts. `sucursalesAsignadas`
+// (ticket #39, D6): ausente = categoría global; presente = catálogo "nombrado"
+// visible sólo en esas sucursales.
 export interface CrearCategoriaPayload {
   readonly etiqueta: string;
   readonly valor: number;
   readonly orden: number;
+  readonly sucursalesAsignadas?: readonly string[];
 }
 
 export interface AdminRepository {

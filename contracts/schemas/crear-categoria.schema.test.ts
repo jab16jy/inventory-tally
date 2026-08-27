@@ -32,4 +32,28 @@ describe("crearCategoriaSchema (docs/plan-panel-administrador.md §3)", () => {
     const resultado = crearCategoriaSchema.safeParse({ ...valido, orden: -1 });
     expect(resultado.success).toBe(false);
   });
+
+  it("acepta sin sucursalesAsignadas (categoría global, comportamiento actual)", () => {
+    const resultado = crearCategoriaSchema.safeParse(valido);
+    expect(resultado.success).toBe(true);
+  });
+
+  it("acepta sucursalesAsignadas con al menos una sucursal (D6: catálogo por sucursal)", () => {
+    const resultado = crearCategoriaSchema.safeParse({
+      ...valido,
+      sucursalesAsignadas: ["suc_norte"],
+    });
+    expect(resultado.success).toBe(true);
+  });
+
+  it("rechaza sucursalesAsignadas vacío (footgun: nadie la vería)", () => {
+    const resultado = crearCategoriaSchema.safeParse({ ...valido, sucursalesAsignadas: [] });
+    expect(resultado.success).toBe(false);
+  });
+
+  it("rechaza más de 10 sucursales asignadas (mismo límite que crearCajeroSchema)", () => {
+    const sucursalesAsignadas = Array.from({ length: 11 }, (_, i) => `suc_${i}`);
+    const resultado = crearCategoriaSchema.safeParse({ ...valido, sucursalesAsignadas });
+    expect(resultado.success).toBe(false);
+  });
 });

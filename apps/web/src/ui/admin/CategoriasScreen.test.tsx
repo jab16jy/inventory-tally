@@ -1,11 +1,25 @@
 // apps/web/src/ui/admin/CategoriasScreen.test.tsx
-// (docs/plan-panel-administrador.md §5, fase F3)
+// (docs/plan-panel-administrador.md §5, fase F3; ticket #39 D4/D6)
 import { FakeAdminRepository } from "@conteo/data";
 import type { CategoriaValor } from "@conteo/shared/models/categoria-valor.js";
+import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AdminRepositoryProvider } from "../../state/admin-contexto.js";
 import { CategoriasScreen } from "./CategoriasScreen.js";
+
+function sucursalBase(overrides: Partial<Sucursal> = {}): Sucursal {
+  return {
+    sucursalId: "suc_norte",
+    nombre: "Norte",
+    direccion: "Calle 1",
+    conectividad: "wifi",
+    activa: true,
+    sesionAbiertaId: null,
+    creadaEn: new Date("2026-01-01T00:00:00Z"),
+    ...overrides,
+  };
+}
 
 function categoriaBase(overrides: Partial<CategoriaValor> = {}): CategoriaValor {
   return {
@@ -55,6 +69,54 @@ describe("CategoriasScreen (F3)", () => {
     await vi.waitFor(() => {
       expect(repo.llamadas).toEqual([
         { metodo: "crearCategoria", payload: { etiqueta: "$10.000", valor: 10000, orden: 2 } },
+      ]);
+    });
+  });
+
+  it("crea una categoría global cuando no se marca ninguna sucursal (D6: comportamiento actual, sin cambios)", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSucursal(sucursalBase({ sucursalId: "suc_norte", nombre: "Norte" }));
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /nueva categoría/i }));
+    fireEvent.change(screen.getByLabelText(/etiqueta/i), { target: { value: "$10.000" } });
+    fireEvent.change(screen.getByLabelText(/^valor$/i), { target: { value: "10000" } });
+    fireEvent.change(screen.getByLabelText(/orden/i), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: /crear categoría/i }));
+
+    await vi.waitFor(() => {
+      expect(repo.llamadas).toEqual([
+        { metodo: "crearCategoria", payload: { etiqueta: "$10.000", valor: 10000, orden: 2 } },
+      ]);
+    });
+  });
+
+  it("crea una categoría por sucursal cuando se marcan sucursales (D4/D6: catálogo nombrado)", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSucursal(sucursalBase({ sucursalId: "suc_norte", nombre: "Norte" }));
+    repo.sembrarSucursal(sucursalBase({ sucursalId: "suc_centro", nombre: "Centro" }));
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /nueva categoría/i }));
+    fireEvent.change(screen.getByLabelText(/etiqueta/i), { target: { value: "Refrigerador X200" } });
+    fireEvent.change(screen.getByLabelText(/^valor$/i), { target: { value: "45000" } });
+    fireEvent.change(screen.getByLabelText(/orden/i), { target: { value: "1" } });
+    fireEvent.click(screen.getByLabelText("Norte"));
+    fireEvent.click(screen.getByRole("button", { name: /crear categoría/i }));
+
+    await vi.waitFor(() => {
+      expect(repo.llamadas).toEqual([
+        {
+          metodo: "crearCategoria",
+          payload: {
+            etiqueta: "Refrigerador X200",
+            valor: 45000,
+            orden: 1,
+            sucursalesAsignadas: ["suc_norte"],
+          },
+        },
       ]);
     });
   });

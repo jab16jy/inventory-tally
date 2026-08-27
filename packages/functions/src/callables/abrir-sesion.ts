@@ -25,9 +25,22 @@ function generarSesionId(sucursalId: string, ahora = new Date()): string {
   return `ses_${fecha}_${sucursalId}_${corr}`;
 }
 
-async function sembrarLineas(db: Firestore, sesionId: string, ejecutadoPor: string): Promise<void> {
+async function sembrarLineas(
+  db: Firestore,
+  sesionId: string,
+  ejecutadoPor: string,
+  sucursalId: string,
+): Promise<void> {
   const categorias = await db.collection("categoriasValor").where("activa", "==", true).get();
-  const docs = categorias.docs;
+  // D4/D6: `sucursalesAsignadas` ausente = global (todas la ven); presente =
+  // sólo esas sucursales. Firestore no soporta "array-contains OR
+  // campo-ausente" en una sola query, así que se filtra en memoria — la
+  // colección es chica (decenas de docs), igual que el resto de catálogos
+  // admin de este repo.
+  const docs = categorias.docs.filter((categoria) => {
+    const sucursalesAsignadas = categoria.get("sucursalesAsignadas") as readonly string[] | undefined;
+    return sucursalesAsignadas === undefined || sucursalesAsignadas.includes(sucursalId);
+  });
 
   for (let i = 0; i < docs.length; i += LOTE_MAXIMO) {
     const lote = db.batch();
@@ -95,7 +108,7 @@ export async function abrirSesionImpl(
   });
 
   try {
-    await sembrarLineas(db, sesionId, ejecutadoPor); // lotes de 400 (límite de 500 ops)
+    await sembrarLineas(db, sesionId, ejecutadoPor, input.sucursalId); // lotes de 400 (límite de 500 ops)
   } catch (error) {
     // D3: la siembra corre fuera de la transacción de apertura. Si un lote
     // falla a mitad de camino, la sesión quedaría abierta con líneas

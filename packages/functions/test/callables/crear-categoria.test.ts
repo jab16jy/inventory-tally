@@ -15,6 +15,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { describe, expect, it, afterEach } from "vitest";
 import { crearCategoriaImpl } from "../../src/callables/crear-categoria.js";
 import { abrirSesionImpl } from "../../src/callables/abrir-sesion.js";
+import { crearCategoriaSchema } from "@conteo/contracts";
 
 if (getApps().length === 0) {
   initializeApp({ projectId: "demo-conteo-eficiente" });
@@ -85,5 +86,35 @@ describe("crearCategoriaImpl", () => {
 
     const despues = await db.collection(`sesiones/${sesionId}/lineas`).get();
     expect(despues.size).toBe(antes.size);
+  });
+
+  it(
+    "crea la categoría cuando el input viene de validar() sin sucursalesAsignadas " +
+      "(regresión: zod deja la clave presente en undefined, Firestore rechaza escribirla tal cual)",
+    async () => {
+      // Simula exactamente lo que hace `validar()` en producción: parsear
+      // con el schema, no construir el objeto a mano como `datosValidos()`.
+      const datos = crearCategoriaSchema.parse(datosValidos());
+
+      const resultado = await crearCategoriaImpl(db, "uid_admin", datos);
+      categoriasCreadas.push(resultado.categoriaId);
+
+      const categoria = await db.doc(`categoriasValor/${resultado.categoriaId}`).get();
+      expect(categoria.exists).toBe(true);
+      expect(categoria.data()).not.toHaveProperty("sucursalesAsignadas");
+    },
+  );
+
+  it("crea la categoría con sucursalesAsignadas cuando se especifica (D4/D6: catálogo por sucursal)", async () => {
+    const datos = crearCategoriaSchema.parse({
+      ...datosValidos(),
+      sucursalesAsignadas: ["suc_norte", "suc_centro"],
+    });
+
+    const resultado = await crearCategoriaImpl(db, "uid_admin", datos);
+    categoriasCreadas.push(resultado.categoriaId);
+
+    const categoria = await db.doc(`categoriasValor/${resultado.categoriaId}`).get();
+    expect(categoria.get("sucursalesAsignadas")).toEqual(["suc_norte", "suc_centro"]);
   });
 });

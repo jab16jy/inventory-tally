@@ -217,7 +217,22 @@ describe("categoriaValorDesdeDoc (docs/plan-panel-administrador.md §4)", () => 
       activa: true,
       orden: 1,
       creadaEn: creadaEn.toDate(),
+      sucursalesAsignadas: undefined,
     });
+  });
+
+  it("mapea sucursalesAsignadas cuando está presente (D4/D6: catálogo por sucursal)", () => {
+    const creadaEn = Timestamp.fromDate(new Date("2026-01-10T08:00:00Z"));
+    const categoria = categoriaValorDesdeDoc("cat_nombrado", {
+      valor: 45000,
+      etiqueta: "Refrigerador X200",
+      activa: true,
+      orden: 1,
+      creadaEn,
+      sucursalesAsignadas: ["suc_norte"],
+    });
+
+    expect(categoria.sucursalesAsignadas).toEqual(["suc_norte"]);
   });
 });
 

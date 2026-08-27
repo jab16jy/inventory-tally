@@ -5,6 +5,7 @@
 // `sesiones/*/lineas`, se prueba en `packages/functions`, no aquí.
 import { useEffect, useId, useState, type FormEvent } from "react";
 import type { CategoriaValor } from "@conteo/shared/models/categoria-valor.js";
+import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import type { CrearCategoriaPayload } from "@conteo/data";
 import { moneda } from "../../lib/formato.js";
 import { useAdminRepository } from "../../state/admin-contexto.js";
@@ -13,6 +14,15 @@ import { Tabla, type ColumnaTabla } from "./Tabla.js";
 const CAMPO =
   "w-full min-h-[var(--size-toque)] rounded-placa border border-borde bg-fondo px-3 " +
   "text-tinta placeholder:text-tenue focus:border-senal focus:outline-none";
+
+// Mismo patrón que SucursalesAdminScreen.tsx/SesionesScreen.tsx (sin extraer
+// a un hook compartido: es la convención ya usada en este repo).
+function useSucursales(): Sucursal[] {
+  const repo = useAdminRepository();
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  useEffect(() => repo.observarSucursales(setSucursales), [repo]);
+  return sucursales;
+}
 
 function useCategorias(): { categorias: CategoriaValor[]; cargando: boolean } {
   const repo = useAdminRepository();
@@ -147,20 +157,37 @@ interface FormularioCategoriaProps {
 }
 
 function FormularioCategoria({ error, onCancelar, onCrear }: FormularioCategoriaProps) {
+  const sucursales = useSucursales();
   const [etiqueta, setEtiqueta] = useState("");
   const [valor, setValor] = useState("");
   const [orden, setOrden] = useState("");
+  const [sucursalesAsignadas, setSucursalesAsignadas] = useState<string[]>([]);
   const [enviando, setEnviando] = useState(false);
 
   const idEtiqueta = useId();
   const idValor = useId();
   const idOrden = useId();
 
+  // D6: la sola presencia de sucursales marcadas ES la distinción entre
+  // categoría global y "nombrada" — no hay un toggle aparte de tipo.
+  function alternarSucursal(sucursalId: string): void {
+    setSucursalesAsignadas((actual) =>
+      actual.includes(sucursalId)
+        ? actual.filter((id) => id !== sucursalId)
+        : [...actual, sucursalId],
+    );
+  }
+
   async function manejarEnvio(evento: FormEvent<HTMLFormElement>): Promise<void> {
     evento.preventDefault();
     setEnviando(true);
     try {
-      await onCrear({ etiqueta, valor: Number(valor), orden: Number(orden) });
+      await onCrear({
+        etiqueta,
+        valor: Number(valor),
+        orden: Number(orden),
+        ...(sucursalesAsignadas.length > 0 && { sucursalesAsignadas }),
+      });
     } finally {
       setEnviando(false);
     }
@@ -217,6 +244,29 @@ function FormularioCategoria({ error, onCancelar, onCrear }: FormularioCategoria
           />
         </div>
       </div>
+
+      {sucursales.length > 0 && (
+        <fieldset>
+          <legend className="mb-1.5 block text-micro text-tenue">
+            Sucursales (ninguna marcada = categoría global, disponible en todas)
+          </legend>
+          <div className="flex flex-wrap gap-3">
+            {sucursales.map((s) => (
+              <label
+                key={s.sucursalId}
+                className="flex items-center gap-1.5 text-micro text-tinta"
+              >
+                <input
+                  type="checkbox"
+                  checked={sucursalesAsignadas.includes(s.sucursalId)}
+                  onChange={() => alternarSucursal(s.sucursalId)}
+                />
+                {s.nombre}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
 
       {error && (
         <p

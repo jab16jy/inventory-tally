@@ -139,6 +139,7 @@ interface CategoriaValorDoc {
   readonly activa: boolean;
   readonly orden: number;
   readonly creadaEn: Timestamp;
+  readonly sucursalesAsignadas?: readonly string[];
 }
 
 export function categoriaValorDesdeDoc(
@@ -152,6 +153,7 @@ export function categoriaValorDesdeDoc(
     activa: data.activa,
     orden: data.orden,
     creadaEn: data.creadaEn.toDate(),
+    sucursalesAsignadas: data.sucursalesAsignadas,
   };
 }
 
