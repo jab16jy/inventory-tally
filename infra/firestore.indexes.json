@@ -48,6 +48,15 @@
         { "fieldPath": "estado", "order": "ASCENDING" },
         { "fieldPath": "abiertaEn", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "sesiones",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sucursalId", "order": "ASCENDING" },
+        { "fieldPath": "participantes", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "abiertaEn", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

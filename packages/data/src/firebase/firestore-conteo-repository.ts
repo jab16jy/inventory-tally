@@ -207,6 +207,45 @@ export class FirestoreConteoRepository implements ConteoRepository {
     };
   }
 
+  /**
+   * Historial del cajero (`/mis-conteos`). Mismo par de cláusulas que
+   * `listarAuditoria`, por la misma razón de reglas: `array-contains` sobre
+   * `participantes` (que el trigger `on-aporte-escrito` mantiene con
+   * `FieldValue.arrayUnion(uid)`) responde "¿participé?", pero es el
+   * `where("sucursalId", "in", ...)` el que hace que Firestore pueda demostrar
+   * que TODO resultado posible cumple `tieneSucursal(...)`. Sin él la query
+   * entera se deniega en cuanto el cajero participó alguna vez en una sucursal
+   * que ya no tiene asignada.
+   *
+   * Máx. 10 sucursales por cajero
+   * (`contracts/schemas/crear-cajero.schema.ts`: `.max(10)`), muy por debajo
+   * del límite de 30 valores de `in`.
+   */
+  async listarMisSesiones(
+    sucursalIds: readonly string[],
+    cursor?: unknown,
+  ): Promise<Pagina<SesionConteo>> {
+    if (sucursalIds.length === 0) return { items: [], siguienteCursor: null };
+
+    // Índice compuesto sucursalId ASC, participantes CONTAINS, abiertaEn DESC
+    // (infra/firestore.indexes.json, doc 04 §4).
+    const base = query(
+      collection(this.db, "sesiones"),
+      where("participantes", "array-contains", this.usuario.obtenerUid()),
+      where("sucursalId", "in", sucursalIds),
+      orderBy("abiertaEn", "desc"),
+    );
+    const acotada = cursor
+      ? query(base, startAfter(cursor as QueryDocumentSnapshot), limit(TAMANO_PAGINA))
+      : query(base, limit(TAMANO_PAGINA));
+    const snap = await getDocs(acotada);
+    const siguienteCursor = snap.docs.length === TAMANO_PAGINA ? (snap.docs.at(-1) ?? null) : null;
+    return {
+      items: snap.docs.map((d) => sesionConteoDesdeDoc(d.id, d.data() as never)),
+      siguienteCursor,
+    };
+  }
+
   async registrarAporte({ sesionId, categoriaId, cantidad }: RegistrarAporteInput): Promise<void> {
     if (cantidad < 0) throw new CantidadInvalidaError("La cantidad no puede ser negativa");
 

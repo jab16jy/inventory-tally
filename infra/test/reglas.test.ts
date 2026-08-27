@@ -62,6 +62,16 @@ beforeEach(async () => {
       participantes: ["uid_ana", "uid_luis"],
       totalUnidades: 10,
     });
+    // Historial del cajero: uid_ana participó también en una sesión de
+    // suc_sur. Es la fila que, sin `where("sucursalId","in",...)`, denegaría
+    // la query ENTERA cuando el claim ya no incluye suc_sur.
+    await db.doc("sesiones/ses_sur").set({
+      sucursalId: "suc_sur",
+      sucursalNombre: "Sucursal Sur",
+      estado: "cerrada",
+      participantes: ["uid_ana"],
+      totalUnidades: 4,
+    });
     await db.doc("sesiones/ses_cerrada").set({
       sucursalId: "suc_norte",
       sucursalNombre: "Sucursal Norte",
@@ -392,8 +402,56 @@ describe("A-2 · auditoría inmutable", () => {
     // evalúa `undefined in token.sucursales`, que nunca es true — un get()
     // directo (no una query de colección) prueba la regla contra ESTE
     // documento en concreto, no sólo lo que un `where` deja pasar.
+    await assertFails(cajero("uid_ana", ["suc_norte"]).firestore().doc("auditoria/e1").get());
+  });
+});
+
+describe("historial del cajero · sesiones acotadas por participantes + sucursalId", () => {
+  it("un cajero NO puede listar sesiones con una query acotada SÓLO por participantes", async () => {
+    // El fallo que sólo aparecería en producción: `array-contains` demuestra
+    // "participé", pero no demuestra `tieneSucursal(...)` para TODO resultado
+    // posible, así que Firestore rechaza la query entera.
     await assertFails(
-      cajero("uid_ana", ["suc_norte"]).firestore().doc("auditoria/e1").get(),
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .collection("sesiones")
+        .where("participantes", "array-contains", "uid_ana")
+        .get(),
+    );
+  });
+
+  it("un cajero SÍ lista sus sesiones con array-contains + in sobre las sucursales de su claim", async () => {
+    await assertSucceeds(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .collection("sesiones")
+        .where("participantes", "array-contains", "uid_ana")
+        .where("sucursalId", "in", ["suc_norte"])
+        .get(),
+    );
+  });
+
+  it("un cajero SÍ lista sus sesiones de VARIAS sucursales cuando todas están en el claim", async () => {
+    await assertSucceeds(
+      cajero("uid_ana", ["suc_norte", "suc_sur"])
+        .firestore()
+        .collection("sesiones")
+        .where("participantes", "array-contains", "uid_ana")
+        .where("sucursalId", "in", ["suc_norte", "suc_sur"])
+        .get(),
+    );
+  });
+
+  it("un cajero NO lista sesiones de una sucursal fuera de su claim, ni acotando la query", async () => {
+    // Reasignación vía `actualizarCajero`: uid_ana participó en ses_sur pero
+    // ya no tiene suc_sur asignada. La query se deniega entera.
+    await assertFails(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .collection("sesiones")
+        .where("participantes", "array-contains", "uid_ana")
+        .where("sucursalId", "in", ["suc_norte", "suc_sur"])
+        .get(),
     );
   });
 });

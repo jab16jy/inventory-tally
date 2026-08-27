@@ -302,13 +302,14 @@ a la confirmación la vuelve obsoleta aunque `confirmadoEn` siga siendo verdader
 
 ## 4. Índices compuestos
 
-| Colección   | Campos                                           | Consulta que habilita          |
-| ----------- | ------------------------------------------------ | ------------------------------ |
-| `auditoria` | `sucursalId` ASC, `ocurridoEn` DESC              | Historial de una sucursal      |
-| `auditoria` | `usuarioId` ASC, `ocurridoEn` DESC               | "Qué hizo este cajero"         |
-| `auditoria` | `sesionId` ASC, `ocurridoEn` DESC                | Historial de un conteo         |
-| `sesiones`  | `sucursalId` ASC, `estado` ASC, `abiertaEn` DESC | Sesión abierta / histórico     |
-| `sesiones`  | `estado` ASC, `abiertaEn` DESC                   | Panel admin: sesiones abiertas |
+| Colección   | Campos                                                       | Consulta que habilita                 |
+| ----------- | ------------------------------------------------------------ | ------------------------------------- |
+| `auditoria` | `sucursalId` ASC, `ocurridoEn` DESC                          | Historial de una sucursal             |
+| `auditoria` | `usuarioId` ASC, `ocurridoEn` DESC                           | "Qué hizo este cajero"                |
+| `auditoria` | `sesionId` ASC, `ocurridoEn` DESC                            | Historial de un conteo                |
+| `sesiones`  | `sucursalId` ASC, `estado` ASC, `abiertaEn` DESC             | Sesión abierta / histórico            |
+| `sesiones`  | `estado` ASC, `abiertaEn` DESC                               | Panel admin: sesiones abiertas        |
+| `sesiones`  | `sucursalId` ASC, `participantes` CONTAINS, `abiertaEn` DESC | Historial del cajero (`/mis-conteos`) |
 
 ```json
 {
