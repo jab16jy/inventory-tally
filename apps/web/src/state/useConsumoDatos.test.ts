@@ -9,6 +9,7 @@ function lineaBase(categoriaId: string): LineaConteo {
     categoriaId,
     valorUnitario: 1000,
     etiqueta: `$${categoriaId}`,
+    area: "Aseo",
     cantidadTotal: 0,
     numAportantes: 0,
     versiones: {},

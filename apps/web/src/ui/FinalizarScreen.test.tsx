@@ -16,6 +16,7 @@ function lineaBase(
     categoriaId,
     valorUnitario,
     etiqueta,
+    area: "Aseo",
     cantidadTotal: 0,
     numAportantes: 0,
     versiones: {},

@@ -9,6 +9,7 @@ export interface LineaConteo {
   readonly categoriaId: string;
   readonly valorUnitario: number;
   readonly etiqueta: string;
+  readonly area: string;
   readonly cantidadTotal: number;
   readonly numAportantes: number;
   readonly versiones: Readonly<Record<string, number>>;
