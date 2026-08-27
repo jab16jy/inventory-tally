@@ -168,6 +168,18 @@ describe("reconciliarLineasImpl", () => {
     expect(eventos[0]?.get("cantidadNueva")).toBe(53);
   });
 
+  it("ticket #45 · RECONCILIACION lleva sucursalId denormalizado, sin lectura extra", async () => {
+    const sesionId = `ses_${randomUUID()}`;
+    await crearSesion(sesionId, "abierta"); // sucursalId: "suc_norte"
+    await sembrarLinea(sesionId, "cat_suc", 300, "SUC", { cantidadTotal: 1 });
+    await sembrarAporte(sesionId, "cat_suc", "uid_ana", "Ana", 4, 1);
+
+    await reconciliarLineasImpl(db);
+
+    const eventos = await reconciliacionesDe("cat_suc");
+    expect(eventos[0]?.get("sucursalId")).toBe("suc_norte");
+  });
+
   it("corrección vuelve a marcar el resumen dirty y sube marcaAportes (I-M)", async () => {
     const sesionId = `ses_${randomUUID()}`;
     await crearSesion(sesionId, "abierta");

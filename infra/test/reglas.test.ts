@@ -109,6 +109,11 @@ beforeEach(async () => {
       .set({ sesionId: "ses1", cerradaEn: null, totalUnidades: 10, totalMonetario: 50000 });
 
     await db.doc("auditoria/e1").set({ tipo: "APORTE_CREADO", sesionId: "ses1" });
+    // Con sucursalId (ticket #45): sirve para los casos (a)/(b) del cajero.
+    // "e1" queda sin sucursalId a propósito, para el caso (c).
+    await db
+      .doc("auditoria/e_suc")
+      .set({ tipo: "APORTE_CREADO", sesionId: "ses1", sucursalId: "suc_norte" });
   });
 });
 
@@ -353,7 +358,42 @@ describe("A-2 · auditoría inmutable", () => {
     await assertSucceeds(admin().firestore().collection("auditoria").get());
   });
 
-  it("un cajero no puede leer la auditoría", async () => {
+  it("un cajero no puede leer la auditoría con una query SIN acotar por sucursalId", async () => {
+    // Firestore no puede demostrar que TODOS los resultados posibles de una
+    // query sin `where` cumplirían la regla, así que rechaza la query
+    // entera — sigue denegado tras el ticket #45, no es el mismo escenario
+    // que las queries acotadas de abajo.
     await assertFails(cajero("uid_ana", ["suc_norte"]).firestore().collection("auditoria").get());
+  });
+
+  it("ticket #45 · un cajero SÍ lee, con la query acotada, un evento de su propia sucursal", async () => {
+    await assertSucceeds(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .collection("auditoria")
+        .where("sucursalId", "in", ["suc_norte"])
+        .get(),
+    );
+  });
+
+  it("ticket #45 · un cajero NO lee, ni acotando la query, un evento de una sucursal que no tiene asignada", async () => {
+    await assertFails(
+      cajero("uid_ana", ["suc_sur"])
+        .firestore()
+        .collection("auditoria")
+        .where("sucursalId", "in", ["suc_norte"])
+        .get(),
+    );
+  });
+
+  it("ticket #45 · un evento sin sucursalId sigue ilegible para el cajero, ni con get() directo", async () => {
+    // "e1" (sembrado en beforeEach) no tiene sucursalId: es uno de los 6
+    // tipos que no lo llevan. `tieneSucursal(resource.data.sucursalId)`
+    // evalúa `undefined in token.sucursales`, que nunca es true — un get()
+    // directo (no una query de colección) prueba la regla contra ESTE
+    // documento en concreto, no sólo lo que un `where` deja pasar.
+    await assertFails(
+      cajero("uid_ana", ["suc_norte"]).firestore().doc("auditoria/e1").get(),
+    );
   });
 });

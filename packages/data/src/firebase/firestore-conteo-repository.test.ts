@@ -10,6 +10,8 @@ const limit = vi.fn((...args: unknown[]) => ({ __limit: args }));
 const onSnapshot = vi.fn();
 const setDoc = vi.fn();
 const updateDoc = vi.fn();
+const getDocs = vi.fn();
+const startAfter = vi.fn((...args: unknown[]) => ({ __startAfter: args }));
 const increment = vi.fn((n: number) => ({ __op: "increment", n }));
 const serverTimestamp = vi.fn(() => ({ __op: "serverTimestamp" }));
 
@@ -23,6 +25,8 @@ vi.mock("firebase/firestore", () => ({
   onSnapshot: (...args: unknown[]) => onSnapshot(...args),
   setDoc: (...args: unknown[]) => setDoc(...args),
   updateDoc: (...args: unknown[]) => updateDoc(...args),
+  getDocs: (...args: unknown[]) => getDocs(...args),
+  startAfter: (...args: unknown[]) => startAfter(...args),
   increment: (n: number) => increment(n),
   serverTimestamp: () => serverTimestamp(),
 }));
@@ -316,5 +320,64 @@ describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
     // El contador NO debe volver a 0 (eso apagaría el banner "no cierres
     // la aplicación" como si se hubiera sincronizado).
     expect(valores.at(-1)).toBe(1);
+  });
+});
+
+describe("FirestoreConteoRepository.listarAuditoria (ticket #45)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function snapEvento(id: string, datos: Record<string, unknown>) {
+    return { id, data: () => datos };
+  }
+
+  it("con sucursalIds vacío devuelve página vacía sin tocar Firestore", async () => {
+    const repo = new FirestoreConteoRepository({} as never, usuario);
+
+    const pagina = await repo.listarAuditoria([]);
+
+    expect(pagina).toEqual({ items: [], siguienteCursor: null });
+    expect(getDocs).not.toHaveBeenCalled();
+    expect(where).not.toHaveBeenCalled();
+  });
+
+  it("construye la query con where('sucursalId','in',sucursalIds) — NUNCA una lectura de colección sin acotar", async () => {
+    getDocs.mockResolvedValue({ docs: [] });
+    const repo = new FirestoreConteoRepository({} as never, usuario);
+
+    await repo.listarAuditoria(["suc_norte", "suc_sur"]);
+
+    expect(where).toHaveBeenCalledWith("sucursalId", "in", ["suc_norte", "suc_sur"]);
+    expect(collection).toHaveBeenCalledWith({}, "auditoria");
+  });
+
+  it("mapea los docs con eventoAuditoriaDesdeDoc y da siguienteCursor null bajo el tamaño de página", async () => {
+    getDocs.mockResolvedValue({
+      docs: [
+        snapEvento("e1", {
+          tipo: "APORTE_CREADO",
+          sesionId: "ses1",
+          sucursalId: "suc_norte",
+          ocurridoEn: { toDate: () => new Date("2026-01-01T00:00:00Z") },
+        }),
+      ],
+    });
+    const repo = new FirestoreConteoRepository({} as never, usuario);
+
+    const pagina = await repo.listarAuditoria(["suc_norte"]);
+
+    expect(pagina.items).toEqual([
+      expect.objectContaining({ eventoId: "e1", tipo: "APORTE_CREADO", sucursalId: "suc_norte" }),
+    ]);
+    expect(pagina.siguienteCursor).toBeNull();
+  });
+
+  it("con cursor, encadena la página siguiente vía startAfter", async () => {
+    getDocs.mockResolvedValue({ docs: [] });
+    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const cursor = { __doc: "e1" };
+
+    await repo.listarAuditoria(["suc_norte"], cursor);
+
+    expect(startAfter).toHaveBeenCalledWith(cursor);
   });
 });

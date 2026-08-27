@@ -60,6 +60,7 @@ export async function cerrarSesionImpl(
       registrarAuditoria(tx, db, {
         tipo: "CIERRE_BLOQUEADO",
         sesionId,
+        sucursalId, // ticket #45: para el filtro del cajero
         sinConfirmar,
         excluidosPorInactivo,
       });
@@ -106,6 +107,7 @@ export async function cerrarSesionImpl(
     registrarAuditoria(tx, db, {
       tipo: "SESION_CERRADA",
       sesionId,
+      sucursalId, // ticket #45: para el filtro del cajero
       forzado: forzar,
       sinConfirmar,
       excluidosPorInactivo,

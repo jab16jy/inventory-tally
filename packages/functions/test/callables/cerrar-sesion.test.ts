@@ -107,6 +107,23 @@ describe("cerrarSesionImpl", () => {
     expect(eventos.docs[0]?.get("sinConfirmar")).toEqual([]);
   });
 
+  it("ticket #45 · SESION_CERRADA lleva sucursalId denormalizado", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const sesionId = `ses_${randomUUID()}`;
+    await crearSucursal(sucursalId, sesionId);
+    await crearSesion(sesionId, sucursalId, "abierta");
+    await sembrarLinea(sesionId, "cat_5000", { cantidadTotal: 10 });
+
+    await cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false });
+
+    const eventos = await db
+      .collection("auditoria")
+      .where("sesionId", "==", sesionId)
+      .where("tipo", "==", "SESION_CERRADA")
+      .get();
+    expect(eventos.docs[0]?.get("sucursalId")).toBe(sucursalId);
+  });
+
   it("bloqueada sin forzar · CIERRE_BLOQUEADO auditado, el inactivo no bloquea (negativo, multi-participante)", async () => {
     const sucursalId = `suc_${randomUUID()}`;
     const sesionId = `ses_${randomUUID()}`;
@@ -142,6 +159,26 @@ describe("cerrarSesionImpl", () => {
     );
     expect(detalle?.sinConfirmar).toHaveLength(2);
     expect(detalle?.excluidosPorInactivo).toEqual([{ uid: "uid_carla", nombre: "Carla Ruiz" }]);
+  });
+
+  it("ticket #45 · CIERRE_BLOQUEADO lleva sucursalId denormalizado", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const sesionId = `ses_${randomUUID()}`;
+    await crearSucursal(sucursalId, sesionId);
+    await crearSesion(sesionId, sucursalId, "abierta", ["uid_luis"]);
+    await sembrarUsuario("uid_luis", "Luis Pérez", true);
+    await sembrarSinConfirmar(sesionId, ["uid_luis"]);
+
+    await expect(cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false })).rejects.toThrow(
+      HttpsError,
+    );
+
+    const eventos = await db
+      .collection("auditoria")
+      .where("sesionId", "==", sesionId)
+      .where("tipo", "==", "CIERRE_BLOQUEADO")
+      .get();
+    expect(eventos.docs[0]?.get("sucursalId")).toBe(sucursalId);
   });
 
   it("forzado · cierra pese a pendientes y audita forzado:true con la lista completa (afirmativo)", async () => {

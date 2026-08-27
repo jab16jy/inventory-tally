@@ -126,7 +126,13 @@ service cloud.firestore {
 
     // ─────────── auditoría: INMUTABLE ───────────
     match /auditoria/{eventoId} {
-      allow read:  if esAdmin();
+      // Ticket #45: el cajero lee sólo eventos de SUS sucursales asignadas
+      // (D1/D3) — una query de colección sin `where("sucursalId","in",...)`
+      // sigue denegada porque Firestore no puede demostrar que TODOS los
+      // resultados posibles cumplirían la regla (gotcha real, no hipotético).
+      // Los 6 tipos de evento sin `sucursalId` (packages/shared/src/models/
+      // evento-auditoria.ts) siguen ilegibles para el cajero.
+      allow read:  if esAdmin() || (esCajero() && tieneSucursal(resource.data.sucursalId));
       allow write: if false;                              // ← A-2, sin excepciones
     }
 

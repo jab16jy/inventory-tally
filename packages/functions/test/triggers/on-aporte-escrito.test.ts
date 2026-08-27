@@ -164,6 +164,22 @@ describe("procesarAporteEscrito", () => {
     expect(eventos.docs[0]?.get("tipo")).toBe("APORTE_CREADO");
   });
 
+  it("ticket #45 · el evento de auditoría lleva sucursalId denormalizado, sin lectura extra", async () => {
+    const sesionId = `ses_${randomUUID()}`;
+    const categoriaId = "cat_5000";
+    await crearSesionAbierta(sesionId); // sucursalId: "suc_norte"
+
+    await procesarAporteEscrito(db, { sesionId, categoriaId, uid: "uid_ana" }, undefined, {
+      uid: "uid_ana",
+      nombre: "Ana",
+      cantidad: 30,
+      version: 1,
+    });
+
+    const eventos = await db.collection("auditoria").where("sesionId", "==", sesionId).get();
+    expect(eventos.docs[0]?.get("sucursalId")).toBe("suc_norte");
+  });
+
   it("I-M · marca resumen/actual dirty y sube marcaAportes de forma monotónica", async () => {
     const sesionId = `ses_${randomUUID()}`;
     const categoriaId = "cat_5000";

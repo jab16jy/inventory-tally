@@ -76,6 +76,7 @@ async function reconciliarUnaLinea(
     registrarAuditoria(tx, db, {
       tipo: "RECONCILIACION",
       sesionId: sesionRef.id,
+      sucursalId: sesion.get("sucursalId") as string, // ticket #45: para el filtro del cajero
       categoriaId: lineaRef.id,
       cantidadAnterior,
       cantidadNueva: esperado,

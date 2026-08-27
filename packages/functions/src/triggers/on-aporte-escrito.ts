@@ -105,6 +105,7 @@ export async function procesarAporteEscrito(
     registrarAuditoria(tx, db, {
       tipo: antes ? "APORTE_MODIFICADO" : "APORTE_CREADO",
       sesionId,
+      sucursalId: sesion.get("sucursalId") as string, // ticket #45: para el filtro del cajero
       categoriaId,
       usuarioId: uid,
       usuarioNombre: (despues?.nombre ?? antes?.nombre) as string | undefined,

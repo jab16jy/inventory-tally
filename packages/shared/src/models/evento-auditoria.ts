@@ -38,5 +38,15 @@ export interface EventoAuditoria {
   readonly eventoId: string;
   readonly tipo: TipoEventoAuditoria;
   readonly ocurridoEn: Date;
+  /**
+   * Denormalizado (ticket #45) sólo en los eventos ligados a una sucursal:
+   * `SESION_ABIERTA`, `SUCURSAL_CREADA`, `SUCURSAL_ACTUALIZADA`,
+   * `APORTE_CREADO`, `APORTE_MODIFICADO`, `SESION_CERRADA`,
+   * `CIERRE_BLOQUEADO`, `RECONCILIACION` (8 de 14 tipos) — habilita
+   * `ConteoRepository.listarAuditoria` y la regla de lectura del cajero en
+   * `infra/firestore.rules`. Ausente en el resto (`USUARIO_*`,
+   * `CATEGORIA_*`, `AUDITORIA_PURGADA`): esos NO son legibles por un cajero.
+   */
+  readonly sucursalId?: string;
   readonly [campo: string]: unknown;
 }

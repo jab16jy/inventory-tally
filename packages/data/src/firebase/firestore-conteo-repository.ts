@@ -2,6 +2,7 @@
 import {
   collection,
   doc,
+  getDocs,
   increment,
   limit,
   onSnapshot,
@@ -9,16 +10,20 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  startAfter,
   updateDoc,
   where,
   type DocumentData,
   type Firestore,
+  type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { CantidadInvalidaError } from "@conteo/shared/errors.js";
 import type { Aporte } from "@conteo/shared/models/aporte.js";
+import type { EventoAuditoria } from "@conteo/shared/models/evento-auditoria.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
+import type { Pagina } from "../repositories/admin-repository.js";
 import type {
   ConteoRepository,
   RegistrarAporteInput,
@@ -26,11 +31,14 @@ import type {
 } from "../repositories/conteo-repository.js";
 import {
   aporteDesdeDoc,
+  eventoAuditoriaDesdeDoc,
   lineaConteoDesdeDoc,
   sesionConteoDesdeDoc,
   sucursalDesdeDoc,
 } from "./mappers.js";
 import { obtenerIdDispositivo } from "./dispositivo.js";
+
+const TAMANO_PAGINA = 20; // mismo valor que FirestoreAdminRepository.listarAuditoria
 
 /** Desacopla el repositorio de `firebase/auth`: quien lo construye resuelve
  *  el usuario activo (apps/web lo hace con `getAuth().currentUser`). */
@@ -154,6 +162,35 @@ export class FirestoreConteoRepository implements ConteoRepository {
     });
 
     return () => unsubs.forEach((unsub) => unsub());
+  }
+
+  /**
+   * Ticket #45: a diferencia de `observarSucursales`, SÍ es una query de
+   * colección con `where("sucursalId", "in", sucursalIds)` — la regla nueva
+   * de `infra/firestore.rules` exige que la query venga acotada así, porque
+   * Firestore rechaza de entrada una query de colección sin `where` que no
+   * pueda demostrar que TODOS sus resultados posibles cumplen la regla.
+   */
+  async listarAuditoria(
+    sucursalIds: readonly string[],
+    cursor?: unknown,
+  ): Promise<Pagina<EventoAuditoria>> {
+    if (sucursalIds.length === 0) return { items: [], siguienteCursor: null };
+
+    const base = query(
+      collection(this.db, "auditoria"),
+      where("sucursalId", "in", sucursalIds),
+      orderBy("ocurridoEn", "desc"),
+    );
+    const acotada = cursor
+      ? query(base, startAfter(cursor as QueryDocumentSnapshot), limit(TAMANO_PAGINA))
+      : query(base, limit(TAMANO_PAGINA));
+    const snap = await getDocs(acotada);
+    const siguienteCursor = snap.docs.length === TAMANO_PAGINA ? (snap.docs.at(-1) ?? null) : null;
+    return {
+      items: snap.docs.map((d) => eventoAuditoriaDesdeDoc(d.id, d.data())),
+      siguienteCursor,
+    };
   }
 
   async registrarAporte({ sesionId, categoriaId, cantidad }: RegistrarAporteInput): Promise<void> {

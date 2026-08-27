@@ -3,14 +3,18 @@
 // `apps/web` sin tocar el SDK de Firebase ni el emulador.
 import { CantidadInvalidaError } from "@conteo/shared/errors.js";
 import type { Aporte } from "@conteo/shared/models/aporte.js";
+import type { EventoAuditoria } from "@conteo/shared/models/evento-auditoria.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
+import type { Pagina } from "../repositories/admin-repository.js";
 import type {
   ConteoRepository,
   RegistrarAporteInput,
   Unsubscribe,
 } from "../repositories/conteo-repository.js";
+
+const TAMANO_PAGINA_AUDITORIA = 20; // mismo valor que FakeAdminRepository (constante en producción)
 
 export interface UsuarioFake {
   readonly uid: string;
@@ -36,6 +40,7 @@ export class FakeConteoRepository implements ConteoRepository {
   private readonly sesionesPorId = new Map<string, SesionConteo>();
   private readonly sucursales = new Map<string, Sucursal>();
   private readonly pendientesPorSesion = new Map<string, number>();
+  private readonly auditoria: EventoAuditoria[] = [];
 
   private readonly listenersLineas = new Map<string, Set<(l: LineaConteo[]) => void>>();
   private readonly listenersAporte = new Map<string, Set<(a: Aporte | null) => void>>();
@@ -73,6 +78,10 @@ export class FakeConteoRepository implements ConteoRepository {
 
   sembrarSucursal(sucursal: Sucursal): void {
     this.sucursales.set(sucursal.sucursalId, sucursal);
+  }
+
+  sembrarAuditoria(evento: EventoAuditoria): void {
+    this.auditoria.push(evento);
   }
 
   // ─────────── ConteoRepository ───────────
@@ -126,6 +135,21 @@ export class FakeConteoRepository implements ConteoRepository {
       .sort((a, b) => a.nombre.localeCompare(b.nombre) || a.sucursalId.localeCompare(b.sucursalId));
     onChange(encontradas);
     return () => {};
+  }
+
+  // Mismo contrato observable que FirestoreConteoRepository.listarAuditoria
+  // (ticket #45): sólo eventos cuyo sucursalId esté en `sucursalIds`.
+  async listarAuditoria(
+    sucursalIds: readonly string[],
+    cursor?: unknown,
+  ): Promise<Pagina<EventoAuditoria>> {
+    const filtrados = this.auditoria
+      .filter((e) => typeof e.sucursalId === "string" && sucursalIds.includes(e.sucursalId))
+      .sort((a, b) => b.ocurridoEn.getTime() - a.ocurridoEn.getTime());
+    const offset = typeof cursor === "number" ? cursor : 0;
+    const items = filtrados.slice(offset, offset + TAMANO_PAGINA_AUDITORIA);
+    const siguienteCursor = offset + items.length < filtrados.length ? offset + items.length : null;
+    return { items, siguienteCursor };
   }
 
   async registrarAporte({ sesionId, categoriaId, cantidad }: RegistrarAporteInput): Promise<void> {

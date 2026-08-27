@@ -4,9 +4,14 @@
 // `ImportMeta.env` de Vite — innecesario aquí y fuera del alcance de esta
 // ola tocar `packages/shared` para exponerlo en este programa de TS.
 import type { Aporte } from "@conteo/shared/models/aporte.js";
+import type { EventoAuditoria } from "@conteo/shared/models/evento-auditoria.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
+// `Pagina<T>` vive en admin-repository.ts (mismo paquete `packages/data`):
+// import cruzado en vez de duplicar el tipo — es el mismo contrato de
+// paginación con cursor opaco (ver su doc ahí).
+import type { Pagina } from "./admin-repository.js";
 
 export type Unsubscribe = () => void;
 
@@ -53,6 +58,16 @@ export interface ConteoRepository {
     sucursalIds: readonly string[],
     onChange: (sucursales: Sucursal[]) => void,
   ): Unsubscribe;
+
+  /**
+   * Audita SÓLO las `sucursalesAsignadas` del cajero activo (ticket #45, D1)
+   * — `sucursalIds` entra por parámetro por la misma razón que
+   * `observarSucursales`: la fuente real es el claim
+   * `request.auth.token.sucursales`, y este repositorio está deliberadamente
+   * desacoplado de `firebase/auth`. Máx. 30 valores (límite de Firestore
+   * para `where(..., "in", ...)`); un cajero no tiene tantas sucursales.
+   */
+  listarAuditoria(sucursalIds: readonly string[], cursor?: unknown): Promise<Pagina<EventoAuditoria>>;
 
   /** Registra o corrige el aporte propio. NUNCA escribe totales. */
   registrarAporte(input: RegistrarAporteInput): Promise<void>;
