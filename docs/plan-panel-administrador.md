@@ -20,7 +20,7 @@ Este plan cubre las 9 pantallas, las 5 callables que faltan, y nada más.
 |---|---|---|
 | Alcance | **9 rutas completas**, con CRUD de sucursales y categorías | 5 callables nuevas |
 | Gráficas | **CSS puro**, sin Recharts | 0 KB de dependencia; barras con `div` y `width:%`, dona con un `<svg>` y `stroke-dasharray` |
-| Responsive | **Sólo escritorio > 1024 px** | Sidebar fijo. Sin nav inferior ni tablas-tarjeta |
+| Responsive | ~~Sólo escritorio > 1024 px~~ **Superado por el issue #20**: los 3 breakpoints de `doc 11:298-304` (`useDisenoAdaptativo.ts`) | Sidebar fijo sólo en escritorio; nav inferior/tablas-tarjeta bajo 600 px y sidebar de íconos entre 600–1024 px, en `AdminLayout.tsx` y `Tabla.tsx` |
 | Dirección visual | **"Placa de bodega · escritorio"** | Mismos tokens de color, cero nuevos. Numeral de 32 px sólo en los 3 KPI; tablas en `text-base`; regla de tinta reservada al bloque de sincronización |
 | Capa de datos | **`AdminRepository` aparte** | No se toca `ConteoRepository` ni `FakeConteoRepository` |
 | Dinero | **Calculado en cliente** desde `lineas` | `totalMonetarioSesion()` de `packages/shared` estrena consumidor; el problema de `dirty:true` desaparece |
@@ -236,4 +236,4 @@ Después de F5, y sólo entonces:
 
 ### Deuda anotada, deliberadamente fuera
 
-Exportación CSV/PDF (los docs ya la declaran fuera de v1), reset de contraseña, `ejecutadoPor` en `SESION_CERRADA` y `CIERRE_BLOQUEADO`, reapertura de sesiones (`sesionCorregidaId` está modelado y nunca se escribe), filtros combinables de auditoría, y breakpoints de móvil y tablet.
+Exportación CSV/PDF (los docs ya la declaran fuera de v1), reset de contraseña, `ejecutadoPor` en `SESION_CERRADA` y `CIERRE_BLOQUEADO`, reapertura de sesiones (`sesionCorregidaId` está modelado y nunca se escribe), y filtros combinables de auditoría (formalizado como ADR en `docs/diseno/13-decisiones-adr.md`, issue #20). Los breakpoints de móvil y tablet **ya no son deuda**: el issue #20 los cerró (`useDisenoAdaptativo.ts`).
