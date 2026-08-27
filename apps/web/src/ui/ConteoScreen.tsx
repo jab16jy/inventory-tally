@@ -21,6 +21,7 @@ import { useMiAporte } from "../state/useMiAporte.js";
 import { usePendientes } from "../state/usePendientes.js";
 import { useSesion } from "../state/useSesion.js";
 import { BannerPendientes } from "./BannerPendientes.js";
+import { BotonSalir } from "./BotonSalir.js";
 import { FilaCategoria } from "./FilaCategoria.js";
 import { ModalSesionCerrada } from "./ModalSesionCerrada.js";
 import { BarraProgreso } from "./primitivos/BarraProgreso.js";
@@ -30,7 +31,15 @@ import { Hoja } from "./primitivos/Hoja.js";
 import { Icono } from "./primitivos/Icono.js";
 import { Placa } from "./primitivos/Placa.js";
 
-export function ConteoScreen() {
+export interface ConteoScreenProps {
+  // issue #40: sin título de una línea como las otras 3 pantallas (esta
+  // cabecera ya es progreso+búsqueda), así que "Salir" no pasa por
+  // CabeceraCajero — se inserta directo en la fila de búsqueda/filtro con el
+  // mismo BotonSalir que usan las demás.
+  readonly onSalir: () => void | Promise<void>;
+}
+
+export function ConteoScreen({ onSalir }: ConteoScreenProps) {
   // Valor por defecto para no romper las reglas de hooks con un return
   // condicional antes de useLineasSesion/usePendientes; la ruta siempre
   // provee :sesionId cuando este componente se monta desde el router.
@@ -207,6 +216,8 @@ export function ConteoScreen() {
             <Icono nombre="filtro" className="size-4" />
             Pendientes
           </button>
+
+          <BotonSalir onSalir={onSalir} />
         </div>
       </header>
 
@@ -302,7 +313,7 @@ export function ConteoScreen() {
  * cuenta para quien CREA el elemento, no para el componente que lo contiene
  * (error real cometido y corregido durante esta ola).
  */
-export function ConteoScreenPorSesion() {
+export function ConteoScreenPorSesion({ onSalir }: ConteoScreenProps) {
   const { sesionId } = useParams<{ sesionId: string }>();
-  return <ConteoScreen key={sesionId} />;
+  return <ConteoScreen key={sesionId} onSalir={onSalir} />;
 }

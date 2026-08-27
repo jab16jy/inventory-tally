@@ -46,7 +46,7 @@ function renderConteoScreen(repo: FakeConteoRepository, sesionId = "ses_1") {
     <MemoryRouter initialEntries={[`/conteo/${sesionId}`]}>
       <ConteoRepositoryProvider repo={repo}>
         <Routes>
-          <Route path="/conteo/:sesionId" element={<ConteoScreen />} />
+          <Route path="/conteo/:sesionId" element={<ConteoScreen onSalir={() => {}} />} />
           <Route path="/sucursales" element={<p>Sucursales — próximamente</p>} />
         </Routes>
       </ConteoRepositoryProvider>
@@ -73,16 +73,18 @@ describe("ConteoScreen · sesión cerrada por el admin (F4-A1, doc 11 §5)", () 
     });
 
     expect(screen.getByText(/cerró esta sesión/i)).toBeVisible();
-    expect(screen.getByRole("button", { name: /salir/i })).toBeInTheDocument();
+    const modal = screen.getByRole("dialog", { name: /sesión cerrada/i });
+    expect(within(modal).getByRole("button", { name: /salir/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /cerrar|descartar/i })).not.toBeInTheDocument();
   });
 
-  it('tocar "Salir" navega fuera de la pantalla de conteo', () => {
+  it('tocar "Salir" del modal navega fuera de la pantalla de conteo', () => {
     const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
     repo.sembrarSesion(sesionBase({ estado: "cerrada" }));
     renderConteoScreen(repo);
 
-    fireEvent.click(screen.getByRole("button", { name: /salir/i }));
+    const modal = screen.getByRole("dialog", { name: /sesión cerrada/i });
+    fireEvent.click(within(modal).getByRole("button", { name: /salir/i }));
 
     expect(screen.getByText(/sucursales — próximamente/i)).toBeInTheDocument();
   });
@@ -121,7 +123,10 @@ describe("ConteoScreen · sesión cerrada por el admin (F4-A1, doc 11 §5)", () 
     repo.sembrarSesion(sesionBase({ estado: "cerrada" }));
     renderConteoScreen(repo);
 
-    expect(screen.getByRole("button", { name: /salir/i })).toBeInTheDocument();
+    // Alcance al diálogo: desde issue #40 la cabecera SIEMPRE tiene su propio
+    // botón "Salir", así que /salir/i deja de ser único en la pantalla.
+    const modal = screen.getByRole("dialog", { name: /sesión cerrada/i });
+    expect(within(modal).getByRole("button", { name: /salir/i })).toBeInTheDocument();
     expect(screen.getAllByRole("alert")).toHaveLength(1);
   });
 });

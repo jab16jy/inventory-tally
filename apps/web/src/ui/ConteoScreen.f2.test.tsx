@@ -28,7 +28,7 @@ function renderConteoScreen(repo: FakeConteoRepository, sesionId = "ses_1") {
     <MemoryRouter initialEntries={[`/conteo/${sesionId}`]}>
       <ConteoRepositoryProvider repo={repo}>
         <Routes>
-          <Route path="/conteo/:sesionId" element={<ConteoScreen />} />
+          <Route path="/conteo/:sesionId" element={<ConteoScreen onSalir={() => {}} />} />
         </Routes>
       </ConteoRepositoryProvider>
     </MemoryRouter>,

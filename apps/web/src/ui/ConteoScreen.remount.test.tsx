@@ -46,7 +46,7 @@ function renderConDosSesiones() {
       <ConteoRepositoryProvider repo={repoConDosSesiones()}>
         <Link to="/conteo/ses_b">Ir a sesión B</Link>
         <Routes>
-          <Route path="/conteo/:sesionId" element={<ConteoScreenPorSesion />} />
+          <Route path="/conteo/:sesionId" element={<ConteoScreenPorSesion onSalir={() => {}} />} />
         </Routes>
       </ConteoRepositoryProvider>
     </MemoryRouter>,
