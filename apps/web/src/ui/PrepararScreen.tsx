@@ -20,6 +20,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useConexion } from "../state/useConexion.js";
 import { useLineasSesion } from "../state/useLineasSesion.js";
 import { usePendientes } from "../state/usePendientes.js";
+import { CabeceraCajero } from "./CabeceraCajero.js";
 import { ChipEstado } from "./primitivos/ChipEstado.js";
 import { Icono } from "./primitivos/Icono.js";
 import { Placa } from "./primitivos/Placa.js";
@@ -31,7 +32,13 @@ const PASOS = [
   'Al terminar, pulsa "Finalizar conteo"',
 ] as const;
 
-export function PrepararScreen() {
+export interface PrepararScreenProps {
+  // issue #40: "Salir" (variante A, decidida vía /prototype) entra por prop,
+  // igual que en SucursalesScreen/AdminLayout.
+  readonly onSalir: () => void | Promise<void>;
+}
+
+export function PrepararScreen({ onSalir }: PrepararScreenProps) {
   // Mismo valor por defecto que ConteoScreen y por la misma razón: no
   // romper las reglas de hooks con un return condicional antes de los
   // hooks de estado — la ruta siempre provee :sesionId al montar.
@@ -63,9 +70,7 @@ export function PrepararScreen() {
           …)` aquí para el nombre, y `observarSucursales([sesion.sucursalId],
           …)` para el aviso de datos móviles, el día que una pantalla real lo
           necesite. */}
-      <header className="pb-3">
-        <h1 className="text-micro tracking-[0.18em] text-tenue uppercase">Antes de empezar</h1>
-      </header>
+      <CabeceraCajero titulo="Antes de empezar" onSalir={onSalir} />
 
       <ul className="flex flex-col gap-2">
         <li className="list-none">

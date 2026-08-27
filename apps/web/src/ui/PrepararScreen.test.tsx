@@ -2,7 +2,7 @@
 import { FakeConteoRepository } from "@conteo/data";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ConteoRepositoryProvider } from "../state/repositorio-contexto.js";
 import { PrepararScreen } from "./PrepararScreen.js";
 
@@ -19,12 +19,15 @@ function lineaBase(categoriaId: string, etiqueta: string, valorUnitario: number)
   };
 }
 
-function renderPantalla(repo: FakeConteoRepository, sesionId = "ses_1") {
+function renderPantalla(repo: FakeConteoRepository, sesionId = "ses_1", onSalir = vi.fn()) {
   return render(
     <MemoryRouter initialEntries={[`/conteo/${sesionId}/preparar`]}>
       <ConteoRepositoryProvider repo={repo}>
         <Routes>
-          <Route path="/conteo/:sesionId/preparar" element={<PrepararScreen />} />
+          <Route
+            path="/conteo/:sesionId/preparar"
+            element={<PrepararScreen onSalir={onSalir} />}
+          />
           <Route path="/conteo/:sesionId" element={<p>Pantalla de conteo</p>} />
         </Routes>
       </ConteoRepositoryProvider>
@@ -59,5 +62,16 @@ describe("PrepararScreen (F3-B, doc 11 §3)", () => {
     fireEvent.click(screen.getByRole("button", { name: /empezar a contar/i }));
 
     expect(await screen.findByText("Pantalla de conteo")).toBeInTheDocument();
+  });
+
+  it("ofrece un control de salida visible que no se llama 'Cerrar sesión'", () => {
+    const onSalir = vi.fn();
+    renderPantalla(new FakeConteoRepository(), "ses_1", onSalir);
+
+    const boton = screen.getByRole("button", { name: /^salir$/i });
+    expect(screen.queryByRole("button", { name: /cerrar sesión/i })).not.toBeInTheDocument();
+
+    fireEvent.click(boton);
+    expect(onSalir).toHaveBeenCalledTimes(1);
   });
 });
