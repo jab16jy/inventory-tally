@@ -177,7 +177,9 @@ export const abrirSesion = onCall(async (req) => {
 
 La siembra crea una línea por categoría activa con `cantidadTotal: 0` y el
 `valorUnitario` **copiado y congelado** (invariante I-7): cambiar el catálogo después no
-altera conteos en curso ni históricos.
+altera conteos en curso ni históricos. Mismo tratamiento para `area`: se resuelve una
+vez el nombre del área activa referenciada por `categoriasValor.areaId` (`"Sin área"`
+si no tiene una asignada) y se copia congelado en la línea.
 
 ### `cerrarSesion` — reforzada en la v2
 
