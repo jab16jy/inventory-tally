@@ -42,6 +42,9 @@ async function sembrarLineas(
     return sucursalesAsignadas === undefined || sucursalesAsignadas.includes(sucursalId);
   });
 
+  const areas = await db.collection("areas").where("activa", "==", true).get();
+  const nombresPorArea = new Map(areas.docs.map((area) => [area.id, area.get("nombre") as string]));
+
   for (let i = 0; i < docs.length; i += LOTE_MAXIMO) {
     const lote = db.batch();
     for (const categoria of docs.slice(i, i + LOTE_MAXIMO)) {
@@ -49,6 +52,7 @@ async function sembrarLineas(
         categoriaId: categoria.id,
         valorUnitario: categoria.get("valor"), // I-7: copiado y congelado
         etiqueta: categoria.get("etiqueta"),
+        area: nombresPorArea.get(categoria.get("areaId")) ?? "Sin área", // I-7: copiado y congelado
         cantidadTotal: 0,
         numAportantes: 0,
         versiones: {},

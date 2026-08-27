@@ -24,6 +24,7 @@ async function crearCategoria(
   valor: number,
   activa = true,
   sucursalesAsignadas?: readonly string[],
+  areaId?: string,
 ) {
   await db.doc(`categoriasValor/${categoriaId}`).set({
     valor,
@@ -31,7 +32,12 @@ async function crearCategoria(
     activa,
     orden: 1,
     ...(sucursalesAsignadas !== undefined && { sucursalesAsignadas }),
+    ...(areaId !== undefined && { areaId }),
   });
+}
+
+async function crearArea(areaId: string, nombre: string, activa = true) {
+  await db.doc(`areas/${areaId}`).set({ nombre, activa });
 }
 
 describe("abrirSesionImpl", () => {
@@ -142,6 +148,32 @@ describe("abrirSesionImpl", () => {
     });
     const lineaFuera = await db.doc(`sesiones/${sesionFuera}/lineas/${catId}`).get();
     expect(lineaFuera.exists).toBe(false);
+  });
+
+  it("I-7 · siembra la línea con el nombre de área copiado y congelado", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const areaId = `area_${randomUUID()}`;
+    const catId = `cat_${randomUUID()}`;
+    await crearSucursal(sucursalId);
+    await crearArea(areaId, "Aseo");
+    await crearCategoria(catId, 5000, true, undefined, areaId);
+
+    const { sesionId } = await abrirSesionImpl(db, "uid_admin", { sucursalId });
+
+    const linea = await db.doc(`sesiones/${sesionId}/lineas/${catId}`).get();
+    expect(linea.get("area")).toBe("Aseo");
+  });
+
+  it("I-7 · siembra la línea con 'Sin área' cuando la categoría no tiene areaId", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const catId = `cat_${randomUUID()}`;
+    await crearSucursal(sucursalId);
+    await crearCategoria(catId, 5000); // sin areaId
+
+    const { sesionId } = await abrirSesionImpl(db, "uid_admin", { sucursalId });
+
+    const linea = await db.doc(`sesiones/${sesionId}/lineas/${catId}`).get();
+    expect(linea.get("area")).toBe("Sin área");
   });
 
   it("registra un evento de auditoría SESION_ABIERTA", async () => {

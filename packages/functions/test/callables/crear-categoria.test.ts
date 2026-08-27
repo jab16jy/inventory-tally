@@ -117,4 +117,17 @@ describe("crearCategoriaImpl", () => {
     const categoria = await db.doc(`categoriasValor/${resultado.categoriaId}`).get();
     expect(categoria.get("sucursalesAsignadas")).toEqual(["suc_norte", "suc_centro"]);
   });
+
+  it("crea la categoría con areaId cuando se especifica", async () => {
+    const datos = crearCategoriaSchema.parse({
+      ...datosValidos(),
+      areaId: "area_aseo",
+    });
+
+    const resultado = await crearCategoriaImpl(db, "uid_admin", datos);
+    categoriasCreadas.push(resultado.categoriaId);
+
+    const categoria = await db.doc(`categoriasValor/${resultado.categoriaId}`).get();
+    expect(categoria.get("areaId")).toBe("area_aseo");
+  });
 });
