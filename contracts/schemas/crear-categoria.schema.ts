@@ -11,6 +11,7 @@ export const crearCategoriaSchema = z.object({
   valor: z.number().int().min(0),
   orden: z.number().int().min(0),
   sucursalesAsignadas: z.array(z.string()).min(1).max(10).optional(),
+  areaId: z.string().min(1).optional(),
 });
 
 export type CrearCategoriaInput = z.infer<typeof crearCategoriaSchema>;

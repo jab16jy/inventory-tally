@@ -29,3 +29,9 @@ export type { CrearCategoriaInput } from "./crear-categoria.schema.js";
 
 export { desactivarCategoriaSchema } from "./desactivar-categoria.schema.js";
 export type { DesactivarCategoriaInput } from "./desactivar-categoria.schema.js";
+
+export { crearAreaSchema } from "./crear-area.schema.js";
+export type { CrearAreaInput } from "./crear-area.schema.js";
+
+export { desactivarAreaSchema } from "./desactivar-area.schema.js";
+export type { DesactivarAreaInput } from "./desactivar-area.schema.js";
