@@ -8,12 +8,13 @@ export type { Conectividad, Sucursal } from "./models/sucursal.js";
 export type { EventoAuditoria, TipoEventoAuditoria } from "./models/evento-auditoria.js";
 export type { Historico } from "./models/historico.js";
 
-export type { LineaSumable } from "./services/calculadora.js";
+export type { LineaSumable, LineaAgrupablePorArea } from "./services/calculadora.js";
 export {
   cantidadTotalDesdeAportes,
   subtotal,
   totalMonetarioSesion,
   totalUnidadesSesion,
+  totalPorArea,
 } from "./services/calculadora.js";
 
 export { aporteConfirmado } from "./services/sincronizacion.js";

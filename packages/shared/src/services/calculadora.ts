@@ -37,3 +37,18 @@ export function totalUnidadesSesion(lineas: readonly LineaSumable[]): number {
 export function totalMonetarioSesion(lineas: readonly LineaSumable[]): number {
   return lineas.reduce((total, linea) => total + subtotal(linea), 0);
 }
+
+export type LineaAgrupablePorArea = Pick<LineaConteo, "area" | "cantidadTotal">;
+
+/** Unidades contadas por área: suma cantidadTotal agrupando por LineaConteo.area. */
+export function totalPorArea(
+  lineas: readonly LineaAgrupablePorArea[],
+): ReadonlyArray<{ area: string; cantidad: number }> {
+  const totales = new Map<string, number>();
+  for (const linea of lineas) {
+    totales.set(linea.area, (totales.get(linea.area) ?? 0) + linea.cantidadTotal);
+  }
+  return [...totales.entries()]
+    .map(([area, cantidad]) => ({ area, cantidad }))
+    .sort((a, b) => a.area.localeCompare(b.area));
+}
