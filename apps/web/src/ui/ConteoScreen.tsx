@@ -221,8 +221,6 @@ export function ConteoScreen({ onSalir }: ConteoScreenProps) {
         </div>
       </header>
 
-      <BannerPendientes pendientes={escriturasPendientes} />
-
       {/* Con la sesión cerrada NO se montan las filas. Los +/- que escriben
           viven dentro de FilaCategoria y llaman al repositorio ellos mismos,
           así que taparlos con el modal no es una garantía de integridad: la
@@ -268,11 +266,19 @@ export function ConteoScreen({ onSalir }: ConteoScreenProps) {
         </ul>
       )}
 
-      <Deck
-        tuAporte={tuAporteTotal}
-        equipo={equipoTotal}
-        onFinalizar={() => navigate(`/conteo/${sesionId}/finalizar`)}
-      />
+      {/* issue #44: el banner de pendientes vive junto al Deck, no arriba de
+          la lista — así no compite por el mismo espacio fijo que "siempre
+          bajo el pulgar" reserva para "Finalizar conteo" (Deck.tsx:6-7). Un
+          solo contenedor sticky evita que los dos se disputen el borde
+          inferior real de la pantalla. */}
+      <div className="sticky bottom-0">
+        <BannerPendientes pendientes={escriturasPendientes} />
+        <Deck
+          tuAporte={tuAporteTotal}
+          equipo={equipoTotal}
+          onFinalizar={() => navigate(`/conteo/${sesionId}/finalizar`)}
+        />
+      </div>
 
       <Hoja
         abierta={lineaEnEdicion !== null}

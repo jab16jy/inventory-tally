@@ -15,7 +15,7 @@ export function BannerPendientes({ pendientes }: BannerPendientesProps) {
     <div
       role="alert"
       aria-live="assertive"
-      className="sticky top-0 z-10 border border-riesgo bg-riesgo-placa rounded-placa px-3 py-2.5 text-base text-tinta"
+      className="border border-riesgo bg-riesgo-placa rounded-placa px-3 py-2.5 text-base text-tinta"
     >
       {/* text-tinta, no text-riesgo: verificado con la fórmula WCAG (F4-B),
           ámbar/riesgo-placa mide 3.93:1 — bajo el mínimo AA de 4.5:1 para
