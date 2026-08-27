@@ -98,6 +98,7 @@ Un campo nuevo en la v2:
 | ----------------------- | -------------------------------------------------------------------------------------------------- |
 | **Cajero**              | Persona que realiza el conteo. Único rol operativo del sistema                                     |
 | **Categoría de valor**  | Un precio de venta definido por el negocio. Unidad de clasificación, global a todas las sucursales |
+| **Área**                | Agrupación de categorías gestionada por el administrador. El cajero nunca la crea             |
 | **Sesión de conteo**    | Ejercicio de inventario completo sobre una sucursal, con apertura y cierre. Unidad de trabajo      |
 | **Línea de conteo**     | Intersección (sesión × categoría). Contiene el total agregado. Dato **derivado**                   |
 | **Aporte**              | Lo que **un** cajero declara haber contado. **Único dato que el cliente escribe**                  |
@@ -201,6 +202,11 @@ contable; mutarla destruye el valor de la auditoría.
 > **I-7 en detalle:** si el negocio sube un precio de $5.000 a $5.500, los conteos
 > históricos deben conservar el valor vigente al momento del conteo. Por eso la línea
 > guarda una copia del valor, no una referencia viva al catálogo.
+>
+> Mismo patrón para `LineaConteo.area`: el nombre del área se copia y congela al
+> sembrar la línea (`"Sin área"` si la categoría no tiene una asignada). El cajero
+> nunca crea áreas al vuelo por esta misma razón — una entrada creada a mitad de
+> conteo sólo aplicaría a la próxima sesión.
 
 ---
 

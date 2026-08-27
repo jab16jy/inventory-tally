@@ -118,12 +118,27 @@ El ID del documento es el UID de Firebase Auth. Nunca se guarda contraseña.
   "etiqueta": "$5.000",
   "activa": true,
   "orden": 12,
-  "creadaEn": "2026-01-15T10:05:00Z"
+  "creadaEn": "2026-01-15T10:05:00Z",
+  "areaId": "area_aseo"
 }
 ```
 
 Enteros en la unidad mínima. Las categorías nunca se borran, sólo se desactivan:
-borrarlas rompería los históricos.
+borrarlas rompería los históricos. `areaId` es opcional: ausente = sin área
+(comportamiento válido, no roto).
+
+### `areas/{areaId}`
+
+```json
+{
+  "nombre": "Aseo",
+  "activa": true,
+  "creadaEn": "2026-01-15T10:00:00Z"
+}
+```
+
+Gestionada exclusivamente por el administrador (crear/desactivar, sin editar). Igual
+que `categoriasValor`, nunca se borra, sólo se desactiva.
 
 ### `sesiones/{sesionId}`
 
@@ -157,6 +172,7 @@ duplicar.
   "categoriaId": "cat_5000",
   "valorUnitario": 5000,
   "etiqueta": "$5.000",
+  "area": "Aseo",
   "cantidadTotal": 55,
   "numAportantes": 2,
   "versiones": { "uid_ana": 3, "uid_luis": 1 },
@@ -168,6 +184,9 @@ duplicar.
 > **El `subtotal` ya no vive aquí** (cambio respecto a la v1). Se movió a `resumen` para
 > que el cajero, que necesita leer las líneas, no reciba importes consolidados.
 > `versiones` da idempotencia al trigger ([05](05-concurrencia-offline-tiempo-real.md)).
+> `area` sigue el mismo patrón que `valorUnitario` (invariante I-7, [03](03-modelo-de-dominio.md)):
+> copiado y congelado desde `categoriasValor.areaId` al sembrar la línea, `"Sin área"` si
+> la categoría no tenía una asignada.
 
 ### `sesiones/{sesionId}/lineas/{categoriaId}/aportes/{uid}`
 
