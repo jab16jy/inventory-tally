@@ -5,16 +5,21 @@
 //
 // FUERA DE ALCANCE, verificado y no asumido: el mock (doc 11 §6) muestra
 // "Contaste 412 UNIDADES en 47 categorías". Esta pantalla sólo puede
-// mostrar CATEGORÍAS: el total de unidades propias exige sumar el `Aporte`
-// de cada categoría para este uid, y `ConteoRepository.observarMiAporte`
-// sólo observa una categoría a la vez. `ConteoScreen` evita ese mismo costo
-// abriendo cero suscripciones nuevas — cada `FilaCategoria` ya montada
-// REPORTA su cantidad hacia el padre (ver el comentario de
-// `onCantidadPropiaCambio` en FilaCategoria.tsx) — pero aquí no hay filas
-// montadas de las que colgarse. Ver el `ponytail:` de más abajo.
+// mostrar CATEGORÍAS: el total de unidades PROPIAS del cajero exige sumar
+// el `Aporte` de cada categoría para este uid, y
+// `ConteoRepository.observarMiAporte` sólo observa una categoría a la vez.
+// `ConteoScreen` evita ese mismo costo abriendo cero suscripciones nuevas —
+// cada `FilaCategoria` ya montada REPORTA su cantidad hacia el padre (ver el
+// comentario de `onCantidadPropiaCambio` en FilaCategoria.tsx) — pero aquí no
+// hay filas montadas de las que colgarse. Ver el `ponytail:` de más abajo.
+//
+// El desglose por ÁREA que sí se muestra abajo es distinto: es el agregado
+// DE EQUIPO (`LineaConteo.cantidadTotal`, ya sincronizado por el trigger de
+// aportes), no el aporte propio del cajero — por eso no choca con la
+// limitación de arriba.
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { estaPendiente } from "@conteo/shared";
+import { estaPendiente, totalPorArea } from "@conteo/shared";
 import { useConteoRepository } from "../state/repositorio-contexto.js";
 import { useEscriturasConError } from "../state/useEscriturasConError.js";
 import { useLineasSesion } from "../state/useLineasSesion.js";
@@ -40,14 +45,18 @@ export function FinalizarScreen({ onSalir }: FinalizarScreenProps) {
   const pendientes = usePendientes(sesionId);
   const escriturasConError = useEscriturasConError(sesionId);
 
-  // ponytail: total en CATEGORÍAS, no en unidades — el techo es la falta de
-  // una vía de agregación en el repositorio (ver comentario de archivo).
-  // Ruta de escalamiento: exponer un `observarMiTotalUnidades(sesionId)` en
-  // `ConteoRepository` (+ Fake + Firestore) que agregue en el servidor o en
-  // el propio listener, sin abrir una suscripción por categoría en el
+  // ponytail: total PROPIO en CATEGORÍAS, no en unidades — el techo es la
+  // falta de una vía de agregación en el repositorio (ver comentario de
+  // archivo). Ruta de escalamiento: exponer un `observarMiTotalUnidades(sesionId)`
+  // en `ConteoRepository` (+ Fake + Firestore) que agregue en el servidor o
+  // en el propio listener, sin abrir una suscripción por categoría en el
   // cliente — el mismo presupuesto que ya protege a `ConteoScreen`.
   const contadas = lineas.filter((l) => !estaPendiente(l, uid)).length;
   const faltantes = lineas.length - contadas;
+
+  // El desglose por área SÍ es un reduce puro sobre `lineas`, ya suscritas
+  // en tiempo real vía `useLineasSesion` — sin suscripción nueva.
+  const porArea = totalPorArea(lineas);
 
   const listo = pendientes === 0;
   const [fallo, setFallo] = useState(false);
@@ -87,6 +96,16 @@ export function FinalizarScreen({ onSalir }: FinalizarScreenProps) {
               faltantes === 1 ? "categoría" : "categorías"
             } sin contar.`}
       </p>
+
+      {porArea.length > 0 && (
+        <ul className="mt-3 flex flex-col gap-0.5">
+          {porArea.map(({ area, cantidad }) => (
+            <li key={area} className="text-base text-tenue">
+              {area}: {cantidad} {cantidad === 1 ? "producto" : "productos"}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {/* Mismo lenguaje que BannerPendientes (doc 06 §3): insistente, nunca
           alarmante hacia el cajero — no hizo nada mal, sólo hay que esperar
