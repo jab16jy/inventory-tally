@@ -1,3 +1,12 @@
+import { initializeApp } from "firebase-admin/app";
+
+// Sin esto, getFirestore()/getAuth() (llamadas dentro de cada handler) lanzan
+// "The default Firebase app does not exist" en el runtime real de Cloud
+// Functions — v2/https.js (onCall) no auto-inicializa el Admin SDK. Los tests
+// no lo detectan porque cada uno llama initializeApp() en su propio
+// beforeAll contra el emulador.
+initializeApp();
+
 export { onAporteEscrito } from "./triggers/on-aporte-escrito.js";
 export { abrirSesion } from "./callables/abrir-sesion.js";
 export { cerrarSesion } from "./callables/cerrar-sesion.js";
