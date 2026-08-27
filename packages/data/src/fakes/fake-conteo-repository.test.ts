@@ -259,6 +259,81 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
     expect(pagina.siguienteCursor).toBeNull();
   });
 
+  it("listarMisSesiones devuelve sólo sesiones donde el uid participó y la sucursal está en la lista", async () => {
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarSesion(
+      crearSesion({ sesionId: "ses_mia", sucursalId: "suc_norte", participantes: ["uid_ana"] }),
+    );
+    repo.sembrarSesion(
+      crearSesion({ sesionId: "ses_ajena", sucursalId: "suc_norte", participantes: ["uid_luis"] }),
+    );
+    // Participó, pero la sucursal ya no está asignada: en Firestore esta fila
+    // no se oculta sola, es la que denegaría la query entera sin el `in`.
+    repo.sembrarSesion(
+      crearSesion({ sesionId: "ses_otra_suc", sucursalId: "suc_sur", participantes: ["uid_ana"] }),
+    );
+
+    const pagina = await repo.listarMisSesiones(["suc_norte"]);
+
+    expect(pagina.items.map((s) => s.sesionId)).toEqual(["ses_mia"]);
+    expect(pagina.siguienteCursor).toBeNull();
+  });
+
+  it("listarMisSesiones ordena de la más reciente a la más antigua por abiertaEn", async () => {
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarSesion(
+      crearSesion({
+        sesionId: "ses_vieja",
+        participantes: ["uid_ana"],
+        abiertaEn: new Date("2026-01-01T08:00:00Z"),
+      }),
+    );
+    repo.sembrarSesion(
+      crearSesion({
+        sesionId: "ses_nueva",
+        participantes: ["uid_ana"],
+        abiertaEn: new Date("2026-06-01T08:00:00Z"),
+      }),
+    );
+
+    const pagina = await repo.listarMisSesiones(["suc_norte"]);
+
+    expect(pagina.items.map((s) => s.sesionId)).toEqual(["ses_nueva", "ses_vieja"]);
+  });
+
+  it("listarMisSesiones pagina de 20 en 20 y encadena con el cursor devuelto", async () => {
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    for (let i = 0; i < 25; i++) {
+      repo.sembrarSesion(
+        crearSesion({
+          sesionId: `ses_${String(i).padStart(2, "0")}`,
+          participantes: ["uid_ana"],
+          // i mayor ⇒ más reciente, para que el orden desc sea predecible.
+          abiertaEn: new Date(Date.UTC(2026, 0, 1 + i)),
+        }),
+      );
+    }
+
+    const primera = await repo.listarMisSesiones(["suc_norte"]);
+    expect(primera.items).toHaveLength(20);
+    expect(primera.items[0]?.sesionId).toBe("ses_24");
+    expect(primera.siguienteCursor).toBe(20);
+
+    const segunda = await repo.listarMisSesiones(["suc_norte"], primera.siguienteCursor);
+    expect(segunda.items).toHaveLength(5);
+    expect(segunda.items.at(-1)?.sesionId).toBe("ses_00");
+    expect(segunda.siguienteCursor).toBeNull();
+  });
+
+  it("listarMisSesiones con sucursalIds vacío no devuelve nada", async () => {
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarSesion(crearSesion({ participantes: ["uid_ana"] }));
+
+    const pagina = await repo.listarMisSesiones([]);
+
+    expect(pagina).toEqual({ items: [], siguienteCursor: null });
+  });
+
   it("listarAuditoria omite eventos sin sucursalId (los 6 tipos que no lo llevan)", async () => {
     const repo = new FakeConteoRepository();
     repo.sembrarAuditoria(crearEvento({ eventoId: "e_sin_sucursal", tipo: "USUARIO_CREADO" }));

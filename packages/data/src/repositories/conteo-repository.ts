@@ -67,7 +67,33 @@ export interface ConteoRepository {
    * desacoplado de `firebase/auth`. Máx. 30 valores (límite de Firestore
    * para `where(..., "in", ...)`); un cajero no tiene tantas sucursales.
    */
-  listarAuditoria(sucursalIds: readonly string[], cursor?: unknown): Promise<Pagina<EventoAuditoria>>;
+  listarAuditoria(
+    sucursalIds: readonly string[],
+    cursor?: unknown,
+  ): Promise<Pagina<EventoAuditoria>>;
+
+  /**
+   * Sesiones en las que participó el cajero activo, de la más reciente a la
+   * más antigua. El uid NO entra por parámetro: sale de `uidActual()`, igual
+   * que en `observarMiAporte` — cada implementación ya conoce su propio
+   * usuario. `sucursalIds` SÍ entra por parámetro, por la misma razón que en
+   * `observarSucursales`/`listarAuditoria`: la fuente real es el claim
+   * `request.auth.token.sucursales` y este repositorio está deliberadamente
+   * desacoplado de `firebase/auth`.
+   *
+   * Ese `sucursalIds` no es un filtro de conveniencia, es OBLIGATORIO.
+   * `infra/firestore.rules` concede `allow read` sobre `sesiones/{sesionId}`
+   * sólo si `tieneSucursal(resource.data.sucursalId)`, y Firestore evalúa esa
+   * condición contra la query ENTERA, no fila por fila: basta con que el
+   * cajero haya participado alguna vez en una sucursal que ya no tiene
+   * asignada (una reasignación vía `actualizarCajero`) para que, sin la
+   * cláusula `in`, se deniegue la consulta completa en vez de ocultar esa
+   * sola fila.
+   */
+  listarMisSesiones(
+    sucursalIds: readonly string[],
+    cursor?: unknown,
+  ): Promise<Pagina<SesionConteo>>;
 
   /** Registra o corrige el aporte propio. NUNCA escribe totales. */
   registrarAporte(input: RegistrarAporteInput): Promise<void>;

@@ -42,6 +42,7 @@ flowchart TD
     HOME -->|admin| PANEL["/admin"]
 
     SUC --> PREP["/conteo/:sesionId/preparar<br/>precarga + recordatorio"]
+    SUC --> MIS["/mis-conteos<br/>historial del cajero"]
     PREP --> CONTEO["/conteo/:sesionId"]
     CONTEO --> DETALLE["bottom sheet<br/>registrar cantidad"]
     CONTEO --> FIN["/conteo/:sesionId/finalizar<br/>confirmar sincronización"]

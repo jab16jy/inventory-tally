@@ -17,6 +17,7 @@ import { AdminRepositoryProvider } from "../state/admin-contexto.js";
 import { ConteoScreenPorSesion } from "../ui/ConteoScreen.js";
 import { FinalizarScreen } from "../ui/FinalizarScreen.js";
 import { LoginScreen } from "../ui/LoginScreen.js";
+import { MisConteosScreen } from "../ui/MisConteosScreen.js";
 import { PrepararScreen } from "../ui/PrepararScreen.js";
 import { SucursalesScreen } from "../ui/SucursalesScreen.js";
 import { AdminLayout } from "../ui/admin/AdminLayout.js";
@@ -101,6 +102,17 @@ export function AppRouter(): ReactNode {
           element={
             <RequireAuth>
               <SucursalesScreen auth={auth} onSalir={() => signOut(auth)} />
+            </RequireAuth>
+          }
+        />
+        {/* Historial del cajero, alcanzado desde el pie de /sucursales.
+            `calcularRedireccion` (lib/guardas.ts) no necesita cambios: sólo
+            desvía /admin, y esta ruta es del cajero. */}
+        <Route
+          path="/mis-conteos"
+          element={
+            <RequireAuth>
+              <MisConteosScreen auth={auth} onSalir={() => signOut(auth)} />
             </RequireAuth>
           }
         />

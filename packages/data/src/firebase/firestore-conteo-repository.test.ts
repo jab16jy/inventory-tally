@@ -506,3 +506,79 @@ describe("FirestoreConteoRepository.listarAuditoria (ticket #45)", () => {
     expect(startAfter).toHaveBeenCalledWith(cursor);
   });
 });
+
+describe("FirestoreConteoRepository.listarMisSesiones (historial del cajero)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function snapSesion(id: string, datos: Record<string, unknown> = {}) {
+    return {
+      id,
+      data: () => ({
+        sucursalId: "suc_norte",
+        sucursalNombre: "Sucursal Norte",
+        estado: "cerrada",
+        abiertaEn: { toDate: () => new Date("2026-08-02T08:00:00Z") },
+        abiertaPor: "uid_admin",
+        cerradaEn: null,
+        cerradaPor: null,
+        participantes: ["uid_ana"],
+        totalUnidades: 120,
+        sesionCorregidaId: null,
+        ...datos,
+      }),
+    };
+  }
+
+  it("con sucursalIds vacío devuelve página vacía sin tocar Firestore", async () => {
+    const repo = new FirestoreConteoRepository({} as never, usuario);
+
+    const pagina = await repo.listarMisSesiones([]);
+
+    expect(pagina).toEqual({ items: [], siguienteCursor: null });
+    expect(getDocs).not.toHaveBeenCalled();
+    expect(where).not.toHaveBeenCalled();
+  });
+
+  it("acota por participantes Y por sucursalId: sin el 'in' la regla deniega la query entera", async () => {
+    getDocs.mockResolvedValue({ docs: [] });
+    const repo = new FirestoreConteoRepository({} as never, usuario);
+
+    await repo.listarMisSesiones(["suc_norte", "suc_sur"]);
+
+    expect(where).toHaveBeenCalledWith("participantes", "array-contains", "uid_ana");
+    expect(where).toHaveBeenCalledWith("sucursalId", "in", ["suc_norte", "suc_sur"]);
+    expect(collection).toHaveBeenCalledWith({}, "sesiones");
+    expect(orderBy).toHaveBeenCalledWith("abiertaEn", "desc");
+  });
+
+  it("mapea los docs con sesionConteoDesdeDoc y da siguienteCursor null bajo el tamaño de página", async () => {
+    getDocs.mockResolvedValue({ docs: [snapSesion("ses1")] });
+    const repo = new FirestoreConteoRepository({} as never, usuario);
+
+    const pagina = await repo.listarMisSesiones(["suc_norte"]);
+
+    expect(pagina.items).toEqual([
+      expect.objectContaining({
+        sesionId: "ses1",
+        sucursalNombre: "Sucursal Norte",
+        estado: "cerrada",
+        totalUnidades: 120,
+      }),
+    ]);
+    expect(pagina.siguienteCursor).toBeNull();
+  });
+
+  it("con la página llena devuelve el último doc como cursor y con cursor encadena vía startAfter", async () => {
+    const docs = Array.from({ length: 20 }, (_, i) => snapSesion(`ses${i}`));
+    getDocs.mockResolvedValue({ docs });
+    const repo = new FirestoreConteoRepository({} as never, usuario);
+
+    const primera = await repo.listarMisSesiones(["suc_norte"]);
+    expect(primera.siguienteCursor).toBe(docs.at(-1));
+
+    getDocs.mockResolvedValue({ docs: [] });
+    await repo.listarMisSesiones(["suc_norte"], primera.siguienteCursor);
+
+    expect(startAfter).toHaveBeenCalledWith(primera.siguienteCursor);
+  });
+});

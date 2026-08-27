@@ -14,7 +14,7 @@ import type {
   Unsubscribe,
 } from "../repositories/conteo-repository.js";
 
-const TAMANO_PAGINA_AUDITORIA = 20; // mismo valor que FakeAdminRepository (constante en producción)
+const TAMANO_PAGINA = 20; // mismo valor que FirestoreConteoRepository (constante en producción)
 
 // Issue #41: misma máquina de estados que FirestoreConteoRepository
 // (reintento con backoff, fallo permanente expuesto tras agotar intentos).
@@ -167,8 +167,28 @@ export class FakeConteoRepository implements ConteoRepository {
       .filter((e) => typeof e.sucursalId === "string" && sucursalIds.includes(e.sucursalId))
       .sort((a, b) => b.ocurridoEn.getTime() - a.ocurridoEn.getTime());
     const offset = typeof cursor === "number" ? cursor : 0;
-    const items = filtrados.slice(offset, offset + TAMANO_PAGINA_AUDITORIA);
+    const items = filtrados.slice(offset, offset + TAMANO_PAGINA);
     const siguienteCursor = offset + items.length < filtrados.length ? offset + items.length : null;
+    return { items, siguienteCursor };
+  }
+
+  // Mismo contrato observable que FirestoreConteoRepository.listarMisSesiones:
+  // sólo sesiones donde el uid está en `participantes` Y cuyo `sucursalId`
+  // está en `sucursalIds` (la cláusula `in` que las reglas exigen), ordenadas
+  // de la más reciente a la más antigua. Lee de `sesionesPorId`, que es lo que
+  // siembra `sembrarSesion`.
+  async listarMisSesiones(
+    sucursalIds: readonly string[],
+    cursor?: unknown,
+  ): Promise<Pagina<SesionConteo>> {
+    const filtradas = [...this.sesionesPorId.values()]
+      .filter(
+        (s) => s.participantes.includes(this.usuario.uid) && sucursalIds.includes(s.sucursalId),
+      )
+      .sort((a, b) => b.abiertaEn.getTime() - a.abiertaEn.getTime());
+    const offset = typeof cursor === "number" ? cursor : 0;
+    const items = filtradas.slice(offset, offset + TAMANO_PAGINA);
+    const siguienteCursor = offset + items.length < filtradas.length ? offset + items.length : null;
     return { items, siguienteCursor };
   }
 
