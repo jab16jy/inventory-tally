@@ -9,7 +9,7 @@
 import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { procesarAporteEscrito } from "../../src/triggers/on-aporte-escrito.js";
 
 if (getApps().length === 0) {
@@ -17,7 +17,14 @@ if (getApps().length === 0) {
 }
 const db = getFirestore();
 
+// Este paquete comparte UN emulador de Firestore mutable entre archivos
+// (packages/functions/vitest.config.ts). Una sesión "abierta" que sobrevive
+// al test contamina la consulta global de recalcular-resumenes.test.ts
+// (where("estado","==","abierta")) — issue de CI del 2026-08-27.
+const sesionesCreadas: string[] = [];
+
 async function crearSesionAbierta(sesionId: string): Promise<void> {
+  sesionesCreadas.push(sesionId);
   await db.doc(`sesiones/${sesionId}`).set({
     sucursalId: "suc_norte",
     estado: "abierta",
@@ -25,6 +32,11 @@ async function crearSesionAbierta(sesionId: string): Promise<void> {
     totalUnidades: 0,
   });
 }
+
+afterEach(async () => {
+  await Promise.all(sesionesCreadas.map((id) => db.doc(`sesiones/${id}`).delete()));
+  sesionesCreadas.length = 0;
+});
 
 describe("procesarAporteEscrito", () => {
   it("T-3 · reprocesar el mismo evento no duplica el total (idempotencia por versiones)", async () => {
