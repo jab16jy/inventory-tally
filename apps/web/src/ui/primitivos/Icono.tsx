@@ -33,6 +33,9 @@ const PATHS = {
   sucursal: "M4 8h16v12H4zM4 8l2-4h12l2 4M10 20v-5h4v5M8 12h2v2H8zM14 12h2v2h-2z",
   /** Rótulo de precio con orificio cuadrado — nav "Categorías". */
   etiqueta: "M3 3h8l10 10-10 10L3 13z M7 7h2v2H7z",
+  /** Carpeta con pestaña recta — nav "Áreas": agrupa categorías, distinto
+   *  de la cuadrícula de "Panel" para no repetir glifo en el sidebar. */
+  carpeta: "M3 6h6l2 2h10v11H3z",
   /** Lista de tres filas — nav "Sesiones". */
   sesiones: "M4 6h2v2H4zM8 6h12M4 12h2v2H4zM8 12h12M4 18h2v2H4zM8 18h8",
   /** Documento con esquina doblada y visto interno — nav "Auditoría". */

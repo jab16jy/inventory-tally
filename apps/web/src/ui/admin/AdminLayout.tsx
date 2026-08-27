@@ -29,13 +29,15 @@ interface Destino {
   readonly fin?: boolean;
 }
 
-// Siete destinos de primer nivel (doc plan §1). Análisis y Cerrar se
-// alcanzan DESDE Panel/Sesiones — no son nav de primer nivel (F4/F5).
+// Ocho destinos de primer nivel (doc plan §1 + agrupación por área).
+// Análisis y Cerrar se alcanzan DESDE Panel/Sesiones — no son nav de primer
+// nivel (F4/F5).
 const DESTINOS: readonly Destino[] = [
   { ruta: "/admin", etiqueta: "Panel", icono: "panel", fin: true },
   { ruta: "/admin/cajeros", etiqueta: "Cajeros", icono: "usuarios" },
   { ruta: "/admin/sucursales", etiqueta: "Sucursales", icono: "sucursal" },
   { ruta: "/admin/categorias", etiqueta: "Categorías", icono: "etiqueta" },
+  { ruta: "/admin/areas", etiqueta: "Áreas", icono: "carpeta" },
   { ruta: "/admin/sesiones", etiqueta: "Sesiones", icono: "sesiones" },
   { ruta: "/admin/auditoria", etiqueta: "Auditoría", icono: "auditoria" },
   { ruta: "/admin/comparativo", etiqueta: "Comparativo", icono: "comparativo" },
