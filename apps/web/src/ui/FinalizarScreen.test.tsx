@@ -57,6 +57,27 @@ describe("FinalizarScreen (F3-B, doc 11 §6)", () => {
     expect(screen.getByText(/falta 1 categoría sin contar/i)).toBeInTheDocument();
   });
 
+  it("muestra el desglose de unidades por área, sumando categorías de distinto precio", () => {
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarLinea(
+      "ses_1",
+      lineaBase("cat_1000", "$1.000", 1000, { area: "Aseo", cantidadTotal: 400 }),
+    );
+    repo.sembrarLinea(
+      "ses_1",
+      lineaBase("cat_2000", "$2.000", 2000, { area: "Aseo", cantidadTotal: 205 }),
+    );
+    repo.sembrarLinea(
+      "ses_1",
+      lineaBase("cat_500", "$500", 500, { area: "Mercancía", cantidadTotal: 1300 }),
+    );
+
+    renderPantalla(repo);
+
+    expect(screen.getByText("Aseo: 605 productos")).toBeInTheDocument();
+    expect(screen.getByText("Mercancía: 1300 productos")).toBeInTheDocument();
+  });
+
   it("con escrituras pendientes > 0, el botón de confirmar queda deshabilitado (RF-16)", () => {
     const repo = new FakeConteoRepository(
       { uid: "uid_ana", nombre: "Ana Ramírez" },
