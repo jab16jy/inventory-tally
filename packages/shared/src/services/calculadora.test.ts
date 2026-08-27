@@ -6,6 +6,7 @@ import {
   subtotal,
   totalMonetarioSesion,
   totalUnidadesSesion,
+  totalPorArea,
 } from "./calculadora.js";
 
 function crearLinea(overrides: Partial<LineaConteo> = {}): LineaConteo {
@@ -100,5 +101,39 @@ describe("totalMonetarioSesion", () => {
 
   it("devuelve 0 sin líneas", () => {
     expect(totalMonetarioSesion([])).toBe(0);
+  });
+});
+
+describe("totalPorArea", () => {
+  it("suma cantidadTotal de líneas de la misma área, independientemente del precio", () => {
+    const lineas = [
+      crearLinea({ categoriaId: "cat_5000", area: "Aseo", cantidadTotal: 55, valorUnitario: 5000 }),
+      crearLinea({ categoriaId: "cat_2000", area: "Aseo", cantidadTotal: 310, valorUnitario: 2000 }),
+    ];
+    expect(totalPorArea(lineas)).toEqual([{ area: "Aseo", cantidad: 365 }]);
+  });
+
+  it("separa áreas distintas", () => {
+    const lineas = [
+      crearLinea({ categoriaId: "cat_5000", area: "Aseo", cantidadTotal: 55 }),
+      crearLinea({ categoriaId: "cat_2000", area: "Cocina", cantidadTotal: 310 }),
+    ];
+    expect(totalPorArea(lineas)).toEqual([
+      { area: "Aseo", cantidad: 55 },
+      { area: "Cocina", cantidad: 310 },
+    ]);
+  });
+
+  it("devuelve [] sin líneas", () => {
+    expect(totalPorArea([])).toEqual([]);
+  });
+
+  it("ordena el resultado alfabéticamente por área", () => {
+    const lineas = [
+      crearLinea({ categoriaId: "cat_1", area: "Cocina", cantidadTotal: 1 }),
+      crearLinea({ categoriaId: "cat_2", area: "Aseo", cantidadTotal: 1 }),
+      crearLinea({ categoriaId: "cat_3", area: "Ferretería", cantidadTotal: 1 }),
+    ];
+    expect(totalPorArea(lineas).map((t) => t.area)).toEqual(["Aseo", "Cocina", "Ferretería"]);
   });
 });
