@@ -50,4 +50,14 @@ describe("crearAreaImpl", () => {
       .get();
     expect(eventos.size).toBe(1);
   });
+
+  it("rechaza un nombre ya usado por un área activa (evita que totalPorArea las fusione)", async () => {
+    const datos = datosValidos();
+    const primera = await crearAreaImpl(db, "uid_admin", datos);
+    areasCreadas.push(primera.areaId);
+
+    await expect(crearAreaImpl(db, "uid_admin", datos)).rejects.toThrow(
+      "Ya existe un área activa con ese nombre",
+    );
+  });
 });

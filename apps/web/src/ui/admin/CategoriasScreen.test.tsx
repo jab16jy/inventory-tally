@@ -158,6 +158,19 @@ describe("CategoriasScreen (F3)", () => {
     });
   });
 
+  it("no ofrece áreas inactivas en el selector del formulario (evitaría degradar a 'Sin área' al abrir sesión)", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarArea(areaBase({ areaId: "area_aseo", nombre: "Aseo", activa: true }));
+    repo.sembrarArea(areaBase({ areaId: "area_vieja", nombre: "Vieja", activa: false }));
+
+    renderPantalla(repo);
+    fireEvent.click(screen.getByRole("button", { name: /nueva categoría/i }));
+
+    const opciones = screen.getAllByRole("option").map((o) => o.textContent);
+    expect(opciones).toContain("Aseo");
+    expect(opciones).not.toContain("Vieja");
+  });
+
   it("ofrece desactivar sólo a las categorías activas", () => {
     const repo = new FakeAdminRepository();
     repo.sembrarCategoria(categoriaBase({ categoriaId: "cat_activa", etiqueta: "Activa" }));

@@ -175,7 +175,11 @@ interface FormularioCategoriaProps {
 
 function FormularioCategoria({ error, onCancelar, onCrear }: FormularioCategoriaProps) {
   const sucursales = useSucursales();
-  const areas = useAreas();
+  // Solo áreas activas: sembrarLineas únicamente resuelve áreas con
+  // activa=true, así que ofrecer una inactiva aquí crearía una categoría
+  // que se ve "con área" en esta pantalla pero cae a "Sin área" al abrir
+  // la próxima sesión.
+  const areas = useAreas().filter((a) => a.activa);
   const [etiqueta, setEtiqueta] = useState("");
   const [valor, setValor] = useState("");
   const [orden, setOrden] = useState("");
