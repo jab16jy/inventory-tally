@@ -78,6 +78,12 @@ export interface ConteoRepository {
   /** Escrituras aún no confirmadas por el servidor. */
   observarEscriturasPendientes(sesionId: string, onChange: (n: number) => void): Unsubscribe;
 
+  /** Escrituras que agotaron sus reintentos automáticos y siguen sin confirmarse. */
+  observarEscriturasConError(sesionId: string, onChange: (n: number) => void): Unsubscribe;
+
+  /** Reintenta manualmente las escrituras que quedaron marcadas con error. */
+  reintentarEscriturasFallidas(sesionId: string): void;
+
   /**
    * uid del cajero activo. Síncrono y sin suscripción propia — a diferencia
    * del resto de la interfaz, no cambia mientras dura la sesión de la

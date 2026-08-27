@@ -301,25 +301,150 @@ describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
     expect(valores.at(-1)).toBe(0);
   });
 
-  it("cuando el servidor RECHAZA la escritura (p.ej. permission-denied), el aporte NO cuenta como sincronizado: el pendiente sigue visible", async () => {
-    const { promesa, rechazador } = deferido<void>();
-    setDoc.mockReturnValue(promesa);
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+  it("cuando el servidor RECHAZA la escritura, reintenta con backoff exponencial sin decrementar pendientes", async () => {
+    vi.useFakeTimers();
+    try {
+      const diferidos = [deferido<void>(), deferido<void>(), deferido<void>()];
+      let llamada = 0;
+      setDoc.mockImplementation(() => diferidos[llamada++]!.promesa);
+      const repo = new FirestoreConteoRepository({} as never, usuario);
 
-    const valores: number[] = [];
-    repo.observarEscriturasPendientes("ses_1", (n) => valores.push(n));
+      const valores: number[] = [];
+      repo.observarEscriturasPendientes("ses_1", (n) => valores.push(n));
 
-    await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
-    expect(valores.at(-1)).toBe(1);
+      await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+      expect(valores.at(-1)).toBe(1);
+      expect(setDoc).toHaveBeenCalledTimes(1);
 
-    rechazador(Object.assign(new Error("permission-denied"), { code: "permission-denied" }));
-    await promesa.catch(() => {});
-    await Promise.resolve();
+      // Intento 0 rechaza → reintento 1 se agenda a 1000ms (RETRASO_BASE_MS * 2**0).
+      diferidos[0]!.rechazador(new Error("permission-denied"));
+      await diferidos[0]!.promesa.catch(() => {});
+      expect(setDoc).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(999);
+      expect(setDoc).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(setDoc).toHaveBeenCalledTimes(2);
+      expect(valores.at(-1)).toBe(1);
 
-    // Un rechazo del servidor no se reintenta solo: el aporte se perdió.
-    // El contador NO debe volver a 0 (eso apagaría el banner "no cierres
-    // la aplicación" como si se hubiera sincronizado).
-    expect(valores.at(-1)).toBe(1);
+      // Intento 1 rechaza → reintento 2 se agenda a 2000ms (RETRASO_BASE_MS * 2**1).
+      diferidos[1]!.rechazador(new Error("permission-denied"));
+      await diferidos[1]!.promesa.catch(() => {});
+      await vi.advanceTimersByTimeAsync(1999);
+      expect(setDoc).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(setDoc).toHaveBeenCalledTimes(3);
+      expect(valores.at(-1)).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("al agotar MAX_REINTENTOS rechazos consecutivos, expone el error en vez de perder el dato en silencio", async () => {
+    vi.useFakeTimers();
+    try {
+      // MAX_REINTENTOS = 3 → 4 intentos totales (0, 1, 2, 3) antes de rendirse.
+      const diferidos = [deferido<void>(), deferido<void>(), deferido<void>(), deferido<void>()];
+      let llamada = 0;
+      setDoc.mockImplementation(() => diferidos[llamada++]!.promesa);
+      const repo = new FirestoreConteoRepository({} as never, usuario);
+
+      const pendientes: number[] = [];
+      const errores: number[] = [];
+      repo.observarEscriturasPendientes("ses_1", (n) => pendientes.push(n));
+      repo.observarEscriturasConError("ses_1", (n) => errores.push(n));
+
+      await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+      expect(errores.at(-1)).toBe(0);
+
+      for (let intento = 0; intento < 3; intento++) {
+        diferidos[intento]!.rechazador(new Error("permission-denied"));
+        await diferidos[intento]!.promesa.catch(() => {});
+        await vi.advanceTimersByTimeAsync(1000 * 2 ** intento);
+      }
+      expect(setDoc).toHaveBeenCalledTimes(4);
+      expect(errores.at(-1)).toBe(0);
+
+      // El 4º y último intento (intento=3) también rechaza: se agotaron los reintentos.
+      diferidos[3]!.rechazador(new Error("permission-denied"));
+      await diferidos[3]!.promesa.catch(() => {});
+      await Promise.resolve();
+
+      expect(pendientes.at(-1)).toBe(1);
+      expect(errores.at(-1)).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("un rechazo transitorio (falla una vez, éxito en el reintento) termina en cero pendientes y sin error", async () => {
+    vi.useFakeTimers();
+    try {
+      const { promesa: p0, rechazador } = deferido<void>();
+      const { promesa: p1, resolver } = deferido<void>();
+      setDoc.mockReturnValueOnce(p0).mockReturnValueOnce(p1);
+      const repo = new FirestoreConteoRepository({} as never, usuario);
+
+      const pendientes: number[] = [];
+      const errores: number[] = [];
+      repo.observarEscriturasPendientes("ses_1", (n) => pendientes.push(n));
+      repo.observarEscriturasConError("ses_1", (n) => errores.push(n));
+
+      await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+
+      rechazador(new Error("permission-denied"));
+      await p0.catch(() => {});
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(setDoc).toHaveBeenCalledTimes(2);
+
+      resolver(undefined);
+      await p1;
+      await Promise.resolve();
+
+      expect(pendientes.at(-1)).toBe(0);
+      expect(errores.at(-1)).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reintentarEscriturasFallidas reintenta tras agotar reintentos; si ahora resuelve, pendientes y error vuelven a 0", async () => {
+    vi.useFakeTimers();
+    try {
+      // 4 intentos automáticos que fallan (agotan MAX_REINTENTOS) + 1 intento
+      // manual, vía reintentarEscriturasFallidas, que esta vez sí resuelve.
+      const diferidos = [deferido<void>(), deferido<void>(), deferido<void>(), deferido<void>()];
+      const { promesa: pManual, resolver } = deferido<void>();
+      let llamada = 0;
+      setDoc.mockImplementation(() => (llamada < 4 ? diferidos[llamada++]!.promesa : pManual));
+      const repo = new FirestoreConteoRepository({} as never, usuario);
+
+      const pendientes: number[] = [];
+      const errores: number[] = [];
+      repo.observarEscriturasPendientes("ses_1", (n) => pendientes.push(n));
+      repo.observarEscriturasConError("ses_1", (n) => errores.push(n));
+
+      await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+
+      for (let intento = 0; intento < 4; intento++) {
+        diferidos[intento]!.rechazador(new Error("permission-denied"));
+        await diferidos[intento]!.promesa.catch(() => {});
+        await vi.advanceTimersByTimeAsync(1000 * 2 ** intento);
+      }
+      expect(errores.at(-1)).toBe(1);
+
+      repo.reintentarEscriturasFallidas("ses_1");
+      expect(errores.at(-1)).toBe(0); // se limpia de inmediato al reintentar
+      expect(setDoc).toHaveBeenCalledTimes(5);
+
+      resolver(undefined);
+      await pManual;
+      await Promise.resolve();
+
+      expect(pendientes.at(-1)).toBe(0);
+      expect(errores.at(-1)).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

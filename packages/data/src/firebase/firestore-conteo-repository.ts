@@ -14,6 +14,7 @@ import {
   updateDoc,
   where,
   type DocumentData,
+  type DocumentReference,
   type Firestore,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
@@ -40,6 +41,14 @@ import { obtenerIdDispositivo } from "./dispositivo.js";
 
 const TAMANO_PAGINA = 20; // mismo valor que FirestoreAdminRepository.listarAuditoria
 
+// Issue #41: un rechazo del servidor (p.ej. conflicto de `version`,
+// infra/firestore.rules:85-88) ya no se abandona en silencio. Se reintenta
+// con backoff exponencial y, agotados los intentos, se expone vía
+// `observarEscriturasConError` con un botón de reintento manual — nunca se
+// pierde el conteo sin que el cajero pueda notarlo (principio rector README).
+const MAX_REINTENTOS = 3;
+const RETRASO_BASE_MS = 1000;
+
 /** Desacopla el repositorio de `firebase/auth`: quien lo construye resuelve
  *  el usuario activo (apps/web lo hace con `getAuth().currentUser`). */
 export interface ProveedorUsuarioActual {
@@ -50,6 +59,11 @@ export interface ProveedorUsuarioActual {
 export class FirestoreConteoRepository implements ConteoRepository {
   private readonly pendientesPorSesion = new Map<string, number>();
   private readonly listenersPendientes = new Map<string, Set<(n: number) => void>>();
+  private readonly fallidosPorSesion = new Map<
+    string,
+    Map<string, { ref: DocumentReference; datos: DocumentData }>
+  >();
+  private readonly listenersError = new Map<string, Set<(n: number) => void>>();
 
   constructor(
     private readonly db: Firestore,
@@ -198,6 +212,14 @@ export class FirestoreConteoRepository implements ConteoRepository {
 
     const uid = this.usuario.obtenerUid();
     const ref = doc(this.db, "sesiones", sesionId, "lineas", categoriaId, "aportes", uid);
+    const datos = {
+      uid,
+      nombre: this.usuario.obtenerNombre() ?? "",
+      cantidad,
+      registradoEn: serverTimestamp(),
+      dispositivoId: obtenerIdDispositivo(),
+      version: increment(1),
+    };
 
     this.incrementarPendientes(sesionId);
 
@@ -206,31 +228,41 @@ export class FirestoreConteoRepository implements ConteoRepository {
     // colgada. El listener local (observarMiAporte/observarLineas) ya
     // actualizó la pantalla desde la caché de Firestore. NO reemplazar por
     // `await` — rompe el conteo offline (RF-16 / doc 06 §3).
-    //
-    // Éxito vs RECHAZO del servidor (p.ej. permission-denied por conflicto
-    // de `version` o por violar `hasOnly`): un rechazo no se reintenta
-    // solo, así que NO debe decrementar el pendiente ni apagar el banner
-    // "no cierres la aplicación" — el aporte quedaría perdido en silencio.
-    // Un fallo de red puro nunca cae en la rama de rechazo: la promesa
-    // simplemente no resuelve (ver arriba), así que sigue contando como
-    // pendiente igual que antes.
+    this.intentarEscritura(sesionId, categoriaId, ref, datos, 0);
+  }
+
+  /**
+   * Issue #41: un solo `datos` (con el `increment(1)` ya congelado) se
+   * reutiliza en cada reintento — un rechazo significa que Firestore no
+   * aplicó nada, así que reenviar el mismo incremento es seguro (no hay
+   * doble-conteo). Agotado `MAX_REINTENTOS`, se rinde vía `registrarFallo`
+   * en vez de perder el aporte en silencio.
+   */
+  private intentarEscritura(
+    sesionId: string,
+    categoriaId: string,
+    ref: DocumentReference,
+    datos: DocumentData,
+    intento: number,
+  ): void {
     void setDoc(
       ref,
-      {
-        uid,
-        nombre: this.usuario.obtenerNombre() ?? "",
-        cantidad,
-        registradoEn: serverTimestamp(),
-        dispositivoId: obtenerIdDispositivo(),
-        version: increment(1),
-      },
+      datos,
       { merge: true }, // NUNCA un set() de reemplazo total: rompe increment() (doc 09 §3)
     ).then(
-      () => this.decrementarPendientes(sesionId),
       () => {
-        // Rechazo del servidor: el aporte se perdió y NO se reintenta.
-        // Deliberadamente no se decrementa: el pendiente activo mantiene
-        // visible el banner de sincronización (doc 07 §8).
+        this.limpiarFallo(sesionId, categoriaId);
+        this.decrementarPendientes(sesionId);
+      },
+      () => {
+        if (intento < MAX_REINTENTOS) {
+          setTimeout(
+            () => this.intentarEscritura(sesionId, categoriaId, ref, datos, intento + 1),
+            RETRASO_BASE_MS * 2 ** intento,
+          );
+          return;
+        }
+        this.registrarFallo(sesionId, categoriaId, ref, datos);
       },
     );
   }
@@ -259,6 +291,57 @@ export class FirestoreConteoRepository implements ConteoRepository {
     listeners.add(onChange);
     onChange(this.pendientesPorSesion.get(sesionId) ?? 0);
     return () => listeners.delete(onChange);
+  }
+
+  observarEscriturasConError(sesionId: string, onChange: (n: number) => void): Unsubscribe {
+    let listeners = this.listenersError.get(sesionId);
+    if (!listeners) {
+      listeners = new Set();
+      this.listenersError.set(sesionId, listeners);
+    }
+    listeners.add(onChange);
+    onChange(this.fallidosPorSesion.get(sesionId)?.size ?? 0);
+    return () => listeners.delete(onChange);
+  }
+
+  reintentarEscriturasFallidas(sesionId: string): void {
+    const fallidos = this.fallidosPorSesion.get(sesionId);
+    if (!fallidos) return;
+
+    // Se limpian ANTES de reintentar: si vuelven a fallar, `registrarFallo`
+    // las repone. No se llama `incrementarPendientes` — el pendiente ya
+    // estaba contado desde el intento original, nunca se decrementó.
+    for (const [categoriaId, { ref, datos }] of fallidos) {
+      fallidos.delete(categoriaId);
+      this.intentarEscritura(sesionId, categoriaId, ref, datos, 0);
+    }
+    this.notificarError(sesionId);
+  }
+
+  private registrarFallo(
+    sesionId: string,
+    categoriaId: string,
+    ref: DocumentReference,
+    datos: DocumentData,
+  ): void {
+    let fallidos = this.fallidosPorSesion.get(sesionId);
+    if (!fallidos) {
+      fallidos = new Map();
+      this.fallidosPorSesion.set(sesionId, fallidos);
+    }
+    fallidos.set(categoriaId, { ref, datos });
+    this.notificarError(sesionId);
+  }
+
+  private limpiarFallo(sesionId: string, categoriaId: string): void {
+    const fallidos = this.fallidosPorSesion.get(sesionId);
+    if (!fallidos?.delete(categoriaId)) return; // no-op si no había fallo (camino normal de éxito)
+    this.notificarError(sesionId);
+  }
+
+  private notificarError(sesionId: string): void {
+    const n = this.fallidosPorSesion.get(sesionId)?.size ?? 0;
+    this.listenersError.get(sesionId)?.forEach((cb) => cb(n));
   }
 
   private incrementarPendientes(sesionId: string): void {

@@ -266,4 +266,83 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
 
     expect(pagina.items).toEqual([]);
   });
+
+  describe("issue #41 — reintento con backoff y fallo expuesto", () => {
+    it("mientras queden rechazos sembrados por debajo de MAX_REINTENTOS, no marca error y termina sincronizando", async () => {
+      vi.useFakeTimers();
+      try {
+        const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+        repo.sembrarLinea("ses_1", crearLinea());
+        repo.sembrarRechazosAporte("ses_1", "cat_5000", 2); // menos que MAX_REINTENTOS (3)
+
+        const pendientes: number[] = [];
+        const errores: number[] = [];
+        repo.observarEscriturasPendientes("ses_1", (n) => pendientes.push(n));
+        repo.observarEscriturasConError("ses_1", (n) => errores.push(n));
+
+        await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+        expect(pendientes.at(-1)).toBe(1);
+
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(errores.at(-1)).toBe(0);
+        expect(pendientes.at(-1)).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("al agotar MAX_REINTENTOS rechazos sembrados, marca fallo permanente sin decrementar pendientes", async () => {
+      vi.useFakeTimers();
+      try {
+        const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+        repo.sembrarLinea("ses_1", crearLinea());
+        repo.sembrarRechazosAporte("ses_1", "cat_5000", 10); // más que suficientes para agotar
+
+        const pendientes: number[] = [];
+        const errores: number[] = [];
+        repo.observarEscriturasPendientes("ses_1", (n) => pendientes.push(n));
+        repo.observarEscriturasConError("ses_1", (n) => errores.push(n));
+
+        await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(errores.at(-1)).toBe(1);
+        expect(pendientes.at(-1)).toBe(1); // nunca se pierde en silencio
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("reintentarEscriturasFallidas limpia el error y reintenta; si ya no quedan rechazos sembrados, termina en éxito", async () => {
+      vi.useFakeTimers();
+      try {
+        const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+        repo.sembrarLinea("ses_1", crearLinea());
+        // Exactamente MAX_REINTENTOS + 1 (4): agota los intentos automáticos
+        // (intentos 0..3) una sola vez y no deja rechazos sembrados para el
+        // reintento manual, que por eso debe terminar en éxito.
+        repo.sembrarRechazosAporte("ses_1", "cat_5000", 4);
+
+        const pendientes: number[] = [];
+        const errores: number[] = [];
+        repo.observarEscriturasPendientes("ses_1", (n) => pendientes.push(n));
+        repo.observarEscriturasConError("ses_1", (n) => errores.push(n));
+
+        await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(errores.at(-1)).toBe(1);
+
+        repo.reintentarEscriturasFallidas("ses_1");
+        expect(errores.at(-1)).toBe(0); // se limpia de inmediato
+
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(errores.at(-1)).toBe(0);
+        expect(pendientes.at(-1)).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
 });

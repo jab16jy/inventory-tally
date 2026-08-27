@@ -16,6 +16,12 @@ import type {
 
 const TAMANO_PAGINA_AUDITORIA = 20; // mismo valor que FakeAdminRepository (constante en producción)
 
+// Issue #41: misma máquina de estados que FirestoreConteoRepository
+// (reintento con backoff, fallo permanente expuesto tras agotar intentos).
+// Duplicar la constante aquí es aceptable — son 2 números, no vale la pena
+// una abstracción compartida entre paquete `data`/`firebase` y este fake.
+const MAX_REINTENTOS = 3;
+
 export interface UsuarioFake {
   readonly uid: string;
   readonly nombre: string;
@@ -42,11 +48,18 @@ export class FakeConteoRepository implements ConteoRepository {
   private readonly pendientesPorSesion = new Map<string, number>();
   private readonly auditoria: EventoAuditoria[] = [];
 
+  // Issue #41: seam de prueba para simular rechazos deterministas del
+  // "servidor" — cuenta cuántos rechazos consecutivos quedan por consumir
+  // para la (sesionId, categoriaId) sembrada.
+  private readonly rechazosPendientes = new Map<string, number>();
+  private readonly fallidosPorSesion = new Map<string, Set<string>>();
+
   private readonly listenersLineas = new Map<string, Set<(l: LineaConteo[]) => void>>();
   private readonly listenersAporte = new Map<string, Set<(a: Aporte | null) => void>>();
   private readonly listenersSesion = new Map<string, Set<(s: SesionConteo | null) => void>>();
   private readonly listenersSesionPorId = new Map<string, Set<(s: SesionConteo | null) => void>>();
   private readonly listenersPendientes = new Map<string, Set<(n: number) => void>>();
+  private readonly listenersError = new Map<string, Set<(n: number) => void>>();
 
   constructor(
     usuario: UsuarioFake = { uid: "uid_test", nombre: "Cajero de prueba" },
@@ -82,6 +95,13 @@ export class FakeConteoRepository implements ConteoRepository {
 
   sembrarAuditoria(evento: EventoAuditoria): void {
     this.auditoria.push(evento);
+  }
+
+  /** Hace que las próximas `veces` "escrituras" de esa (sesionId, categoriaId)
+   *  rechacen, antes de que el fake decida éxito o fallo permanente. */
+  sembrarRechazosAporte(sesionId: string, categoriaId: string, veces: number): void {
+    const clave = `${sesionId}/${categoriaId}`;
+    this.rechazosPendientes.set(clave, (this.rechazosPendientes.get(clave) ?? 0) + veces);
   }
 
   // ─────────── ConteoRepository ───────────
@@ -190,7 +210,7 @@ export class FakeConteoRepository implements ConteoRepository {
     // contrato observable que FirestoreConteoRepository.registrarAporte: la
     // promesa devuelta NO espera a que baje el contador de pendientes.
     this.incrementarPendientes(sesionId);
-    setTimeout(() => this.decrementarPendientes(sesionId), this.retrasoSincronizacionMs);
+    this.intentarSincronizar(sesionId, categoriaId, 0);
   }
 
   async confirmarSincronizacion(sesionId: string): Promise<void> {
@@ -204,6 +224,24 @@ export class FakeConteoRepository implements ConteoRepository {
     listeners.add(onChange);
     onChange(this.pendientesPorSesion.get(sesionId) ?? 0);
     return () => listeners.delete(onChange);
+  }
+
+  observarEscriturasConError(sesionId: string, onChange: (n: number) => void): Unsubscribe {
+    const listeners = this.listenersDe(this.listenersError, sesionId);
+    listeners.add(onChange);
+    onChange(this.fallidosPorSesion.get(sesionId)?.size ?? 0);
+    return () => listeners.delete(onChange);
+  }
+
+  reintentarEscriturasFallidas(sesionId: string): void {
+    const fallidos = this.fallidosPorSesion.get(sesionId);
+    if (!fallidos) return;
+
+    for (const categoriaId of fallidos) {
+      fallidos.delete(categoriaId);
+      this.intentarSincronizar(sesionId, categoriaId, 0);
+    }
+    this.notificar(this.listenersError, sesionId, fallidos.size);
   }
 
   uidActual(): string {
@@ -258,5 +296,45 @@ export class FakeConteoRepository implements ConteoRepository {
     const n = Math.max(0, (this.pendientesPorSesion.get(sesionId) ?? 0) - 1);
     this.pendientesPorSesion.set(sesionId, n);
     this.notificar(this.listenersPendientes, sesionId, n);
+  }
+
+  /**
+   * Issue #41: réplica de la máquina de estados de
+   * FirestoreConteoRepository.intentarEscritura, sin temporizadores reales
+   * de backoff (ponytail: los tests de UI no dependen de timing exacto) —
+   * un rechazo sembrado se resuelve en el siguiente microtask.
+   */
+  private intentarSincronizar(sesionId: string, categoriaId: string, intento: number): void {
+    const clave = `${sesionId}/${categoriaId}`;
+    const rechazos = this.rechazosPendientes.get(clave) ?? 0;
+
+    if (rechazos > 0) {
+      this.rechazosPendientes.set(clave, rechazos - 1);
+      if (intento < MAX_REINTENTOS) {
+        void Promise.resolve().then(() =>
+          this.intentarSincronizar(sesionId, categoriaId, intento + 1),
+        );
+        return;
+      }
+      this.registrarFallo(sesionId, categoriaId);
+      return;
+    }
+
+    setTimeout(() => {
+      this.limpiarFallo(sesionId, categoriaId);
+      this.decrementarPendientes(sesionId);
+    }, this.retrasoSincronizacionMs);
+  }
+
+  private registrarFallo(sesionId: string, categoriaId: string): void {
+    const fallidos = this.listenersDe(this.fallidosPorSesion, sesionId);
+    fallidos.add(categoriaId);
+    this.notificar(this.listenersError, sesionId, fallidos.size);
+  }
+
+  private limpiarFallo(sesionId: string, categoriaId: string): void {
+    const fallidos = this.fallidosPorSesion.get(sesionId);
+    if (!fallidos?.delete(categoriaId)) return; // no-op si no había fallo
+    this.notificar(this.listenersError, sesionId, fallidos.size);
   }
 }
