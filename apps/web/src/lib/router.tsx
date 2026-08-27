@@ -123,7 +123,7 @@ export function AppRouter(): ReactNode {
           path="/conteo/:sesionId/finalizar"
           element={
             <RequireAuth>
-              <FinalizarScreen />
+              <FinalizarScreen onSalir={() => signOut(auth)} />
             </RequireAuth>
           }
         />

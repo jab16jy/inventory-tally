@@ -25,12 +25,15 @@ function lineaBase(
   };
 }
 
-function renderPantalla(repo: FakeConteoRepository, sesionId = "ses_1") {
+function renderPantalla(repo: FakeConteoRepository, sesionId = "ses_1", onSalir = vi.fn()) {
   return render(
     <MemoryRouter initialEntries={[`/conteo/${sesionId}/finalizar`]}>
       <ConteoRepositoryProvider repo={repo}>
         <Routes>
-          <Route path="/conteo/:sesionId/finalizar" element={<FinalizarScreen />} />
+          <Route
+            path="/conteo/:sesionId/finalizar"
+            element={<FinalizarScreen onSalir={onSalir} />}
+          />
           <Route path="/sucursales" element={<p>Pantalla de sucursales</p>} />
         </Routes>
       </ConteoRepositoryProvider>
@@ -85,6 +88,17 @@ describe("FinalizarScreen (F3-B, doc 11 §6)", () => {
 
     expect(espia).toHaveBeenCalledWith("ses_1");
     expect(await screen.findByText("Pantalla de sucursales")).toBeInTheDocument();
+  });
+
+  it("ofrece un control de salida en la cabecera, distinto de 'Confirmar y salir'", () => {
+    const onSalir = vi.fn();
+    renderPantalla(new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" }), "ses_1", onSalir);
+
+    const boton = screen.getByRole("button", { name: /^salir$/i });
+    expect(screen.queryByRole("button", { name: /cerrar sesión/i })).not.toBeInTheDocument();
+
+    fireEvent.click(boton);
+    expect(onSalir).toHaveBeenCalledTimes(1);
   });
 
   it("si la confirmación falla, NO saca al cajero de la sesión y lo dice", async () => {

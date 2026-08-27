@@ -18,9 +18,18 @@ import { estaPendiente } from "@conteo/shared";
 import { useConteoRepository } from "../state/repositorio-contexto.js";
 import { useLineasSesion } from "../state/useLineasSesion.js";
 import { usePendientes } from "../state/usePendientes.js";
+import { CabeceraCajero } from "./CabeceraCajero.js";
 import { Icono } from "./primitivos/Icono.js";
 
-export function FinalizarScreen() {
+export interface FinalizarScreenProps {
+  // issue #40: "Salir" (variante A, decidida vía /prototype) entra por prop,
+  // igual que en SucursalesScreen/PrepararScreen/AdminLayout. Distinto de
+  // "Confirmar y salir": ese botón exige listo === true; éste sale sin
+  // confirmar nada, para el cajero que entró por error o quiere volver luego.
+  readonly onSalir: () => void | Promise<void>;
+}
+
+export function FinalizarScreen({ onSalir }: FinalizarScreenProps) {
   const { sesionId = "" } = useParams<{ sesionId: string }>();
   const repo = useConteoRepository();
   const navigate = useNavigate();
@@ -64,9 +73,7 @@ export function FinalizarScreen() {
           tres pantallas del recorrido comparten patrón para que el cajero no
           reaprenda la jerarquía en cada paso. El contenido —cuánto contó y
           si ya se envió todo— es lo que debe pesar aquí. */}
-      <header className="pb-4">
-        <h1 className="text-micro tracking-[0.18em] text-tenue uppercase">Finalizar tu conteo</h1>
-      </header>
+      <CabeceraCajero titulo="Finalizar tu conteo" onSalir={onSalir} />
 
       <p className="text-base text-tinta">
         Contaste {contadas} {contadas === 1 ? "categoría" : "categorías"}.
