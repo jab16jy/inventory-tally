@@ -98,6 +98,7 @@ jobs:
           distribution: temurin
           java-version: "17"
       - run: npm ci
+      - run: npm run typecheck --workspace packages/functions
       - run: npm run test --workspace packages/functions
 
   # Regla de oro (doc 12 §2): las Security Rules no se despliegan si sus tests
