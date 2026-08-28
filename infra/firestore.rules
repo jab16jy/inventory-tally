@@ -47,6 +47,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ─────────── catálogo de áreas ───────────
+    match /areas/{areaId} {
+      allow read:  if autenticado();
+      allow write: if false;
+    }
+
     // ─────────── sesiones ───────────
     match /sesiones/{sesionId} {
       allow read:  if autenticado() && tieneSucursal(resource.data.sucursalId);
