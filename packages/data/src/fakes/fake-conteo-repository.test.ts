@@ -1,19 +1,9 @@
 import { CantidadInvalidaError } from "@conteo/shared/errors.js";
-import type { EventoAuditoria } from "@conteo/shared/models/evento-auditoria.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import { describe, expect, it, vi } from "vitest";
 import { FakeConteoRepository } from "./fake-conteo-repository.js";
-
-function crearEvento(overrides: Partial<EventoAuditoria> = {}): EventoAuditoria {
-  return {
-    eventoId: "e1",
-    tipo: "APORTE_CREADO",
-    ocurridoEn: new Date("2026-08-02T08:00:00Z"),
-    ...overrides,
-  };
-}
 
 function crearLinea(overrides: Partial<LineaConteo> = {}): LineaConteo {
   return {
@@ -235,30 +225,6 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
     expect(repo.uidActual()).toBe("uid_ana");
   });
 
-  it("listarAuditoria (ticket #45) devuelve sólo eventos de las sucursalIds pedidas, ordenados desc por ocurridoEn", async () => {
-    const repo = new FakeConteoRepository();
-    repo.sembrarAuditoria(
-      crearEvento({
-        eventoId: "e_norte_viejo",
-        sucursalId: "suc_norte",
-        ocurridoEn: new Date("2026-01-01T00:00:00Z"),
-      }),
-    );
-    repo.sembrarAuditoria(
-      crearEvento({
-        eventoId: "e_norte_nuevo",
-        sucursalId: "suc_norte",
-        ocurridoEn: new Date("2026-06-01T00:00:00Z"),
-      }),
-    );
-    repo.sembrarAuditoria(crearEvento({ eventoId: "e_sur", sucursalId: "suc_sur" }));
-
-    const pagina = await repo.listarAuditoria(["suc_norte"]);
-
-    expect(pagina.items.map((e) => e.eventoId)).toEqual(["e_norte_nuevo", "e_norte_viejo"]);
-    expect(pagina.siguienteCursor).toBeNull();
-  });
-
   it("listarMisSesiones devuelve sólo sesiones donde el uid participó y la sucursal está en la lista", async () => {
     const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
     repo.sembrarSesion(
@@ -332,15 +298,6 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
     const pagina = await repo.listarMisSesiones([]);
 
     expect(pagina).toEqual({ items: [], siguienteCursor: null });
-  });
-
-  it("listarAuditoria omite eventos sin sucursalId (los 6 tipos que no lo llevan)", async () => {
-    const repo = new FakeConteoRepository();
-    repo.sembrarAuditoria(crearEvento({ eventoId: "e_sin_sucursal", tipo: "USUARIO_CREADO" }));
-
-    const pagina = await repo.listarAuditoria(["suc_norte"]);
-
-    expect(pagina.items).toEqual([]);
   });
 
   describe("issue #41 — reintento con backoff y fallo expuesto", () => {

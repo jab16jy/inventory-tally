@@ -4,7 +4,6 @@
 // `ImportMeta.env` de Vite — innecesario aquí y fuera del alcance de esta
 // ola tocar `packages/shared` para exponerlo en este programa de TS.
 import type { Aporte } from "@conteo/shared/models/aporte.js";
-import type { EventoAuditoria } from "@conteo/shared/models/evento-auditoria.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
@@ -60,24 +59,11 @@ export interface ConteoRepository {
   ): Unsubscribe;
 
   /**
-   * Audita SÓLO las `sucursalesAsignadas` del cajero activo (ticket #45, D1)
-   * — `sucursalIds` entra por parámetro por la misma razón que
-   * `observarSucursales`: la fuente real es el claim
-   * `request.auth.token.sucursales`, y este repositorio está deliberadamente
-   * desacoplado de `firebase/auth`. Máx. 30 valores (límite de Firestore
-   * para `where(..., "in", ...)`); un cajero no tiene tantas sucursales.
-   */
-  listarAuditoria(
-    sucursalIds: readonly string[],
-    cursor?: unknown,
-  ): Promise<Pagina<EventoAuditoria>>;
-
-  /**
    * Sesiones en las que participó el cajero activo, de la más reciente a la
    * más antigua. El uid NO entra por parámetro: sale de `uidActual()`, igual
    * que en `observarMiAporte` — cada implementación ya conoce su propio
    * usuario. `sucursalIds` SÍ entra por parámetro, por la misma razón que en
-   * `observarSucursales`/`listarAuditoria`: la fuente real es el claim
+   * `observarSucursales`: la fuente real es el claim
    * `request.auth.token.sucursales` y este repositorio está deliberadamente
    * desacoplado de `firebase/auth`.
    *
