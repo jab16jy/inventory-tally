@@ -12,11 +12,42 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-// D1: sólo para construir el sentinel FieldValue.increment() en el test
-// afirmativo — el mismo cliente compat que ya usa @firebase/rules-unit-testing
-// internamente (ver su public_types/index.d.ts).
-import firebase from "firebase/compat/app";
-import "firebase/compat/firestore";
+// SÓLO tipos. El sentinel de D1 NO se construye desde este import — ver
+// `incremento()` más abajo (issue #47).
+import type firebase from "firebase/compat/app";
+
+/** Namespace compat que cuelga de la app viva; ver `incremento()`. */
+interface NamespaceCompat {
+  readonly firestore: {
+    readonly FieldValue: { increment(n: number): firebase.firestore.FieldValue };
+  };
+}
+
+/**
+ * Sentinel `FieldValue.increment()` para el test afirmativo de D1,
+ * construido desde el namespace compat de la PROPIA instancia de prueba
+ * (`db.app.firebase`) y no desde un `import` de "firebase/compat/app"
+ * (issue #47).
+ *
+ * El motivo está comprobado con sonda, no supuesto: bajo Vitest conviven dos
+ * namespaces compat distintos — el que carga `@firebase/rules-unit-testing` y
+ * el que resuelve un `import` de este archivo. Cada uno trae su propia clase
+ * interna para el sentinel de incremento, así que el del `import` falla el
+ * `instanceof` del validador de datos del cliente y `update()` lo rechaza
+ * como "objeto custom" ANTES de que la escritura salga a la red: el test
+ * fallaba sin que las reglas se evaluaran NUNCA, que es justo lo que venía a
+ * probar. Con el namespace de la instancia viva la escritura sí llega a las
+ * reglas.
+ *
+ * ponytail: se lee `db.app.firebase` en vez de deduplicar la resolución por
+ * configuración de Vitest porque no hay dos copias de `firebase` en disco
+ * (pnpm resuelve una sola) — son dos bundles autocontenidos del mismo
+ * paquete, y `resolve.dedupe` no los une.
+ */
+function incremento(db: firebase.firestore.Firestore, n: number): firebase.firestore.FieldValue {
+  const ns = (db.app as unknown as { readonly firebase: NamespaceCompat }).firebase;
+  return ns.firestore.FieldValue.increment(n);
+}
 
 let testEnv: RulesTestEnvironment;
 
@@ -263,11 +294,11 @@ describe("D1 · version obligatoria y monótona en aportes", () => {
     // error" al comparar ese campo — sin relación con el resto de la regla.
     // Por eso este test usa update(); el cliente debe escribir version con
     // update() o set({merge:true}), nunca con un set() de reemplazo total.
+    const db = cajero("uid_ana", ["suc_norte"]).firestore();
     await assertSucceeds(
-      cajero("uid_ana", ["suc_norte"])
-        .firestore()
+      db
         .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana")
-        .update({ cantidad: 50, version: firebase.firestore.FieldValue.increment(1) }),
+        .update({ cantidad: 50, version: incremento(db, 1) }),
     );
   });
 });
