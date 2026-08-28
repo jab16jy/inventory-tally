@@ -20,19 +20,30 @@ export async function crearAreaImpl(
   ejecutadoPor: string,
   input: CrearAreaInput,
 ): Promise<{ areaId: string; creada: true }> {
-  const duplicadas = await db
+  const duplicadas = db
     .collection("areas")
     .where("nombre", "==", input.nombre)
     .where("activa", "==", true)
-    .limit(1)
-    .get();
-  if (!duplicadas.empty) {
-    throw new HttpsError("already-exists", "Ya existe un área activa con ese nombre");
-  }
+    .limit(1);
 
   const areaRef = db.collection("areas").doc();
 
   await db.runTransaction(async (tx) => {
+    // La consulta va DENTRO de la transacción, y con `tx.get`, no antes con
+    // un `.get()` suelto: Firestore sólo detecta conflicto sobre lo que se
+    // lee dentro: eso es lo que forma el read set. Con la comprobación
+    // afuera, el cuerpo de la transacción no leía nada, así que dos llamadas
+    // concurrentes con el mismo nombre veían las dos `empty` y creaban las
+    // dos — justo la fusión silenciosa de totales que esta guarda existe
+    // para impedir. `tx.create` tampoco lo atrapaba: `areaRef` es un id
+    // aleatorio recién generado, nunca colisiona.
+    //
+    // Las lecturas van antes que las escrituras porque Firestore lo exige
+    // dentro de una transacción, no por estilo.
+    if (!(await tx.get(duplicadas)).empty) {
+      throw new HttpsError("already-exists", "Ya existe un área activa con ese nombre");
+    }
+
     tx.create(areaRef, {
       nombre: input.nombre,
       activa: true,
