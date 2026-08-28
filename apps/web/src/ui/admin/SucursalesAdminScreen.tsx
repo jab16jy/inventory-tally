@@ -101,6 +101,22 @@ export function SucursalesAdminScreen() {
     }
   }
 
+  async function abrirConteo(sucursal: Sucursal): Promise<void> {
+    setErrorAccion(null);
+    try {
+      await repo.abrirSesion({ sucursalId: sucursal.sucursalId });
+      setAviso(`Conteo abierto en ${sucursal.nombre}.`);
+    } catch (error) {
+      // Cubre la carrera en la que ya se abrió un conteo entre que se pintó
+      // la fila y se hizo click (mismo patrón que alternarActiva).
+      if (error instanceof FirebaseError && error.code === "functions/failed-precondition") {
+        setErrorAccion(`Ya existe un conteo abierto en ${sucursal.nombre}.`);
+      } else {
+        setErrorAccion(`No se pudo abrir el conteo en ${sucursal.nombre}. Intenta de nuevo.`);
+      }
+    }
+  }
+
   const columnas: ColumnaTabla<Sucursal>[] = [
     { clave: "nombre", etiqueta: "Nombre", render: (s) => s.nombre, valorOrden: (s) => s.nombre },
     {
@@ -140,6 +156,12 @@ export function SucursalesAdminScreen() {
       etiqueta: "Acciones",
       render: (s) => {
         const bloqueaDesactivar = s.activa && s.sesionAbiertaId !== null;
+        const bloqueaAbrirConteo = !s.activa || s.sesionAbiertaId !== null;
+        const tituloAbrirConteo = !s.activa
+          ? "Activa la sucursal primero"
+          : s.sesionAbiertaId !== null
+            ? "Ya hay un conteo abierto en esta sucursal"
+            : undefined;
         return (
           <div className="flex items-center gap-2">
             <button
@@ -157,6 +179,15 @@ export function SucursalesAdminScreen() {
               className="rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-senal hover:text-senal disabled:cursor-not-allowed disabled:text-tenue disabled:opacity-40 disabled:hover:border-borde disabled:hover:text-tenue"
             >
               {s.activa ? "Desactivar" : "Activar"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void abrirConteo(s)}
+              disabled={bloqueaAbrirConteo}
+              title={tituloAbrirConteo}
+              className="rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-senal hover:text-senal disabled:cursor-not-allowed disabled:text-tenue disabled:opacity-40 disabled:hover:border-borde disabled:hover:text-tenue"
+            >
+              Abrir conteo
             </button>
           </div>
         );

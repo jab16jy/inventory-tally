@@ -2,8 +2,9 @@
 // (docs/plan-panel-administrador.md §5, fase F2)
 import { FakeAdminRepository } from "@conteo/data";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
+import { FirebaseError } from "firebase/app";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AdminRepositoryProvider } from "../../state/admin-contexto.js";
 import { SucursalesAdminScreen } from "./SucursalesAdminScreen.js";
 
@@ -102,5 +103,66 @@ describe("SucursalesAdminScreen (F2)", () => {
         payload: { nombre: "Sucursal Sur", direccion: "Cra 8 # 12-4", conectividad: "wifi" },
       },
     ]);
+  });
+
+  it("abre un conteo al hacer click en Abrir conteo", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSucursal(
+      sucursalBase({ sucursalId: "suc_norte", nombre: "Norte", sesionAbiertaId: null }),
+    );
+
+    renderPantalla(repo);
+
+    const fila = screen.getByText("Norte").closest("tr")!;
+    const boton = within(fila).getByRole("button", { name: /abrir conteo/i });
+    expect(boton).toBeEnabled();
+
+    fireEvent.click(boton);
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/conteo abierto en norte/i);
+    expect(repo.llamadas).toEqual([{ metodo: "abrirSesion", payload: { sucursalId: "suc_norte" } }]);
+  });
+
+  it("deshabilita Abrir conteo si la sucursal está inactiva", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSucursal(
+      sucursalBase({ sucursalId: "suc_norte", nombre: "Norte", activa: false, sesionAbiertaId: null }),
+    );
+
+    renderPantalla(repo);
+
+    const fila = screen.getByText("Norte").closest("tr")!;
+    expect(within(fila).getByRole("button", { name: /abrir conteo/i })).toBeDisabled();
+  });
+
+  it("deshabilita Abrir conteo si ya hay una sesión abierta", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSucursal(
+      sucursalBase({ sucursalId: "suc_norte", nombre: "Norte", sesionAbiertaId: "ses_norte" }),
+    );
+
+    renderPantalla(repo);
+
+    const fila = screen.getByText("Norte").closest("tr")!;
+    expect(within(fila).getByRole("button", { name: /abrir conteo/i })).toBeDisabled();
+  });
+
+  it("muestra un error específico si ya se abrió un conteo por otra vía", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSucursal(
+      sucursalBase({ sucursalId: "suc_norte", nombre: "Norte", sesionAbiertaId: null }),
+    );
+    repo.abrirSesion = vi
+      .fn()
+      .mockRejectedValue(new FirebaseError("functions/failed-precondition", "ya hay sesión"));
+
+    renderPantalla(repo);
+
+    const fila = screen.getByText("Norte").closest("tr")!;
+    fireEvent.click(within(fila).getByRole("button", { name: /abrir conteo/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /ya existe un conteo abierto en norte/i,
+    );
   });
 });
