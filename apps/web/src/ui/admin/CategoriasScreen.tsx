@@ -27,11 +27,22 @@ function useSucursales(): Sucursal[] {
 
 // Mismo patrón que useSucursales de arriba: se necesita tanto en la tabla
 // (resolver areaId → nombre) como en el formulario (poblar el <select>).
-function useAreas(): Area[] {
+// Trackea `cargando` igual que useCategorias de abajo y que el useAreas() de
+// AreasScreen.tsx: sin esto, la tabla se pinta con datos ("Sin área" para
+// toda fila) antes de que observarAreas resuelva (issue #52).
+function useAreas(): { areas: Area[]; cargando: boolean } {
   const repo = useAdminRepository();
   const [areas, setAreas] = useState<Area[]>([]);
-  useEffect(() => repo.observarAreas(setAreas), [repo]);
-  return areas;
+  const [cargando, setCargando] = useState(true);
+  useEffect(
+    () =>
+      repo.observarAreas((a) => {
+        setAreas(a);
+        setCargando(false);
+      }),
+    [repo],
+  );
+  return { areas, cargando };
 }
 
 function useCategorias(): { categorias: CategoriaValor[]; cargando: boolean } {
@@ -51,8 +62,9 @@ function useCategorias(): { categorias: CategoriaValor[]; cargando: boolean } {
 
 export function CategoriasScreen() {
   const repo = useAdminRepository();
-  const { categorias, cargando } = useCategorias();
-  const areas = useAreas();
+  const { categorias, cargando: cargandoCategorias } = useCategorias();
+  const { areas, cargando: cargandoAreas } = useAreas();
+  const cargando = cargandoCategorias || cargandoAreas;
 
   const [formularioAbierto, setFormularioAbierto] = useState(false);
   const [errorFormulario, setErrorFormulario] = useState<string | null>(null);
@@ -179,7 +191,7 @@ function FormularioCategoria({ error, onCancelar, onCrear }: FormularioCategoria
   // activa=true, así que ofrecer una inactiva aquí crearía una categoría
   // que se ve "con área" en esta pantalla pero cae a "Sin área" al abrir
   // la próxima sesión.
-  const areas = useAreas().filter((a) => a.activa);
+  const areas = useAreas().areas.filter((a) => a.activa);
   const [etiqueta, setEtiqueta] = useState("");
   const [valor, setValor] = useState("");
   const [orden, setOrden] = useState("");

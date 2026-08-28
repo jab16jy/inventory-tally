@@ -84,6 +84,8 @@ beforeEach(async () => {
       .doc("categoriasValor/cat_5000")
       .set({ valor: 5000, etiqueta: "$5.000", activa: true, orden: 1 });
 
+    await db.doc("areas/area_1").set({ nombre: "Charcutería", activa: true });
+
     await db.doc("config/app").set({ versionMinima: "1.0.0" });
 
     await db.doc("sesiones/ses1").set({
@@ -181,6 +183,18 @@ describe("A-1 · líneas de sólo lectura para el cliente", () => {
   it("un cajero SÍ puede leer el catálogo de categorías", async () => {
     await assertSucceeds(
       cajero("uid_ana", ["suc_norte"]).firestore().doc("categoriasValor/cat_5000").get(),
+    );
+  });
+
+  it("un cajero NO puede escribir areas/{areaId}", async () => {
+    await assertFails(
+      cajero("uid_ana", ["suc_norte"]).firestore().doc("areas/area_1").update({ activa: false }),
+    );
+  });
+
+  it("un cajero SÍ puede leer el catálogo de áreas", async () => {
+    await assertSucceeds(
+      cajero("uid_ana", ["suc_norte"]).firestore().doc("areas/area_1").get(),
     );
   });
 });

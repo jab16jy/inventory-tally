@@ -196,4 +196,15 @@ describe("CategoriasScreen (F3)", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/no se pudo desactivar/i);
   });
+
+  it("sigue mostrando el esqueleto de carga mientras observarAreas no resuelve, aunque observarCategorias ya haya resuelto (issue #52)", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarCategoria(categoriaBase());
+    repo.observarAreas = vi.fn(() => () => {});
+
+    renderPantalla(repo);
+
+    expect(await screen.findAllByTestId("fila-esqueleto")).not.toHaveLength(0);
+    expect(screen.queryByText("$5.000")).not.toBeInTheDocument();
+  });
 });
