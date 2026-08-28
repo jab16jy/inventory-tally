@@ -60,4 +60,33 @@ describe("crearAreaImpl", () => {
       "Ya existe un área activa con ese nombre",
     );
   });
+
+  // El caso que el test secuencial de arriba NO puede cubrir: con la consulta
+  // de duplicados fuera de la transacción, las dos llamadas leían antes de que
+  // cualquiera escribiera, las dos veían `empty` y las dos creaban. La guarda
+  // fallaba justo en el escenario contra el que existe.
+  it("no deja crear dos áreas activas homónimas en llamadas concurrentes", async () => {
+    const datos = datosValidos();
+
+    const resultados = await Promise.allSettled([
+      crearAreaImpl(db, "uid_admin", datos),
+      crearAreaImpl(db, "uid_admin", datos),
+    ]);
+
+    // Se registran antes de afirmar nada: si la guarda fallara y se crearan
+    // las dos, el afterEach igual las limpia y el test siguiente no hereda
+    // basura.
+    for (const r of resultados) {
+      if (r.status === "fulfilled") areasCreadas.push(r.value.areaId);
+    }
+
+    expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+
+    const activas = await db
+      .collection("areas")
+      .where("nombre", "==", datos.nombre)
+      .where("activa", "==", true)
+      .get();
+    expect(activas.size).toBe(1);
+  });
 });
