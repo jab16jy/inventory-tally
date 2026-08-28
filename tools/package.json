@@ -12,6 +12,7 @@
     "borrar-prueba": "node --experimental-strip-types borrar-datos-prueba.ts",
     "sembrar-conteos": "node --experimental-strip-types sembrar-conteos-prueba.ts",
     "borrar-conteos": "node --experimental-strip-types borrar-conteos-prueba.ts",
+    "fijar-version-minima": "node --experimental-strip-types fijar-version-minima.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
