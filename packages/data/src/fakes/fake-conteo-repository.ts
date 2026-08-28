@@ -3,7 +3,6 @@
 // `apps/web` sin tocar el SDK de Firebase ni el emulador.
 import { CantidadInvalidaError } from "@conteo/shared/errors.js";
 import type { Aporte } from "@conteo/shared/models/aporte.js";
-import type { EventoAuditoria } from "@conteo/shared/models/evento-auditoria.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
@@ -46,7 +45,6 @@ export class FakeConteoRepository implements ConteoRepository {
   private readonly sesionesPorId = new Map<string, SesionConteo>();
   private readonly sucursales = new Map<string, Sucursal>();
   private readonly pendientesPorSesion = new Map<string, number>();
-  private readonly auditoria: EventoAuditoria[] = [];
 
   // Issue #41: seam de prueba para simular rechazos deterministas del
   // "servidor" — cuenta cuántos rechazos consecutivos quedan por consumir
@@ -91,10 +89,6 @@ export class FakeConteoRepository implements ConteoRepository {
 
   sembrarSucursal(sucursal: Sucursal): void {
     this.sucursales.set(sucursal.sucursalId, sucursal);
-  }
-
-  sembrarAuditoria(evento: EventoAuditoria): void {
-    this.auditoria.push(evento);
   }
 
   /** Hace que las próximas `veces` "escrituras" de esa (sesionId, categoriaId)
@@ -155,21 +149,6 @@ export class FakeConteoRepository implements ConteoRepository {
       .sort((a, b) => a.nombre.localeCompare(b.nombre) || a.sucursalId.localeCompare(b.sucursalId));
     onChange(encontradas);
     return () => {};
-  }
-
-  // Mismo contrato observable que FirestoreConteoRepository.listarAuditoria
-  // (ticket #45): sólo eventos cuyo sucursalId esté en `sucursalIds`.
-  async listarAuditoria(
-    sucursalIds: readonly string[],
-    cursor?: unknown,
-  ): Promise<Pagina<EventoAuditoria>> {
-    const filtrados = this.auditoria
-      .filter((e) => typeof e.sucursalId === "string" && sucursalIds.includes(e.sucursalId))
-      .sort((a, b) => b.ocurridoEn.getTime() - a.ocurridoEn.getTime());
-    const offset = typeof cursor === "number" ? cursor : 0;
-    const items = filtrados.slice(offset, offset + TAMANO_PAGINA);
-    const siguienteCursor = offset + items.length < filtrados.length ? offset + items.length : null;
-    return { items, siguienteCursor };
   }
 
   // Mismo contrato observable que FirestoreConteoRepository.listarMisSesiones:
