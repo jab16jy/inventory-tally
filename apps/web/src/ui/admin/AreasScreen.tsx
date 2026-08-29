@@ -5,6 +5,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 import type { Area } from "@conteo/shared/models/area.js";
 import type { CrearAreaPayload } from "@conteo/data";
 import { useAdminRepository } from "../../state/admin-contexto.js";
+import { Spinner } from "../primitivos/Spinner.js";
 import { Tabla, type ColumnaTabla } from "./Tabla.js";
 
 const CAMPO =
@@ -35,6 +36,9 @@ export function AreasScreen() {
   const [formularioAbierto, setFormularioAbierto] = useState(false);
   const [errorFormulario, setErrorFormulario] = useState<string | null>(null);
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
+  // areaId con desactivar en vuelo — deshabilita el botón de esa fila y
+  // muestra el spinner mientras la Cloud Function responde.
+  const [accionEnVueloId, setAccionEnVueloId] = useState<string | null>(null);
 
   async function crear(payload: CrearAreaPayload): Promise<void> {
     try {
@@ -48,10 +52,13 @@ export function AreasScreen() {
 
   async function desactivar(area: Area): Promise<void> {
     setErrorAccion(null);
+    setAccionEnVueloId(area.areaId);
     try {
       await repo.desactivarArea(area.areaId);
     } catch {
       setErrorAccion(`No se pudo desactivar ${area.nombre}. Intenta de nuevo.`);
+    } finally {
+      setAccionEnVueloId(null);
     }
   }
 
@@ -76,8 +83,10 @@ export function AreasScreen() {
           <button
             type="button"
             onClick={() => void desactivar(a)}
-            className="rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-riesgo hover:text-riesgo"
+            disabled={accionEnVueloId === a.areaId}
+            className="inline-flex items-center gap-1.5 rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-riesgo hover:text-riesgo disabled:cursor-not-allowed disabled:opacity-40"
           >
+            {accionEnVueloId === a.areaId && <Spinner className="size-3.5 shrink-0" />}
             Desactivar
           </button>
         ) : (
@@ -185,10 +194,11 @@ function FormularioArea({ error, onCancelar, onCrear }: FormularioAreaProps) {
           type="submit"
           disabled={enviando}
           className={
-            "rounded-placa px-4 py-2 text-micro font-semibold transition-colors duration-150 ease-out " +
+            "inline-flex items-center gap-1.5 rounded-placa px-4 py-2 text-micro font-semibold transition-colors duration-150 ease-out " +
             (enviando ? "bg-senal/40 text-fondo/70" : "bg-senal text-fondo hover:bg-senal/85")
           }
         >
+          {enviando && <Spinner className="size-3.5 shrink-0" />}
           Crear área
         </button>
         <button

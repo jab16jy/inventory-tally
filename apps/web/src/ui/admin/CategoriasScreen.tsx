@@ -10,6 +10,7 @@ import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import type { CrearCategoriaPayload } from "@conteo/data";
 import { moneda } from "../../lib/formato.js";
 import { useAdminRepository } from "../../state/admin-contexto.js";
+import { Spinner } from "../primitivos/Spinner.js";
 import { Tabla, type ColumnaTabla } from "./Tabla.js";
 
 const CAMPO =
@@ -69,6 +70,9 @@ export function CategoriasScreen() {
   const [formularioAbierto, setFormularioAbierto] = useState(false);
   const [errorFormulario, setErrorFormulario] = useState<string | null>(null);
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
+  // categoriaId con desactivar en vuelo — deshabilita el botón de esa fila y
+  // muestra el spinner mientras la Cloud Function responde.
+  const [accionEnVueloId, setAccionEnVueloId] = useState<string | null>(null);
 
   async function crear(payload: CrearCategoriaPayload): Promise<void> {
     try {
@@ -82,10 +86,13 @@ export function CategoriasScreen() {
 
   async function desactivar(categoria: CategoriaValor): Promise<void> {
     setErrorAccion(null);
+    setAccionEnVueloId(categoria.categoriaId);
     try {
       await repo.desactivarCategoria(categoria.categoriaId);
     } catch {
       setErrorAccion(`No se pudo desactivar ${categoria.etiqueta}. Intenta de nuevo.`);
+    } finally {
+      setAccionEnVueloId(null);
     }
   }
 
@@ -124,8 +131,10 @@ export function CategoriasScreen() {
           <button
             type="button"
             onClick={() => void desactivar(c)}
-            className="rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-riesgo hover:text-riesgo"
+            disabled={accionEnVueloId === c.categoriaId}
+            className="inline-flex items-center gap-1.5 rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-riesgo hover:text-riesgo disabled:cursor-not-allowed disabled:opacity-40"
           >
+            {accionEnVueloId === c.categoriaId && <Spinner className="size-3.5 shrink-0" />}
             Desactivar
           </button>
         ) : (
@@ -338,10 +347,11 @@ function FormularioCategoria({ error, onCancelar, onCrear }: FormularioCategoria
           type="submit"
           disabled={enviando}
           className={
-            "rounded-placa px-4 py-2 text-micro font-semibold transition-colors duration-150 ease-out " +
+            "inline-flex items-center gap-1.5 rounded-placa px-4 py-2 text-micro font-semibold transition-colors duration-150 ease-out " +
             (enviando ? "bg-senal/40 text-fondo/70" : "bg-senal text-fondo hover:bg-senal/85")
           }
         >
+          {enviando && <Spinner className="size-3.5 shrink-0" />}
           Crear categoría
         </button>
         <button

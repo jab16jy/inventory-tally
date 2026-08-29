@@ -12,6 +12,7 @@ import type { RolUsuario, Usuario } from "@conteo/shared/models/usuario.js";
 import type { ActualizarCajeroPayload, CrearCajeroPayload } from "@conteo/data";
 import { fecha } from "../../lib/formato.js";
 import { useAdminRepository } from "../../state/admin-contexto.js";
+import { Spinner } from "../primitivos/Spinner.js";
 import { Tabla, type ColumnaTabla } from "./Tabla.js";
 
 const CAMPO =
@@ -58,6 +59,9 @@ export function CajerosScreen() {
   // para una interrupción real (craft-floor: "modal para una tarea que no
   // necesita foco protegido").
   const [confirmandoUid, setConfirmandoUid] = useState<string | null>(null);
+  // uid de la fila con desactivar/reactivar en vuelo — deshabilita el botón
+  // y muestra el spinner mientras la Cloud Function responde.
+  const [accionEnVueloUid, setAccionEnVueloUid] = useState<string | null>(null);
 
   function abrirCreacion(): void {
     setFormulario({ modo: "crear" });
@@ -98,6 +102,7 @@ export function CajerosScreen() {
 
   async function desactivar(usuario: Usuario): Promise<void> {
     setErrorAccion(null);
+    setAccionEnVueloUid(usuario.uid);
     try {
       await repo.desactivarCajero(usuario.uid);
     } catch {
@@ -107,16 +112,22 @@ export function CajerosScreen() {
       // puede quedar pegada en ningún desenlace. En éxito ya no hace falta;
       // en error el admin necesita volver al botón "Desactivar" para
       // reintentar en vez de ver los mismos "Confirmar"/"Cancelar" sin salida.
+      // El estado "en vuelo" se limpia por la misma razón: un error no puede
+      // dejar el botón deshabilitado para siempre.
       setConfirmandoUid(null);
+      setAccionEnVueloUid(null);
     }
   }
 
   async function reactivar(usuario: Usuario): Promise<void> {
     setErrorAccion(null);
+    setAccionEnVueloUid(usuario.uid);
     try {
       await repo.reactivarCajero(usuario.uid);
     } catch {
       setErrorAccion(`No se pudo reactivar a ${usuario.nombre}. Intenta de nuevo.`);
+    } finally {
+      setAccionEnVueloUid(null);
     }
   }
 
@@ -175,8 +186,10 @@ export function CajerosScreen() {
                 <button
                   type="button"
                   onClick={() => void desactivar(u)}
-                  className="rounded-placa border border-riesgo px-2.5 py-1.5 text-micro text-tinta hover:bg-riesgo-placa"
+                  disabled={accionEnVueloUid === u.uid}
+                  className="inline-flex items-center gap-1.5 rounded-placa border border-riesgo px-2.5 py-1.5 text-micro text-tinta hover:bg-riesgo-placa disabled:cursor-not-allowed disabled:opacity-40"
                 >
+                  {accionEnVueloUid === u.uid && <Spinner className="size-3.5 shrink-0" />}
                   Confirmar
                 </button>
                 <button
@@ -200,8 +213,10 @@ export function CajerosScreen() {
             <button
               type="button"
               onClick={() => void reactivar(u)}
-              className="rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-senal hover:text-senal"
+              disabled={accionEnVueloUid === u.uid}
+              className="inline-flex items-center gap-1.5 rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-senal hover:text-senal disabled:cursor-not-allowed disabled:opacity-40"
             >
+              {accionEnVueloUid === u.uid && <Spinner className="size-3.5 shrink-0" />}
               Reactivar
             </button>
           )}
@@ -425,10 +440,11 @@ function FormularioCajero({
           type="submit"
           disabled={enviando}
           className={
-            "rounded-placa px-4 py-2 text-micro font-semibold transition-colors duration-150 ease-out " +
+            "inline-flex items-center gap-1.5 rounded-placa px-4 py-2 text-micro font-semibold transition-colors duration-150 ease-out " +
             (enviando ? "bg-senal/40 text-fondo/70" : "bg-senal text-fondo hover:bg-senal/85")
           }
         >
+          {enviando && <Spinner className="size-3.5 shrink-0" />}
           {modo === "crear" ? "Crear cajero" : "Guardar cambios"}
         </button>
         <button

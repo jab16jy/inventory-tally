@@ -148,4 +148,33 @@ describe("CajerosScreen (F2)", () => {
       /no se pudo reactivar a ana\. intenta de nuevo\./i,
     );
   });
+
+  it("deshabilita Confirmar y muestra el spinner mientras desactivar está en vuelo", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarUsuario(usuarioBase());
+    repo.desactivarCajero = vi.fn(() => new Promise<never>(() => {}));
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /^desactivar$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirmar/i }));
+
+    const boton = screen.getByRole("button", { name: /confirmar/i });
+    expect(boton).toBeDisabled();
+    expect(boton.querySelector("svg")).toHaveClass("animate-spin");
+  });
+
+  it("deshabilita Reactivar y muestra el spinner mientras reactivar está en vuelo", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarUsuario(usuarioBase({ activo: false }));
+    repo.reactivarCajero = vi.fn(() => new Promise<never>(() => {}));
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /^reactivar$/i }));
+
+    const boton = screen.getByRole("button", { name: /^reactivar$/i });
+    expect(boton).toBeDisabled();
+    expect(boton.querySelector("svg")).toHaveClass("animate-spin");
+  });
 });
