@@ -51,17 +51,25 @@ export async function eliminarCajeroImpl(
   // claim es la fuente de verdad. Esta callable borra CAJEROS — dejar pasar a
   // un admin convertiría un panel de gestión de cajeros en la vía para
   // eliminar administradores de forma irreversible.
-  let objetivo;
+  // `null` = la cuenta de Auth ya no existe. NO es necesariamente un uid
+  // inventado: es también el corte parcial que describe el bloque de arriba
+  // (Auth borrado, perfil huérfano). Distinguir los dos casos es lo que hace
+  // cierta la promesa de "un admin puede reintentar" — tratar ambos como
+  // `not-found` dejaría ese perfil inalcanzable para siempre.
+  let objetivo = null;
   try {
     objetivo = await auth.getUser(uid);
   } catch (error) {
-    if ((error as { code?: string }).code === "auth/user-not-found") {
-      throw new HttpsError("not-found", "Cajero inexistente");
+    if ((error as { code?: string }).code !== "auth/user-not-found") {
+      throw error;
     }
-    throw error;
   }
-  if (objetivo.customClaims?.rol !== "cajero") {
+
+  if (objetivo && objetivo.customClaims?.rol !== "cajero") {
     throw new HttpsError("failed-precondition", "Sólo se pueden eliminar cajeros.");
+  }
+  if (!objetivo && !(await db.doc(`usuarios/${uid}`).get()).exists) {
+    throw new HttpsError("not-found", "Cajero inexistente");
   }
 
   const participaciones = await db
@@ -77,13 +85,22 @@ export async function eliminarCajeroImpl(
     );
   }
 
-  try {
+  // En el reintento de un corte parcial `objetivo` es null y la cuenta ya no
+  // está: sólo queda barrer el perfil huérfano.
+  //
+  // ponytail: sin `revokeRefreshTokens`. Borrar al usuario ya expira sus
+  // refresh tokens ("Refresh tokens expire only when the user is deleted,
+  // disabled, or a major account change is detected",
+  // firebase.google.com/docs/auth/admin/manage-sessions), y la llamada
+  // fallaría sobre una cuenta que ya no existe. Lo que NO desaparece al
+  // instante es el ID token ya emitido: vive hasta una hora y las reglas de
+  // Firestore sólo validan firma y expiración, no si el usuario sigue
+  // existiendo. O sea que un cajero recién eliminado conserva hasta 60 min de
+  // escritura sobre `aportes`. No es nuevo ni arreglable aquí —
+  // `desactivarCajero` tiene exactamente la misma ventana— pero que nadie lea
+  // este borrado como un corte instantáneo de acceso.
+  if (objetivo) {
     await auth.deleteUser(uid);
-  } catch (error) {
-    if ((error as { code?: string }).code === "auth/user-not-found") {
-      throw new HttpsError("not-found", "Cajero inexistente");
-    }
-    throw error;
   }
 
   await db.runTransaction(async (tx) => {
