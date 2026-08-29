@@ -31,4 +31,8 @@ describe("exigirReautenticacion", () => {
     const fueraDeLaVentana = Date.now() / 1000 - 5 * 60 - 5;
     expect(() => exigirReautenticacion(req(fueraDeLaVentana))).toThrow(HttpsError);
   });
+
+  it("rechaza auth_time no finito (defensa en profundidad, falla cerrada)", () => {
+    expect(() => exigirReautenticacion(req(NaN))).toThrow(HttpsError);
+  });
 });
