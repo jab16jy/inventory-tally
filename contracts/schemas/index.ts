@@ -30,11 +30,21 @@ export type { CrearCategoriaInput } from "./crear-categoria.schema.js";
 export { desactivarCategoriaSchema } from "./desactivar-categoria.schema.js";
 export type { DesactivarCategoriaInput } from "./desactivar-categoria.schema.js";
 
+// ponytail: mismo shape {categoriaId} que desactivarCategoriaSchema; separar
+// el archivo cuando diverjan (docs/plan-panel-administrador.md §3).
+export { desactivarCategoriaSchema as reactivarCategoriaSchema } from "./desactivar-categoria.schema.js";
+export type { DesactivarCategoriaInput as ReactivarCategoriaInput } from "./desactivar-categoria.schema.js";
+
 export { crearAreaSchema } from "./crear-area.schema.js";
 export type { CrearAreaInput } from "./crear-area.schema.js";
 
 export { desactivarAreaSchema } from "./desactivar-area.schema.js";
 export type { DesactivarAreaInput } from "./desactivar-area.schema.js";
+
+// ponytail: mismo shape {areaId} que desactivarAreaSchema; separar el archivo
+// cuando diverjan (docs/plan-panel-administrador.md §3).
+export { desactivarAreaSchema as reactivarAreaSchema } from "./desactivar-area.schema.js";
+export type { DesactivarAreaInput as ReactivarAreaInput } from "./desactivar-area.schema.js";
 
 // ponytail: mismo shape {categoriaId} que desactivarCategoriaSchema; separar
 // el archivo cuando diverjan (docs/plan-panel-administrador.md §3). Sin test
