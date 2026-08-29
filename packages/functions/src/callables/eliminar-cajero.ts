@@ -65,11 +65,24 @@ export async function eliminarCajeroImpl(
     }
   }
 
-  if (objetivo && objetivo.customClaims?.rol !== "cajero") {
-    throw new HttpsError("failed-precondition", "Sólo se pueden eliminar cajeros.");
-  }
-  if (!objetivo && !(await db.doc(`usuarios/${uid}`).get()).exists) {
-    throw new HttpsError("not-found", "Cajero inexistente");
+  if (objetivo) {
+    if (objetivo.customClaims?.rol !== "cajero") {
+      throw new HttpsError("failed-precondition", "Sólo se pueden eliminar cajeros.");
+    }
+  } else {
+    const perfil = await db.doc(`usuarios/${uid}`).get();
+    if (!perfil.exists) {
+      throw new HttpsError("not-found", "Cajero inexistente");
+    }
+    // Sin cuenta de Auth no hay claims que consultar, así que aquí —y SÓLO
+    // aquí— el espejo es la única evidencia de rol que queda. Comprobarlo
+    // sigue siendo mejor que no comprobar nada: sin esta rama, un perfil
+    // huérfano con rol admin (borrado manual desde la consola, o un bug
+    // ajeno) se iría por un endpoint que dice borrar cajeros. No contradice
+    // la regla de arriba: el claim gana siempre que exista.
+    if (perfil.get("rol") !== "cajero") {
+      throw new HttpsError("failed-precondition", "Sólo se pueden eliminar cajeros.");
+    }
   }
 
   const participaciones = await db
