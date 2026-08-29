@@ -22,6 +22,7 @@ import { moneda, numero } from "../../lib/formato.js";
 import { useAdminRepository } from "../../state/admin-contexto.js";
 import { Icono } from "../primitivos/Icono.js";
 import { Placa } from "../primitivos/Placa.js";
+import { Spinner } from "../primitivos/Spinner.js";
 
 interface ParticipanteServidor {
   readonly uid: string;
@@ -216,12 +217,13 @@ export function CierreScreen() {
             title={!todosSincronizados ? `Falta confirmar: ${nombresPendientes}` : undefined}
             aria-describedby={!todosSincronizados ? idRazonBloqueo : undefined}
             className={clsx(
-              "min-h-[var(--size-toque)] rounded-placa px-4 text-micro font-semibold transition-colors duration-150 ease-out",
+              "inline-flex min-h-[var(--size-toque)] items-center gap-1.5 rounded-placa px-4 text-micro font-semibold transition-colors duration-150 ease-out",
               !todosSincronizados || enviando
                 ? "cursor-not-allowed bg-senal/40 text-fondo/70"
                 : "bg-senal text-fondo hover:bg-senal/85",
             )}
           >
+            {enviando && <Spinner className="size-3.5 shrink-0" />}
             Cerrar conteo
           </button>
           {!todosSincronizados && (
@@ -245,8 +247,9 @@ export function CierreScreen() {
               type="button"
               onClick={() => void cerrar(true)}
               disabled={enviando}
-              className="self-start rounded-placa border border-riesgo px-3 py-2 text-micro font-semibold text-riesgo transition-colors duration-150 ease-out hover:bg-riesgo-placa disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 self-start rounded-placa border border-riesgo px-3 py-2 text-micro font-semibold text-riesgo transition-colors duration-150 ease-out hover:bg-riesgo-placa disabled:cursor-not-allowed disabled:opacity-40"
             >
+              {enviando && <Spinner className="size-3.5 shrink-0" />}
               Forzar cierre
             </button>
           </div>

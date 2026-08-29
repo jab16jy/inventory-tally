@@ -12,6 +12,7 @@ import type { Conectividad, Sucursal } from "@conteo/shared/models/sucursal.js";
 import type { ActualizarSucursalPayload, CrearSucursalPayload } from "@conteo/data";
 import { useAdminRepository } from "../../state/admin-contexto.js";
 import { Icono } from "../primitivos/Icono.js";
+import { Spinner } from "../primitivos/Spinner.js";
 import { Tabla, type ColumnaTabla } from "./Tabla.js";
 
 const CAMPO =
@@ -41,6 +42,9 @@ export function SucursalesAdminScreen() {
   const [errorFormulario, setErrorFormulario] = useState<string | null>(null);
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  // sucursalId con activar/desactivar/abrir-conteo en vuelo — deshabilita el
+  // botón de esa fila y muestra el spinner mientras la Cloud Function responde.
+  const [accionEnVueloId, setAccionEnVueloId] = useState<string | null>(null);
 
   function abrirCreacion(): void {
     setFormulario({ modo: "crear" });
@@ -81,6 +85,7 @@ export function SucursalesAdminScreen() {
 
   async function alternarActiva(sucursal: Sucursal): Promise<void> {
     setErrorAccion(null);
+    setAccionEnVueloId(sucursal.sucursalId);
     try {
       await repo.actualizarSucursal({
         sucursalId: sucursal.sucursalId,
@@ -98,11 +103,14 @@ export function SucursalesAdminScreen() {
       } else {
         setErrorAccion(`No se pudo actualizar ${sucursal.nombre}. Intenta de nuevo.`);
       }
+    } finally {
+      setAccionEnVueloId(null);
     }
   }
 
   async function abrirConteo(sucursal: Sucursal): Promise<void> {
     setErrorAccion(null);
+    setAccionEnVueloId(sucursal.sucursalId);
     try {
       await repo.abrirSesion({ sucursalId: sucursal.sucursalId });
       setAviso(`Conteo abierto en ${sucursal.nombre}.`);
@@ -114,6 +122,8 @@ export function SucursalesAdminScreen() {
       } else {
         setErrorAccion(`No se pudo abrir el conteo en ${sucursal.nombre}. Intenta de nuevo.`);
       }
+    } finally {
+      setAccionEnVueloId(null);
     }
   }
 
@@ -155,8 +165,9 @@ export function SucursalesAdminScreen() {
       clave: "acciones",
       etiqueta: "Acciones",
       render: (s) => {
-        const bloqueaDesactivar = s.activa && s.sesionAbiertaId !== null;
-        const bloqueaAbrirConteo = !s.activa || s.sesionAbiertaId !== null;
+        const enVuelo = accionEnVueloId === s.sucursalId;
+        const bloqueaDesactivar = (s.activa && s.sesionAbiertaId !== null) || enVuelo;
+        const bloqueaAbrirConteo = !s.activa || s.sesionAbiertaId !== null || enVuelo;
         const tituloAbrirConteo = !s.activa
           ? "Activa la sucursal primero"
           : s.sesionAbiertaId !== null
@@ -175,18 +186,22 @@ export function SucursalesAdminScreen() {
               type="button"
               onClick={() => void alternarActiva(s)}
               disabled={bloqueaDesactivar}
-              title={bloqueaDesactivar ? `${s.nombre} tiene una sesión abierta` : undefined}
-              className="rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-senal hover:text-senal disabled:cursor-not-allowed disabled:text-tenue disabled:opacity-40 disabled:hover:border-borde disabled:hover:text-tenue"
+              title={
+                bloqueaDesactivar && !enVuelo ? `${s.nombre} tiene una sesión abierta` : undefined
+              }
+              className="inline-flex items-center gap-1.5 rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-senal hover:text-senal disabled:cursor-not-allowed disabled:text-tenue disabled:opacity-40 disabled:hover:border-borde disabled:hover:text-tenue"
             >
+              {enVuelo && <Spinner className="size-3.5 shrink-0" />}
               {s.activa ? "Desactivar" : "Activar"}
             </button>
             <button
               type="button"
               onClick={() => void abrirConteo(s)}
               disabled={bloqueaAbrirConteo}
-              title={tituloAbrirConteo}
-              className="rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-senal hover:text-senal disabled:cursor-not-allowed disabled:text-tenue disabled:opacity-40 disabled:hover:border-borde disabled:hover:text-tenue"
+              title={enVuelo ? undefined : tituloAbrirConteo}
+              className="inline-flex items-center gap-1.5 rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-senal hover:text-senal disabled:cursor-not-allowed disabled:text-tenue disabled:opacity-40 disabled:hover:border-borde disabled:hover:text-tenue"
             >
+              {enVuelo && <Spinner className="size-3.5 shrink-0" />}
               Abrir conteo
             </button>
           </div>
@@ -366,10 +381,11 @@ function FormularioSucursal({
           type="submit"
           disabled={enviando}
           className={
-            "rounded-placa px-4 py-2 text-micro font-semibold transition-colors duration-150 ease-out " +
+            "inline-flex items-center gap-1.5 rounded-placa px-4 py-2 text-micro font-semibold transition-colors duration-150 ease-out " +
             (enviando ? "bg-senal/40 text-fondo/70" : "bg-senal text-fondo hover:bg-senal/85")
           }
         >
+          {enviando && <Spinner className="size-3.5 shrink-0" />}
           {modo === "crear" ? "Crear sucursal" : "Guardar cambios"}
         </button>
         <button

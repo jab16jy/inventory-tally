@@ -74,4 +74,18 @@ describe("AreasScreen", () => {
       ]);
     });
   });
+
+  it("deshabilita Desactivar y muestra el spinner mientras la acción está en vuelo", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarArea(areaBase());
+    repo.desactivarArea = vi.fn(() => new Promise<never>(() => {}));
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /desactivar/i }));
+
+    const boton = screen.getByRole("button", { name: /desactivar/i });
+    expect(boton).toBeDisabled();
+    expect(boton.querySelector("svg")).toHaveClass("animate-spin");
+  });
 });

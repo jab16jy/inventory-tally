@@ -165,4 +165,34 @@ describe("SucursalesAdminScreen (F2)", () => {
       /ya existe un conteo abierto en norte/i,
     );
   });
+
+  it("deshabilita Desactivar y muestra el spinner mientras la acción está en vuelo", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSucursal(sucursalBase({ sucursalId: "suc_norte", nombre: "Norte" }));
+    repo.actualizarSucursal = vi.fn(() => new Promise<never>(() => {}));
+
+    renderPantalla(repo);
+
+    const fila = screen.getByText("Norte").closest("tr")!;
+    fireEvent.click(within(fila).getByRole("button", { name: /desactivar/i }));
+
+    const boton = within(fila).getByRole("button", { name: /desactivar/i });
+    expect(boton).toBeDisabled();
+    expect(boton.querySelector("svg")).toHaveClass("animate-spin");
+  });
+
+  it("deshabilita Abrir conteo y muestra el spinner mientras la acción está en vuelo", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSucursal(sucursalBase({ sucursalId: "suc_norte", nombre: "Norte" }));
+    repo.abrirSesion = vi.fn(() => new Promise<never>(() => {}));
+
+    renderPantalla(repo);
+
+    const fila = screen.getByText("Norte").closest("tr")!;
+    fireEvent.click(within(fila).getByRole("button", { name: /abrir conteo/i }));
+
+    const boton = within(fila).getByRole("button", { name: /abrir conteo/i });
+    expect(boton).toBeDisabled();
+    expect(boton.querySelector("svg")).toHaveClass("animate-spin");
+  });
 });

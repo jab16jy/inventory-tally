@@ -207,4 +207,18 @@ describe("CategoriasScreen (F3)", () => {
     expect(await screen.findAllByTestId("fila-esqueleto")).not.toHaveLength(0);
     expect(screen.queryByText("$5.000")).not.toBeInTheDocument();
   });
+
+  it("deshabilita Desactivar y muestra el spinner mientras la acción está en vuelo", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarCategoria(categoriaBase());
+    repo.desactivarCategoria = vi.fn(() => new Promise<never>(() => {}));
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /desactivar/i }));
+
+    const boton = screen.getByRole("button", { name: /desactivar/i });
+    expect(boton).toBeDisabled();
+    expect(boton.querySelector("svg")).toHaveClass("animate-spin");
+  });
 });
