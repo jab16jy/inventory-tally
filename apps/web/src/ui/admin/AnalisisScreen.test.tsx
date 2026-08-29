@@ -4,6 +4,7 @@
 // una sesión.
 import { FakeAdminRepository } from "@conteo/data";
 import type { EstadoSincronizacion } from "@conteo/data";
+import type { Historico } from "@conteo/shared/models/historico.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import { render, screen } from "@testing-library/react";
@@ -70,6 +71,17 @@ function lineaBase(
   };
 }
 
+function crearHistorico(overrides: Partial<Historico> = {}): Historico {
+  return {
+    sesionId: "ses_hist",
+    cerradaEn: new Date("2026-06-01T00:00:00Z"),
+    totalUnidades: 100,
+    totalMonetario: 500_000,
+    porCategoria: {},
+    ...overrides,
+  };
+}
+
 function todosSincronizados(): EstadoSincronizacion {
   return {
     participantes: [{ uid: "uid_ana", nombre: "Ana Ramírez", sincronizado: true }],
@@ -122,8 +134,40 @@ describe("AnalisisScreen (F5)", () => {
       "dona",
       "extremos",
       "detalle",
+      "areas",
+      "evolucion",
       "comparativo",
     ]);
+  });
+
+  it("desglosa unidades por área reusando totalPorArea, sin agregación propia", async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo); // las 3 líneas comparten area: "Aseo"
+
+    renderPantalla(repo);
+
+    const seccionAreas = (await screen.findByText("Unidades por área")).closest(
+      '[data-seccion="areas"]',
+    )!;
+    // totalPorArea suma cantidadTotal por área: 310 + 2 + 0 = 312 en "Aseo".
+    expect(seccionAreas).toHaveTextContent("Aseo");
+    expect(seccionAreas).toHaveTextContent("312");
+  });
+
+  it("la evolución mensual pinta la serie de históricos de la sucursal de la sesión", async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo);
+    repo.sembrarHistorico(
+      "suc_norte",
+      crearHistorico({ sesionId: "ses_previa", cerradaEn: new Date("2026-07-01T00:00:00Z") }),
+    );
+
+    const { container } = renderPantalla(repo);
+
+    await screen.findByText("Sucursal Norte", { exact: false });
+    const seccionEvolucion = container.querySelector('[data-seccion="evolucion"]')!;
+    expect(seccionEvolucion.querySelector("svg")).not.toBeNull();
+    expect(seccionEvolucion).toHaveTextContent(textoDom(moneda(crearHistorico().totalMonetario)));
   });
 
   it("usa el numeral de 32px sólo en las tres tarjetas KPI", async () => {
@@ -197,12 +241,15 @@ describe("AnalisisScreen (F5)", () => {
     const repo = new FakeAdminRepository();
     sembrarSesionCompleta(repo);
 
-    renderPantalla(repo);
+    const { container } = renderPantalla(repo);
 
     // 310×2.000 + 2×150.000 + 0×5.000 = 620.000 + 300.000 = 920.000.
     expect(await screen.findByText(textoDom(moneda(920_000)))).toBeInTheDocument();
-    // Unidades: 310 + 2 + 0 = 312.
-    expect(screen.getByText("312")).toBeInTheDocument();
+    // Unidades: 310 + 2 + 0 = 312. Todas las líneas de sembrarSesionCompleta
+    // comparten área ("Aseo"), así que la sección "areas" muestra el mismo
+    // 312 — se acota a "kpis" para que la prueba no dependa de eso.
+    const kpis = container.querySelector('[data-seccion="kpis"]')!;
+    expect(kpis).toHaveTextContent("312");
   });
 
   it("muestra 'categorías contadas' como líneas con cantidadTotal > 0 sobre el total de líneas de la sesión", async () => {
