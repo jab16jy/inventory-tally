@@ -149,6 +149,21 @@ describe("eliminarCajeroImpl", () => {
     expect((await db.doc(`usuarios/${uid}`).get()).exists).toBe(false);
   });
 
+  it("perfil huérfano con rol admin · NO se barre por este endpoint", async () => {
+    const { uid } = await sembrarAdmin();
+    // Sin cuenta de Auth no quedan claims: el espejo es la única evidencia de
+    // rol. Si no se consultara, este endpoint de cajeros borraría el perfil
+    // de un admin.
+    await auth.deleteUser(uid);
+
+    await expect(eliminarCajeroImpl(db, auth, "uid_admin", { uid })).rejects.toThrow(
+      /Sólo se pueden eliminar cajeros/,
+    );
+    expect((await db.doc(`usuarios/${uid}`).get()).exists).toBe(true);
+
+    await db.doc(`usuarios/${uid}`).delete();
+  });
+
   it("uid sin cuenta de Auth y sin perfil · sigue siendo not-found", async () => {
     await expect(
       eliminarCajeroImpl(db, auth, "uid_admin", { uid: `uid_fantasma_${randomUUID()}` }),
