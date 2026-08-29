@@ -104,6 +104,7 @@ export function ConteoScreen({ onSalir }: ConteoScreenProps) {
 
   const [busqueda, setBusqueda] = useState("");
   const [soloPendientes, setSoloPendientes] = useState(false);
+  const [areaFiltro, setAreaFiltro] = useState("");
   const [categoriaEnEdicion, setCategoriaEnEdicion] = useState<string | null>(null);
 
   // "Tu aporte" del Deck: cada fila YA tiene abierto useMiAporte para sí
@@ -160,9 +161,17 @@ export function ConteoScreen({ onSalir }: ConteoScreenProps) {
       ? "pendiente"
       : "sincronizado";
 
+  // Opciones del selector: cero lecturas nuevas, salen de `lineas` ya
+  // suscritas. ponytail: filtro de VISTA únicamente — `contadas`/`total`
+  // de arriba (BarraProgreso, progreso del EQUIPO, doc 10 §2) y
+  // `siguientePendiente` (línea ~150) siguen leyendo `lineas` completas,
+  // nunca `lineasVisibles`; este filtro no los toca.
+  const areas = [...new Set(lineas.map((l) => l.area))].sort();
+
   const consulta = busqueda.trim().toLowerCase();
   const soloDigitos = consulta.replace(/\D/g, "");
   const lineasVisibles = lineas.filter((linea) => {
+    if (areaFiltro && linea.area !== areaFiltro) return false;
     if (soloPendientes && !estaPendiente(linea, uid)) return false;
     if (!consulta) return true;
     return (
@@ -219,6 +228,28 @@ export function ConteoScreen({ onSalir }: ConteoScreenProps) {
 
           <BotonSalir onSalir={onSalir} />
         </div>
+
+        {/* Fila propia: no cabe apretada junto a búsqueda+Pendientes+Salir
+            sin bajar del objetivo táctil mínimo (--size-toque). Con menos de
+            dos áreas no hay nada que elegir: el selector sería una fila de
+            ruido en la pantalla más apretada del sistema. */}
+        {areas.length > 1 && (
+          <label className="relative block">
+            <span className="sr-only">Filtrar por área</span>
+            <select
+              value={areaFiltro}
+              onChange={(e) => setAreaFiltro(e.target.value)}
+              className="min-h-[var(--size-toque)] w-full rounded-placa border border-borde bg-fondo px-3 text-tinta focus:border-senal focus:outline-none"
+            >
+              <option value="">Todas las áreas</option>
+              {areas.map((area) => (
+                <option key={area} value={area}>
+                  {area}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </header>
 
       {/* Con la sesión cerrada NO se montan las filas. Los +/- que escriben
