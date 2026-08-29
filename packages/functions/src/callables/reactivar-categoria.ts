@@ -38,8 +38,8 @@ export async function reactivarCategoriaImpl(
   return { categoriaId, reactivada: true };
 }
 
-// Sin exigirReautenticacion: reactivar deshace un desactivar, no es una
-// acción destructiva ni irreversible.
+// Sin exigir reautenticación reciente: reactivar deshace un desactivar,
+// no es una acción destructiva ni irreversible.
 export const reactivarCategoria = onCall({ region: "us-central1" }, async (req) => {
   exigirAdmin(req);
   const datos = validar(req.data, reactivarCategoriaSchema);

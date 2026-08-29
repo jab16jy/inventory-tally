@@ -3,7 +3,6 @@ import { type Auth, getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { eliminarCajeroSchema, type EliminarCajeroInput } from "@conteo/contracts";
 import { exigirAdmin } from "../lib/exigir-admin.js";
-import { exigirReautenticacion } from "../lib/exigir-reautenticacion.js";
 import { validar } from "../lib/validar.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 
@@ -29,6 +28,18 @@ import { registrarAuditoria } from "../lib/auditoria.js";
  * y ningún cajero sería jamás eliminable. El rastro de auditoría es historial
  * y nunca se purga (salvo por retención, ver `purgar-auditoria.ts`);
  * `USUARIO_ELIMINADO` se suma a ese historial, no lo reemplaza.
+ *
+ * DECISIÓN DE PRODUCTO — sin reautenticación reciente: esta callable llegó a
+ * tener una guarda de frescura de sesión (`exigirReautenticacion`, `auth_time`
+ * de los últimos 5 minutos, ver historial de esta unidad), retirada a
+ * propósito para que el botón "Eliminar" del panel funcione sin pedir la
+ * contraseña de nuevo — una sesión de admin normal dura mucho más que 5
+ * minutos y el refresh del token nunca mueve `auth_time`, así que la guarda
+ * habría rechazado casi toda llamada real. La única protección que queda es
+ * `exigirAdmin` (rol) más las guardas de negocio de arriba (auto-borrado,
+ * rol del objetivo, participaciones): riesgo aceptado conscientemente, no un
+ * descuido. Si el borrado de cajeros necesita más fricción en el futuro, la
+ * vía es una confirmación explícita en la UI, no reintroducir esta guarda.
  */
 export async function eliminarCajeroImpl(
   db: Firestore,
@@ -130,7 +141,6 @@ export async function eliminarCajeroImpl(
 
 export const eliminarCajero = onCall({ region: "us-central1" }, async (req) => {
   exigirAdmin(req);
-  exigirReautenticacion(req);
   const datos = validar(req.data, eliminarCajeroSchema);
   return eliminarCajeroImpl(getFirestore(), getAuth(), req.auth!.uid, datos);
 });
