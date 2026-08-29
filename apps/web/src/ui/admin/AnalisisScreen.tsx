@@ -13,11 +13,13 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { useParams } from "react-router-dom";
+import type { Historico } from "@conteo/shared/models/historico.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import {
   subtotal,
   totalMonetarioSesion,
+  totalPorArea,
   totalUnidadesSesion,
 } from "@conteo/shared/services/calculadora.js";
 import {
@@ -35,6 +37,7 @@ import { Numeral } from "../primitivos/Numeral.js";
 import { Placa } from "../primitivos/Placa.js";
 import { ComparativoScreen } from "./ComparativoScreen.js";
 import { Dona } from "./Dona.js";
+import { EvolucionMensual } from "./EvolucionMensual.js";
 import { Tabla, type ColumnaTabla } from "./Tabla.js";
 
 const SINCRONIZACION_VACIA: EstadoSincronizacion = { participantes: [] };
@@ -79,6 +82,31 @@ function useLineas(sesionId: string): LineaConteo[] {
   const [lineas, setLineas] = useState<LineaConteo[]>([]);
   useEffect(() => repo.observarLineasSesion(sesionId, setLineas), [repo, sesionId]);
   return lineas;
+}
+
+/** Serie para "Evolución mensual" (doc 10 §5-6): consulta puntual, no un
+ *  listener — mismo criterio que `useHayReconciliacion`. `sucursalId` vacío
+ *  (sesión aún sin cargar) se omite en vez de pedirle al repo un id vacío. */
+function useHistoricosRecientes(sucursalId: string): readonly Historico[] {
+  const repo = useAdminRepository();
+  const [historicos, setHistoricos] = useState<readonly Historico[]>([]);
+  useEffect(() => {
+    if (!sucursalId) return;
+    let cancelado = false;
+    repo
+      .historicosRecientesPorSucursal(sucursalId)
+      .then((serie) => {
+        if (!cancelado) setHistoricos(serie);
+      })
+      .catch(() => {
+        // ponytail: mismo criterio que useHayReconciliacion — aviso
+        // discreto y no bloqueante, la sección simplemente queda vacía.
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [repo, sucursalId]);
+  return historicos;
 }
 
 /** issue #20 item 3 (doc 10 §220-228, fila "Datos inconsistentes"): ¿el cron
@@ -192,6 +220,7 @@ export function AnalisisScreen() {
   // reemplazo de pantalla como "sesión no encontrada".
   const enLinea = useConexion();
   const hayReconciliacion = useHayReconciliacion(sesionId);
+  const historicos = useHistoricosRecientes(sesion?.sucursalId ?? "");
 
   const cargando = cargandoSesion || cargandoSync;
 
@@ -242,6 +271,8 @@ export function AnalisisScreen() {
   );
 
   const extremos = extremosPorSubtotal(lineas);
+  const porArea = totalPorArea(lineas);
+  const maxArea = porArea.reduce((max, a) => Math.max(max, a.cantidad), 0);
 
   return (
     <section className="p-6">
@@ -416,6 +447,43 @@ export function AnalisisScreen() {
         />
       </div>
 
+      <div data-seccion="areas" className="mb-4">
+        <h2 className="mb-3 text-micro tracking-[0.18em] text-tenue uppercase">
+          Unidades por área
+        </h2>
+        {/* Mismo patrón de barras que la sección "barras" de más arriba
+            (una <ul>, ancho porcentual aria-hidden + valor en texto), sobre
+            totalPorArea — sin agregación propia (doc calculadora.ts:44). */}
+        {porArea.length === 0 ? (
+          <p className="text-base text-tenue">Todavía no hay unidades por área contadas.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {porArea.map(({ area, cantidad }) => (
+              <li key={area} className="flex items-center gap-3">
+                <span className="w-28 shrink-0 truncate text-micro text-tenue">{area}</span>
+                <div
+                  aria-hidden="true"
+                  className="h-2 flex-1 overflow-hidden rounded-placa bg-placa-alta"
+                >
+                  <div
+                    className="h-full rounded-placa bg-senal"
+                    style={{ width: `${anchoPorcentual(cantidad, maxArea)}%` }}
+                  />
+                </div>
+                <span className="w-14 shrink-0 text-right text-tinta">{numero(cantidad)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div data-seccion="evolucion" className="mb-4">
+        <h2 className="mb-3 text-micro tracking-[0.18em] text-tenue uppercase">
+          Evolución mensual
+        </h2>
+        <EvolucionMensual historicos={historicos} etiqueta="Evolución mensual" />
+      </div>
+
       {/* Composición, no extracción: `ComparativoScreen` ya trae su propio
           fetch, el comentario del fan-out N+1, las barras y la tabla —
           montarlo tal cual reusa todo eso con una línea de diferencia y deja
@@ -465,6 +533,11 @@ function EsqueletoAnalisis({ columnas }: { readonly columnas: ColumnaTabla<FilaD
           claveFila={(f) => f.linea.categoriaId}
         />
       </div>
+      <div data-seccion="areas" className="mb-4 h-24 animate-pulse rounded-placa bg-placa-alta" />
+      <div
+        data-seccion="evolucion"
+        className="mb-4 h-32 animate-pulse rounded-placa bg-placa-alta"
+      />
       <div data-seccion="comparativo" className="h-32 animate-pulse rounded-placa bg-placa-alta" />
     </section>
   );
