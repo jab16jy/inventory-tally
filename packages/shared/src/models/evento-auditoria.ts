@@ -6,7 +6,7 @@
  * arrastra `firebase-admin`) y quien los lee (`packages/data`, que no puede
  * depender de Functions). `lib/auditoria.ts` reexporta este mismo tipo.
  *
- * Son 20 miembros. `SUCURSAL_CREADA` y `SUCURSAL_ACTUALIZADA` se declaran
+ * Son 22 miembros. `SUCURSAL_CREADA` y `SUCURSAL_ACTUALIZADA` se declaran
  * antes que sus emisores (llegan en F2), igual que `CATEGORIA_CREADA` y
  * `CATEGORIA_DESACTIVADA` llevan declaradas sin emisor desde el principio
  * (docs/plan-panel-administrador.md §2). La UI de auditoría deriva su lista
@@ -25,9 +25,11 @@ export type TipoEventoAuditoria =
   | "CATEGORIA_CREADA"
   | "CATEGORIA_DESACTIVADA"
   | "CATEGORIA_ELIMINADA"
+  | "CATEGORIA_REACTIVADA"
   | "AREA_CREADA"
   | "AREA_DESACTIVADA"
   | "AREA_ELIMINADA"
+  | "AREA_REACTIVADA"
   | "SUCURSAL_CREADA"
   | "SUCURSAL_ACTUALIZADA"
   | "SUCURSAL_ELIMINADA"
