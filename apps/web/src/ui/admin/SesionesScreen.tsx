@@ -3,6 +3,7 @@
 // OPACO (doc admin-repository.ts): sólo se guarda en estado y se devuelve
 // tal cual al repositorio, nunca se inspecciona ni se decodifica.
 import { useEffect, useId, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { EstadoSesion, SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import type { FiltroSesiones } from "@conteo/data";
@@ -86,6 +87,7 @@ export function SesionesScreen() {
     sucursalId,
     estado,
   );
+  const navigate = useNavigate();
 
   const idSucursal = useId();
   const idEstado = useId();
@@ -128,6 +130,23 @@ export function SesionesScreen() {
       render: (s) => numero(s.participantes.length),
       valorOrden: (s) => s.participantes.length,
       alinearDerecha: true,
+    },
+    {
+      clave: "acciones",
+      etiqueta: "Acciones",
+      render: (s) => (
+        // Entrada al análisis (F5): navega, no calcula nada aquí. Es la
+        // única acción para llegar al dashboard desde el historial —
+        // PanelScreen sólo cubre sesiones ABIERTAS.
+        <button
+          type="button"
+          onClick={() => navigate(`/admin/sesiones/${s.sesionId}/analisis`)}
+          aria-label={`Análisis — ${s.sucursalNombre}`}
+          className="shrink-0 rounded-placa border border-borde px-3 py-2 text-micro font-semibold text-tinta transition-colors duration-150 ease-out hover:border-senal hover:text-senal"
+        >
+          Análisis →
+        </button>
+      ),
     },
   ];
 
