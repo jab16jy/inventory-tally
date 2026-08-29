@@ -119,6 +119,54 @@ describe("FakeAdminRepository (implementación en memoria, docs/plan-panel-admin
     expect(historicos.get("suc_sur")).toBeNull();
   });
 
+  it("ultimoHistoricoPorSucursal devuelve el MÁS RECIENTE por cerradaEn, no el último sembrado", async () => {
+    const repo = new FakeAdminRepository();
+    // Se siembra el más nuevo PRIMERO: si el fake asumiera orden de
+    // inserción devolvería "ses_viejo" (el último set()), no el más nuevo.
+    repo.sembrarHistorico(
+      "suc_norte",
+      crearHistorico({ sesionId: "ses_nuevo", cerradaEn: new Date("2026-08-15T00:00:00Z") }),
+    );
+    repo.sembrarHistorico(
+      "suc_norte",
+      crearHistorico({ sesionId: "ses_viejo", cerradaEn: new Date("2026-07-01T00:00:00Z") }),
+    );
+
+    const historicos = await repo.ultimoHistoricoPorSucursal(["suc_norte"]);
+
+    expect(historicos.get("suc_norte")?.sesionId).toBe("ses_nuevo");
+  });
+
+  it("historicosRecientesPorSucursal devuelve la serie ordenada por cerradaEn desc", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarHistorico(
+      "suc_norte",
+      crearHistorico({ sesionId: "ses_ago", cerradaEn: new Date("2026-08-01T00:00:00Z") }),
+    );
+    repo.sembrarHistorico(
+      "suc_norte",
+      crearHistorico({ sesionId: "ses_jul", cerradaEn: new Date("2026-07-01T00:00:00Z") }),
+    );
+    repo.sembrarHistorico(
+      "suc_norte",
+      crearHistorico({ sesionId: "ses_sep", cerradaEn: new Date("2026-09-01T00:00:00Z") }),
+    );
+
+    const serie = await repo.historicosRecientesPorSucursal("suc_norte");
+
+    expect(serie.map((h) => h.sesionId)).toEqual(["ses_sep", "ses_ago", "ses_jul"]);
+  });
+
+  it("historicosRecientesPorSucursal respeta el límite explícito", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarHistorico("suc_norte", crearHistorico({ sesionId: "ses_1" }));
+    repo.sembrarHistorico("suc_norte", crearHistorico({ sesionId: "ses_2" }));
+
+    const serie = await repo.historicosRecientesPorSucursal("suc_norte", 1);
+
+    expect(serie).toHaveLength(1);
+  });
+
   it("registra la llamada a cerrarSesion con forzar", async () => {
     const repo = new FakeAdminRepository();
 
