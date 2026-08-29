@@ -1,7 +1,7 @@
 // Pruebas contra los emuladores de Firestore y Auth (docs/plan-panel-administrador.md
 // §3). `unauthenticated`/`permission-denied`/entrada inválida NO se reprueban
-// aquí: `exigirAdmin`, `exigirReautenticacion` y `eliminarCajeroSchema` ya
-// tienen su propio test genérico, misma convención que `desactivarCajero`.
+// aquí: `exigirAdmin` y `eliminarCajeroSchema` ya tienen su propio test
+// genérico, misma convención que `desactivarCajero`.
 import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
