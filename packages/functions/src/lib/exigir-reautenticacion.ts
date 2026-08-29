@@ -30,6 +30,14 @@ export function exigirReautenticacion(req: CallableRequest): void {
   // dejaría la guarda siempre abierta o siempre cerrada, y ningún tipo lo
   // detectaría.
   const antiguedadSegundos = Date.now() / 1000 - req.auth.token.auth_time;
+  // Defensa en profundidad contra un fallo abierto: si `auth_time` llegara
+  // NaN/Infinity, la comparación de abajo sería `false` y la guarda pasaría
+  // en silencio. Hoy es inalcanzable — `DecodedIdToken.auth_time` es
+  // no-opcional y Firebase siempre lo rellena en un token verificado — pero
+  // si eso dejara de ser cierto, esta guarda debe fallar CERRADA, no abierta.
+  if (!Number.isFinite(antiguedadSegundos)) {
+    throw new HttpsError("permission-denied", "No se pudo verificar la reautenticación.");
+  }
   if (antiguedadSegundos > VENTANA_REAUTENTICACION_SEGUNDOS) {
     throw new HttpsError(
       "permission-denied",
