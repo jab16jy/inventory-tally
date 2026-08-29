@@ -22,10 +22,9 @@ import { PrepararScreen } from "../ui/PrepararScreen.js";
 import { SucursalesScreen } from "../ui/SucursalesScreen.js";
 import { AdminLayout } from "../ui/admin/AdminLayout.js";
 import { AnalisisScreen } from "../ui/admin/AnalisisScreen.js";
-import { AreasScreen } from "../ui/admin/AreasScreen.js";
 import { AuditoriaScreen } from "../ui/admin/AuditoriaScreen.js";
 import { CajerosScreen } from "../ui/admin/CajerosScreen.js";
-import { CategoriasScreen } from "../ui/admin/CategoriasScreen.js";
+import { CatalogoScreen } from "../ui/admin/CatalogoScreen.js";
 import { CierreScreen } from "../ui/admin/CierreScreen.js";
 import { ComparativoScreen } from "../ui/admin/ComparativoScreen.js";
 import { PanelScreen } from "../ui/admin/PanelScreen.js";
@@ -153,8 +152,7 @@ export function AppRouter(): ReactNode {
           <Route index element={<PanelScreen />} />
           <Route path="cajeros" element={<CajerosScreen />} />
           <Route path="sucursales" element={<SucursalesAdminScreen />} />
-          <Route path="categorias" element={<CategoriasScreen />} />
-          <Route path="areas" element={<AreasScreen />} />
+          <Route path="categorias" element={<CatalogoScreen />} />
           <Route path="sesiones" element={<SesionesScreen />} />
           {/* Alcanzada desde el botón "Cerrar →" de PanelScreen (F1 ya lo
               anticipaba) — R5, la única pantalla del admin con wireframe. */}
