@@ -199,6 +199,8 @@ Los ocho, todos especificados en los docs y hoy inexistentes salvo dos:
 1. Sincronizado · 2. **Pendientes** (banner rojo fijo no descartable — *existe*) · 3. Sin conexión, tono nunca alarmante · 4. Sesión cerrada por el admin (modal bloqueante) · 5. Persistencia degradada (*existe*) · 6. Versión nueva disponible (bloqueo al arrancar) · 7. PWA no instalada (aviso persistente con instrucciones ilustradas — difieren entre Android y iOS) · 8. Confirmación suave si una cantidad supera 10× el promedio de la categoría.
 
 Carga: **skeleton con la forma final, nunca un spinner** (`docs/diseno/10:222-228`).
+Eso es sobre carga de pantalla; el botón en vuelo de una acción que llama a una Cloud
+Function lleva el primitivo `Spinner` antepuesto al texto (`docs/DESIGN.md`, “Botón primario”).
 
 ---
 
