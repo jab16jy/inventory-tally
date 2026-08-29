@@ -161,4 +161,35 @@ describe("SesionesScreen (F3, R4)", () => {
 
     expect(await screen.findByText("Pantalla de análisis")).toBeInTheDocument();
   });
+
+  // Par afirmativo del arreglo hallado por la revisión: en el historial la
+  // misma sucursal aparece muchas veces (una fila por conteo cerrado). Sin
+  // la fecha en el nombre accesible, ambos botones serían indistinguibles.
+  it("distingue el botón de análisis de dos conteos de la misma sucursal", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSucursal(sucursalBase());
+    repo.sembrarSesion(
+      sesionBase({
+        sesionId: "ses_agosto",
+        estado: "cerrada",
+        abiertaEn: new Date("2026-08-01T10:00:00Z"),
+        cerradaEn: new Date("2026-08-01T18:00:00Z"),
+      }),
+    );
+    repo.sembrarSesion(
+      sesionBase({
+        sesionId: "ses_julio",
+        estado: "cerrada",
+        abiertaEn: new Date("2026-07-01T10:00:00Z"),
+        cerradaEn: new Date("2026-07-01T18:00:00Z"),
+      }),
+    );
+
+    renderPantalla(repo);
+
+    const botones = await screen.findAllByRole("button", { name: /análisis — sucursal norte/i });
+    expect(botones).toHaveLength(2);
+    const nombres = botones.map((b) => b.getAttribute("aria-label"));
+    expect(new Set(nombres).size).toBe(2);
+  });
 });

@@ -141,7 +141,13 @@ export function SesionesScreen() {
         <button
           type="button"
           onClick={() => navigate(`/admin/sesiones/${s.sesionId}/analisis`)}
-          aria-label={`Análisis — ${s.sucursalNombre}`}
+          // El nombre accesible lleva la FECHA además de la sucursal: a
+          // diferencia de PanelScreen (de donde viene el patrón), que sólo
+          // lista sesiones abiertas y tiene como mucho una por sucursal, este
+          // historial pagina las CERRADAS y la misma sucursal aparece muchas
+          // veces. Sin la fecha, todas las filas comparten nombre y ni un
+          // lector de pantalla ni un getByRole pueden distinguirlas.
+          aria-label={`Análisis — ${s.sucursalNombre}, ${fecha(s.abiertaEn)}`}
           className="shrink-0 rounded-placa border border-borde px-3 py-2 text-micro font-semibold text-tinta transition-colors duration-150 ease-out hover:border-senal hover:text-senal"
         >
           Análisis →
