@@ -227,6 +227,9 @@ comparativo destaca **participación porcentual** y no sólo totales absolutos.
 | Datos inconsistentes  | Aviso discreto si `reconciliarLineas` detectó discrepancias       |
 | Cajeros sin confirmar | Bloque destacado con nombres                                      |
 
+> El _skeleton_ de "Cargando" es sobre carga de página/panel; el botón en vuelo de una
+> acción que llama a una Cloud Function se especifica en `docs/DESIGN.md` ("Botón primario").
+
 ---
 
 ## 8. Exportación (fuera del alcance de v1)

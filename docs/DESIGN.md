@@ -198,7 +198,7 @@ Los ocho primitivos del plan existen hoy en `apps/web/src/ui/primitivos/`: `Plac
 - **Prop distintiva:** `nombre` selecciona el path del catálogo (`buscar`, `filtro`, `wifi`, `datos`, `visto`, más los ocho de navegación del panel admin); el resto de props son las de un `<svg>` nativo (`aria-hidden` por defecto).
 
 ### Botón primario (patrón, aún sin extraer a primitivo)
-Usado hoy inline en `LoginScreen.tsx` ("Entrar") y previsto para "Finalizar conteo": ancho completo, alto mínimo 56 px, radio 2 px, fondo `--color-senal` / texto `--color-fondo`. Estado de envío: fondo al 40 % de opacidad, texto ámbar apagado — nunca un spinner reemplazando el texto.
+Usado hoy inline en `LoginScreen.tsx` ("Entrar") y previsto para "Finalizar conteo": ancho completo, alto mínimo 56 px, radio 2 px, fondo `--color-senal` / texto `--color-fondo`. Estado de envío: fondo al 40 % de opacidad, texto ámbar apagado — nunca un spinner reemplazando el texto. El primitivo `Spinner` antepuesto al texto (sin ocultarlo) sí es válido: es el patrón para una acción en vuelo que llama a una Cloud Function.
 
 ### Campos de formulario (patrón, en `LoginScreen`)
 - **Style:** borde `--color-borde`, fondo `--color-fondo`, radio 2 px, alto mínimo 56 px.
