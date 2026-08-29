@@ -134,4 +134,24 @@ describe("eliminarCajeroImpl", () => {
 
     expect(resultado.eliminado).toBe(true);
   });
+
+  it("perfil huérfano de un corte parcial · el reintento lo barre en vez de dar not-found", async () => {
+    const { uid } = await sembrarCajero();
+    // Reproduce el corte que documenta el orden Auth → Firestore: la cuenta
+    // de Auth ya se borró, el perfil quedó. Si el reintento devolviera
+    // not-found, ese perfil sería inalcanzable para siempre.
+    await auth.deleteUser(uid);
+    expect((await db.doc(`usuarios/${uid}`).get()).exists).toBe(true);
+
+    const resultado = await eliminarCajeroImpl(db, auth, "uid_admin", { uid });
+
+    expect(resultado.eliminado).toBe(true);
+    expect((await db.doc(`usuarios/${uid}`).get()).exists).toBe(false);
+  });
+
+  it("uid sin cuenta de Auth y sin perfil · sigue siendo not-found", async () => {
+    await expect(
+      eliminarCajeroImpl(db, auth, "uid_admin", { uid: `uid_fantasma_${randomUUID()}` }),
+    ).rejects.toThrow(/Cajero inexistente/);
+  });
 });
