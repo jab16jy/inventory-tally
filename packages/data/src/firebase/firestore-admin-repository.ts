@@ -64,6 +64,7 @@ import {
 } from "./mappers.js";
 
 const TAMANO_PAGINA = 20; // límite de página de listarSesiones/listarAuditoria (doc plan §4)
+const LIMITE_SERIE_POR_DEFECTO = 12; // un año de conteos mensuales (doc 10 §6)
 
 interface EntradaSincronizacionDoc {
   readonly confirmadoEn?: Timestamp | null;
@@ -241,6 +242,21 @@ export class FirestoreAdminRepository implements AdminRepository {
       }),
     );
     return new Map(entradas);
+  }
+
+  /** Consulta ÚNICA por un solo campo (`cerradaEn`): no requiere índice
+   *  nuevo, a diferencia del fan-out N+1 de `ultimoHistoricoPorSucursal`. */
+  async historicosRecientesPorSucursal(
+    sucursalId: string,
+    limite = LIMITE_SERIE_POR_DEFECTO,
+  ): Promise<readonly Historico[]> {
+    const q = query(
+      collection(this.db, "sucursales", sucursalId, "historicos"),
+      orderBy("cerradaEn", "desc"),
+      limit(limite),
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => historicoDesdeDoc(d.data() as never));
   }
 
   // ─────────── escrituras: TODAS vía httpsCallable ───────────

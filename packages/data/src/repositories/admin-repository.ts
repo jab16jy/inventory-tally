@@ -152,6 +152,17 @@ export interface AdminRepository {
     sucursalIds: readonly string[],
   ): Promise<Map<string, Historico | null>>;
 
+  /**
+   * Serie de históricos de UNA sucursal, más reciente primero (doc 10 §5,
+   * §6 — "Evolución mensual"): consulta ÚNICA, sin fan-out — a diferencia de
+   * `ultimoHistoricoPorSucursal`, aquí la sucursal ya se conoce (la de la
+   * sesión analizada). `limite` por defecto 12 (un año de conteos mensuales).
+   */
+  historicosRecientesPorSucursal(
+    sucursalId: string,
+    limite?: number,
+  ): Promise<readonly Historico[]>;
+
   // ── escrituras: TODAS vía httpsCallable, ninguna escritura directa a
   // Firestore — las reglas son `if false` en cada ruta que toca el admin. ──
   abrirSesion(payload: AbrirSesionPayload): Promise<{ sesionId: string }>;

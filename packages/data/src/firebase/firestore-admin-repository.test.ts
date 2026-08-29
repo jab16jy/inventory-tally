@@ -90,6 +90,46 @@ describe("FirestoreAdminRepository.ultimoHistoricoPorSucursal (fan-out N+1 delib
   });
 });
 
+describe("FirestoreAdminRepository.historicosRecientesPorSucursal (consulta única, doc 10 §5-6)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function snapSerie(...sesionIds: string[]) {
+    return {
+      docs: sesionIds.map((sesionId) => ({
+        data: () => ({
+          sesionId,
+          cerradaEn: { toDate: () => new Date("2026-08-01T00:00:00Z") },
+          totalUnidades: 10,
+          totalMonetario: 50000,
+          porCategoria: {},
+        }),
+      })),
+    };
+  }
+
+  it("consulta UNA vez, orderBy cerradaEn desc y limit(12) por defecto", async () => {
+    getDocs.mockResolvedValueOnce(snapSerie("ses_a", "ses_b"));
+    const repo = new FirestoreAdminRepository({} as never, {} as never);
+
+    const serie = await repo.historicosRecientesPorSucursal("suc_a");
+
+    expect(getDocs).toHaveBeenCalledTimes(1);
+    expect(collection).toHaveBeenCalledWith({}, "sucursales", "suc_a", "historicos");
+    expect(orderBy).toHaveBeenCalledWith("cerradaEn", "desc");
+    expect(limit).toHaveBeenCalledWith(12);
+    expect(serie.map((h) => h.sesionId)).toEqual(["ses_a", "ses_b"]);
+  });
+
+  it("respeta un límite explícito", async () => {
+    getDocs.mockResolvedValueOnce(snapSerie("ses_a"));
+    const repo = new FirestoreAdminRepository({} as never, {} as never);
+
+    await repo.historicosRecientesPorSucursal("suc_a", 3);
+
+    expect(limit).toHaveBeenCalledWith(3);
+  });
+});
+
 describe("FirestoreAdminRepository.listarSesiones / listarAuditoria (cursor opaco, doc plan §4)", () => {
   beforeEach(() => vi.clearAllMocks());
 

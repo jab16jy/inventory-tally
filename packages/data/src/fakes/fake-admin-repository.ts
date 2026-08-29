@@ -57,7 +57,7 @@ export class FakeAdminRepository implements AdminRepository {
   private readonly categorias = new Map<string, CategoriaValor>();
   private readonly areas = new Map<string, Area>();
   private readonly auditoria: EventoAuditoria[] = [];
-  private readonly historicos = new Map<string, Historico>();
+  private readonly historicos = new Map<string, Historico[]>();
 
   private readonly listenersSesionesAbiertas = new Set<(s: SesionConteo[]) => void>();
   private readonly listenersSesion = new Map<string, Set<(s: SesionConteo | null) => void>>();
@@ -120,7 +120,7 @@ export class FakeAdminRepository implements AdminRepository {
   }
 
   sembrarHistorico(sucursalId: string, historico: Historico): void {
-    this.historicos.set(sucursalId, historico);
+    this.historicos.set(sucursalId, [...(this.historicos.get(sucursalId) ?? []), historico]);
   }
 
   // ─────────── AdminRepository — lecturas en vivo ───────────
@@ -202,7 +202,14 @@ export class FakeAdminRepository implements AdminRepository {
   async ultimoHistoricoPorSucursal(
     sucursalIds: readonly string[],
   ): Promise<Map<string, Historico | null>> {
-    return new Map(sucursalIds.map((id) => [id, this.historicos.get(id) ?? null]));
+    return new Map(sucursalIds.map((id) => [id, this.historicosOrdenados(id).at(0) ?? null]));
+  }
+
+  async historicosRecientesPorSucursal(
+    sucursalId: string,
+    limite = 12,
+  ): Promise<readonly Historico[]> {
+    return this.historicosOrdenados(sucursalId).slice(0, limite);
   }
 
   // ─────────── AdminRepository — escrituras (registran la llamada) ───────────
@@ -306,6 +313,15 @@ export class FakeAdminRepository implements AdminRepository {
 
   private areasOrdenadas(): Area[] {
     return [...this.areas.values()].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }
+
+  /** Serie de una sucursal ordenada por `cerradaEn` desc — no asume orden de
+   *  inserción de `sembrarHistorico` (los tests siembran fuera de orden a
+   *  propósito). */
+  private historicosOrdenados(sucursalId: string): Historico[] {
+    return [...(this.historicos.get(sucursalId) ?? [])].sort(
+      (a, b) => b.cerradaEn.getTime() - a.cerradaEn.getTime(),
+    );
   }
 
   private lineasDeSesion(sesionId: string): Map<string, LineaConteo> {
