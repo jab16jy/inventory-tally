@@ -4,6 +4,7 @@ import { FakeAdminRepository } from "@conteo/data";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { AdminRepositoryProvider } from "../../state/admin-contexto.js";
 import { SesionesScreen } from "./SesionesScreen.js";
@@ -40,9 +41,14 @@ function sesionBase(overrides: Partial<SesionConteo> = {}): SesionConteo {
 
 function renderPantalla(repo: FakeAdminRepository) {
   return render(
-    <AdminRepositoryProvider repo={repo}>
-      <SesionesScreen />
-    </AdminRepositoryProvider>,
+    <MemoryRouter initialEntries={["/admin/sesiones"]}>
+      <AdminRepositoryProvider repo={repo}>
+        <Routes>
+          <Route path="/admin/sesiones" element={<SesionesScreen />} />
+          <Route path="/admin/sesiones/:sesionId/analisis" element={<p>Pantalla de análisis</p>} />
+        </Routes>
+      </AdminRepositoryProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -137,5 +143,22 @@ describe("SesionesScreen (F3, R4)", () => {
     // El defecto real: sin `.catch()`, `cargando` se queda en `true` para
     // siempre y el esqueleto no se va nunca, aunque el alert sí aparezca.
     expect(screen.queryByTestId("fila-esqueleto")).not.toBeInTheDocument();
+  });
+
+  it('cada fila ofrece "Análisis" y navega al dashboard de la sesión', async () => {
+    // Causa raíz: AnalisisScreen ya existe completo, pero SesionesScreen
+    // (donde viven las sesiones CERRADAS) no ofrece ninguna acción por fila
+    // para llegar ahí — sólo PanelScreen lo hace, y sólo para abiertas.
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(
+      sesionBase({ estado: "cerrada", cerradaEn: new Date("2026-08-02T10:00:00Z") }),
+    );
+
+    renderPantalla(repo);
+
+    const boton = await screen.findByRole("button", { name: /análisis — sucursal norte/i });
+    fireEvent.click(boton);
+
+    expect(await screen.findByText("Pantalla de análisis")).toBeInTheDocument();
   });
 });
