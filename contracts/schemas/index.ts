@@ -63,6 +63,3 @@ export type { DesactivarAreaInput as EliminarAreaInput } from "./desactivar-area
 // el mismo objeto que ya cubre desactivar-cajero.schema.test.ts.
 export { desactivarCajeroSchema as eliminarCajeroSchema } from "./desactivar-cajero.schema.js";
 export type { DesactivarCajeroInput as EliminarCajeroInput } from "./desactivar-cajero.schema.js";
-
-export { eliminarSucursalSchema } from "./eliminar-sucursal.schema.js";
-export type { EliminarSucursalInput } from "./eliminar-sucursal.schema.js";
