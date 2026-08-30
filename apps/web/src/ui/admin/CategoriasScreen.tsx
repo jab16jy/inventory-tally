@@ -1,8 +1,8 @@
 // apps/web/src/ui/admin/CategoriasScreen.tsx (docs/plan-panel-administrador.md
-// §5, fase F3) — CRUD de categorías de valor (R3). Crear + desactivar; no
-// hay `reactivarCategoria` (doc plan §3), así que una categoría inactiva no
-// ofrece ninguna acción — invariante I-7: ninguna de las dos callables toca
-// `sesiones/*/lineas`, se prueba en `packages/functions`, no aquí.
+// §5, fase F3/F7) — CRUD de categorías de valor (R3). Crear, desactivar,
+// eliminar (borrado real con guarda de participación) y reactivar —
+// invariante I-7: ninguna de las callables toca `sesiones/*/lineas`, se
+// prueba en `packages/functions`, no aquí.
 import { useEffect, useId, useState, type FormEvent } from "react";
 import type { Area } from "@conteo/shared/models/area.js";
 import type { CategoriaValor } from "@conteo/shared/models/categoria-valor.js";
@@ -10,6 +10,7 @@ import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import type { CrearCategoriaPayload } from "@conteo/data";
 import { moneda } from "../../lib/formato.js";
 import { useAdminRepository } from "../../state/admin-contexto.js";
+import { Icono } from "../primitivos/Icono.js";
 import { Spinner } from "../primitivos/Spinner.js";
 import { Tabla, type ColumnaTabla } from "./Tabla.js";
 
@@ -70,9 +71,18 @@ export function CategoriasScreen() {
   const [formularioAbierto, setFormularioAbierto] = useState(false);
   const [errorFormulario, setErrorFormulario] = useState<string | null>(null);
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
-  // categoriaId con desactivar en vuelo — deshabilita el botón de esa fila y
-  // muestra el spinner mientras la Cloud Function responde.
-  const [accionEnVueloId, setAccionEnVueloId] = useState<string | null>(null);
+  // categoriaId + tipo de acción en vuelo — deshabilita el botón de esa fila
+  // y muestra el spinner sólo en el botón que la disparó mientras la Cloud
+  // Function responde (activa/eliminar/reactivar comparten fila).
+  const [accionEnVuelo, setAccionEnVuelo] = useState<{
+    id: string;
+    tipo: "desactivar" | "eliminar" | "reactivar";
+  } | null>(null);
+  // Eliminar es IRREVERSIBLE (borrado real, sin `reactivarCategoria` que lo
+  // deshaga si ya se ejecutó) — a diferencia de desactivar, exige confirmar
+  // en un segundo clic con advertencia explícita, mismo criterio que
+  // CajerosScreen.tsx para eliminarCajero.
+  const [confirmandoEliminarId, setConfirmandoEliminarId] = useState<string | null>(null);
 
   async function crear(payload: CrearCategoriaPayload): Promise<void> {
     try {
@@ -86,13 +96,45 @@ export function CategoriasScreen() {
 
   async function desactivar(categoria: CategoriaValor): Promise<void> {
     setErrorAccion(null);
-    setAccionEnVueloId(categoria.categoriaId);
+    setAccionEnVuelo({ id: categoria.categoriaId, tipo: "desactivar" });
     try {
       await repo.desactivarCategoria(categoria.categoriaId);
     } catch {
       setErrorAccion(`No se pudo desactivar ${categoria.etiqueta}. Intenta de nuevo.`);
     } finally {
-      setAccionEnVueloId(null);
+      setAccionEnVuelo(null);
+    }
+  }
+
+  // El servidor ya trae el conteo humano en el mensaje de la guarda (ej. "No
+  // se puede eliminar: usada en 3 conteos."): se muestra tal cual, no se
+  // reformatea (a diferencia de desactivar, que no tiene guarda de negocio).
+  async function eliminar(categoria: CategoriaValor): Promise<void> {
+    setErrorAccion(null);
+    setAccionEnVuelo({ id: categoria.categoriaId, tipo: "eliminar" });
+    try {
+      await repo.eliminarCategoria(categoria.categoriaId);
+    } catch (error) {
+      setErrorAccion(
+        error instanceof Error
+          ? error.message
+          : `No se pudo eliminar ${categoria.etiqueta}. Intenta de nuevo.`,
+      );
+    } finally {
+      setAccionEnVuelo(null);
+      setConfirmandoEliminarId(null);
+    }
+  }
+
+  async function reactivar(categoria: CategoriaValor): Promise<void> {
+    setErrorAccion(null);
+    setAccionEnVuelo({ id: categoria.categoriaId, tipo: "reactivar" });
+    try {
+      await repo.reactivarCategoria(categoria.categoriaId);
+    } catch {
+      setErrorAccion(`No se pudo reactivar ${categoria.etiqueta}. Intenta de nuevo.`);
+    } finally {
+      setAccionEnVuelo(null);
     }
   }
 
@@ -126,20 +168,72 @@ export function CategoriasScreen() {
     {
       clave: "acciones",
       etiqueta: "Acciones",
-      render: (c) =>
-        c.activa ? (
-          <button
-            type="button"
-            onClick={() => void desactivar(c)}
-            disabled={accionEnVueloId === c.categoriaId}
-            className="inline-flex items-center gap-1.5 rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-riesgo hover:text-riesgo disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {accionEnVueloId === c.categoriaId && <Spinner className="size-3.5 shrink-0" />}
-            Desactivar
-          </button>
-        ) : (
-          "—"
-        ),
+      render: (c) => (
+        <div className="flex flex-wrap items-center gap-2">
+          {c.activa ? (
+            <>
+              <button
+                type="button"
+                onClick={() => void desactivar(c)}
+                disabled={accionEnVuelo?.id === c.categoriaId}
+                className="inline-flex items-center gap-1.5 rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-riesgo hover:text-riesgo disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {accionEnVuelo?.id === c.categoriaId && accionEnVuelo.tipo === "desactivar" && (
+                  <Spinner className="size-3.5 shrink-0" />
+                )}
+                Desactivar
+              </button>
+              {confirmandoEliminarId === c.categoriaId ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="text-micro text-tenue">
+                    ¿Eliminar {c.etiqueta} permanentemente? No se puede deshacer.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void eliminar(c)}
+                    disabled={accionEnVuelo?.id === c.categoriaId}
+                    className="inline-flex items-center gap-1.5 rounded-placa border border-riesgo px-2.5 py-1.5 text-micro text-tinta hover:bg-riesgo-placa disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {accionEnVuelo?.id === c.categoriaId && accionEnVuelo.tipo === "eliminar" && (
+                      <Spinner className="size-3.5 shrink-0" />
+                    )}
+                    Confirmar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmandoEliminarId(null)}
+                    className="rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tenue hover:text-tinta"
+                  >
+                    Cancelar
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmandoEliminarId(c.categoriaId)}
+                  disabled={accionEnVuelo?.id === c.categoriaId}
+                  className="inline-flex items-center gap-1.5 rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-riesgo hover:text-riesgo disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Icono nombre="papelera" className="size-3.5 shrink-0" />
+                  Eliminar
+                </button>
+              )}
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void reactivar(c)}
+              disabled={accionEnVuelo?.id === c.categoriaId}
+              className="inline-flex items-center gap-1.5 rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-senal hover:text-senal disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {accionEnVuelo?.id === c.categoriaId && accionEnVuelo.tipo === "reactivar" && (
+                <Spinner className="size-3.5 shrink-0" />
+              )}
+              Reactivar
+            </button>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -317,10 +411,7 @@ function FormularioCategoria({ error, onCancelar, onCrear }: FormularioCategoria
           </legend>
           <div className="flex flex-wrap gap-3">
             {sucursales.map((s) => (
-              <label
-                key={s.sucursalId}
-                className="flex items-center gap-1.5 text-micro text-tinta"
-              >
+              <label key={s.sucursalId} className="flex items-center gap-1.5 text-micro text-tinta">
                 <input
                   type="checkbox"
                   checked={sucursalesAsignadas.includes(s.sucursalId)}

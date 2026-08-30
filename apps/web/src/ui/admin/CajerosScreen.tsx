@@ -1,5 +1,6 @@
 // apps/web/src/ui/admin/CajerosScreen.tsx (docs/plan-panel-administrador.md
-// §5, fase F2) — CRUD de usuarios: crear, editar, desactivar, reactivar.
+// §5, fase F2/F7) — CRUD de usuarios: crear, editar, desactivar, reactivar,
+// eliminar (borrado real: borra la cuenta de Auth y el documento).
 //
 // Sin comprobación de correo duplicado en cliente: `crearCajero` ya la hace
 // (Auth es la fuente de verdad) y `already-exists` mapea a un mensaje claro
@@ -12,6 +13,7 @@ import type { RolUsuario, Usuario } from "@conteo/shared/models/usuario.js";
 import type { ActualizarCajeroPayload, CrearCajeroPayload } from "@conteo/data";
 import { fecha } from "../../lib/formato.js";
 import { useAdminRepository } from "../../state/admin-contexto.js";
+import { Icono } from "../primitivos/Icono.js";
 import { Spinner } from "../primitivos/Spinner.js";
 import { Tabla, type ColumnaTabla } from "./Tabla.js";
 
@@ -62,6 +64,12 @@ export function CajerosScreen() {
   // uid de la fila con desactivar/reactivar en vuelo — deshabilita el botón
   // y muestra el spinner mientras la Cloud Function responde.
   const [accionEnVueloUid, setAccionEnVueloUid] = useState<string | null>(null);
+  // Eliminar es IRREVERSIBLE (borra la cuenta de Auth y el documento; no hay
+  // `reactivarCajero` que la deshaga, a diferencia de desactivar). La misma
+  // confirmación inline de un paso alcanza porque el texto ya deja explícito
+  // que es un borrado permanente — no hace falta una segunda pantalla.
+  const [confirmandoEliminarUid, setConfirmandoEliminarUid] = useState<string | null>(null);
+  const [eliminandoUid, setEliminandoUid] = useState<string | null>(null);
 
   function abrirCreacion(): void {
     setFormulario({ modo: "crear" });
@@ -128,6 +136,26 @@ export function CajerosScreen() {
       setErrorAccion(`No se pudo reactivar a ${usuario.nombre}. Intenta de nuevo.`);
     } finally {
       setAccionEnVueloUid(null);
+    }
+  }
+
+  // El servidor ya trae el motivo exacto en el mensaje de la guarda (cuenta
+  // propia, rol distinto de cajero, o participación en N conteos): se
+  // muestra tal cual, no se reformatea.
+  async function eliminar(usuario: Usuario): Promise<void> {
+    setErrorAccion(null);
+    setEliminandoUid(usuario.uid);
+    try {
+      await repo.eliminarCajero(usuario.uid);
+    } catch (error) {
+      setErrorAccion(
+        error instanceof Error
+          ? error.message
+          : `No se pudo eliminar a ${usuario.nombre}. Intenta de nuevo.`,
+      );
+    } finally {
+      setConfirmandoEliminarUid(null);
+      setEliminandoUid(null);
     }
   }
 
@@ -218,6 +246,39 @@ export function CajerosScreen() {
             >
               {accionEnVueloUid === u.uid && <Spinner className="size-3.5 shrink-0" />}
               Reactivar
+            </button>
+          )}
+
+          {confirmandoEliminarUid === u.uid ? (
+            <span className="inline-flex items-center gap-2">
+              <span className="text-micro text-tenue">
+                ¿Eliminar a {u.nombre} permanentemente? No se puede deshacer.
+              </span>
+              <button
+                type="button"
+                onClick={() => void eliminar(u)}
+                disabled={eliminandoUid === u.uid}
+                className="inline-flex items-center gap-1.5 rounded-placa border border-riesgo px-2.5 py-1.5 text-micro text-tinta hover:bg-riesgo-placa disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {eliminandoUid === u.uid && <Spinner className="size-3.5 shrink-0" />}
+                Confirmar
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmandoEliminarUid(null)}
+                className="rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tenue hover:text-tinta"
+              >
+                Cancelar
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmandoEliminarUid(u.uid)}
+              className="inline-flex items-center gap-1.5 rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-riesgo hover:text-riesgo"
+            >
+              <Icono nombre="papelera" className="size-3.5 shrink-0" />
+              Eliminar
             </button>
           )}
         </div>

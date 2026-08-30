@@ -111,7 +111,9 @@ describe("CategoriasScreen (F3)", () => {
     renderPantalla(repo);
 
     fireEvent.click(screen.getByRole("button", { name: /nueva categoría/i }));
-    fireEvent.change(screen.getByLabelText(/etiqueta/i), { target: { value: "Refrigerador X200" } });
+    fireEvent.change(screen.getByLabelText(/etiqueta/i), {
+      target: { value: "Refrigerador X200" },
+    });
     fireEvent.change(screen.getByLabelText(/^valor$/i), { target: { value: "45000" } });
     fireEvent.change(screen.getByLabelText(/orden/i), { target: { value: "1" } });
     fireEvent.click(screen.getByLabelText("Norte"));
@@ -171,7 +173,7 @@ describe("CategoriasScreen (F3)", () => {
     expect(opciones).not.toContain("Vieja");
   });
 
-  it("ofrece desactivar sólo a las categorías activas", () => {
+  it("ofrece desactivar y eliminar sólo a las categorías activas, reactivar sólo a las inactivas", () => {
     const repo = new FakeAdminRepository();
     repo.sembrarCategoria(categoriaBase({ categoriaId: "cat_activa", etiqueta: "Activa" }));
     repo.sembrarCategoria(
@@ -180,9 +182,85 @@ describe("CategoriasScreen (F3)", () => {
 
     renderPantalla(repo);
 
-    // Sólo una fila (la activa) puede ofrecer "Desactivar"; la inactiva no
-    // tiene ninguna acción disponible porque `reactivarCategoria` no existe.
     expect(screen.getAllByRole("button", { name: /desactivar/i })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^eliminar$/i })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^reactivar$/i })).toHaveLength(1);
+  });
+
+  it("pide confirmación con aviso de irreversibilidad antes de eliminar", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarCategoria(categoriaBase());
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /^eliminar$/i }));
+
+    expect(
+      screen.getByText(/¿eliminar \$5\.000 permanentemente\? no se puede deshacer\./i),
+    ).toBeInTheDocument();
+  });
+
+  it("elimina una categoría existente", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarCategoria(categoriaBase());
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /^eliminar$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirmar/i }));
+
+    await vi.waitFor(() => {
+      expect(repo.llamadas).toEqual([
+        { metodo: "eliminarCategoria", payload: { categoriaId: "cat_5000" } },
+      ]);
+    });
+  });
+
+  it("reactiva una categoría existente", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarCategoria(categoriaBase({ activa: false }));
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /^reactivar$/i }));
+
+    await vi.waitFor(() => {
+      expect(repo.llamadas).toEqual([
+        { metodo: "reactivarCategoria", payload: { categoriaId: "cat_5000" } },
+      ]);
+    });
+  });
+
+  it("muestra el mensaje de la guarda del servidor tal cual cuando falla eliminar", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarCategoria(categoriaBase());
+    repo.eliminarCategoria = vi
+      .fn()
+      .mockRejectedValue(new Error("No se puede eliminar: usada en 3 conteos."));
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /^eliminar$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirmar/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "No se puede eliminar: usada en 3 conteos.",
+    );
+  });
+
+  it("deshabilita Confirmar y muestra el spinner mientras eliminar está en vuelo", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarCategoria(categoriaBase());
+    repo.eliminarCategoria = vi.fn(() => new Promise<never>(() => {}));
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /^eliminar$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirmar/i }));
+
+    const boton = screen.getByRole("button", { name: /confirmar/i });
+    expect(boton).toBeDisabled();
+    expect(boton.querySelector("svg")).toHaveClass("animate-spin");
   });
 
   it("muestra el error del servidor cuando falla desactivar", async () => {
