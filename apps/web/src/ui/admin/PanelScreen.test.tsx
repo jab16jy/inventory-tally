@@ -107,6 +107,20 @@ describe("PanelScreen (R0, F1)", () => {
     expect(screen.getAllByRole("button", { name: /cerrar/i })).toHaveLength(2);
   });
 
+  it("ofrece contar en cada sucursal con sesión abierta", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(sesionBase({ sesionId: "ses_norte", sucursalNombre: "Sucursal Norte" }));
+    repo.sembrarLinea("ses_norte", lineaBase("cat_5000", 5000, 1));
+    repo.sembrarSesion(
+      sesionBase({ sesionId: "ses_sur", sucursalId: "suc_sur", sucursalNombre: "Sucursal Sur" }),
+    );
+    repo.sembrarLinea("ses_sur", lineaBase("cat_5000", 5000, 1));
+
+    renderPanel(repo);
+
+    expect(screen.getAllByRole("button", { name: /contar/i })).toHaveLength(2);
+  });
+
   it("muestra un estado vacío cuando no hay ninguna sesión abierta", () => {
     const repo = new FakeAdminRepository();
 

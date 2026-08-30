@@ -121,6 +121,15 @@ export function PanelScreen() {
                     Análisis →
                   </button>
 
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/conteo/${sesion.sesionId}/preparar`)}
+                    aria-label={`Contar — ${sesion.sucursalNombre}`}
+                    className="shrink-0 rounded-placa border border-borde px-3 py-2 text-micro font-semibold text-tinta transition-colors duration-150 ease-out hover:border-senal hover:text-senal"
+                  >
+                    Contar →
+                  </button>
+
                   {/* Entrada al cierre (F4): navega, no cierra desde aquí. */}
                   <button
                     type="button"
