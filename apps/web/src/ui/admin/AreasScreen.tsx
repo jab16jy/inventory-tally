@@ -1,10 +1,12 @@
 // apps/web/src/ui/admin/AreasScreen.tsx — CRUD de áreas (agrupación de
-// categorías, doc 03 §3). Crear + desactivar; no hay `reactivarArea`, mismo
-// criterio que CategoriasScreen.tsx: una vez inactiva no ofrece acción.
+// categorías, doc 03 §3). Crear, desactivar, eliminar (borrado real con
+// guarda de participación) y reactivar — mismo criterio que
+// CategoriasScreen.tsx.
 import { useEffect, useId, useState, type FormEvent } from "react";
 import type { Area } from "@conteo/shared/models/area.js";
 import type { CrearAreaPayload } from "@conteo/data";
 import { useAdminRepository } from "../../state/admin-contexto.js";
+import { Icono } from "../primitivos/Icono.js";
 import { Spinner } from "../primitivos/Spinner.js";
 import { Tabla, type ColumnaTabla } from "./Tabla.js";
 
@@ -36,9 +38,18 @@ export function AreasScreen() {
   const [formularioAbierto, setFormularioAbierto] = useState(false);
   const [errorFormulario, setErrorFormulario] = useState<string | null>(null);
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
-  // areaId con desactivar en vuelo — deshabilita el botón de esa fila y
-  // muestra el spinner mientras la Cloud Function responde.
-  const [accionEnVueloId, setAccionEnVueloId] = useState<string | null>(null);
+  // areaId + tipo de acción en vuelo — deshabilita el botón de esa fila y
+  // muestra el spinner sólo en el botón que la disparó mientras la Cloud
+  // Function responde (activa/eliminar/reactivar comparten fila).
+  const [accionEnVuelo, setAccionEnVuelo] = useState<{
+    id: string;
+    tipo: "desactivar" | "eliminar" | "reactivar";
+  } | null>(null);
+  // Eliminar es IRREVERSIBLE (borrado real, sin `reactivarArea` que lo
+  // deshaga si ya se ejecutó) — a diferencia de desactivar, exige confirmar
+  // en un segundo clic con advertencia explícita, mismo criterio que
+  // CajerosScreen.tsx para eliminarCajero.
+  const [confirmandoEliminarId, setConfirmandoEliminarId] = useState<string | null>(null);
 
   async function crear(payload: CrearAreaPayload): Promise<void> {
     try {
@@ -52,13 +63,45 @@ export function AreasScreen() {
 
   async function desactivar(area: Area): Promise<void> {
     setErrorAccion(null);
-    setAccionEnVueloId(area.areaId);
+    setAccionEnVuelo({ id: area.areaId, tipo: "desactivar" });
     try {
       await repo.desactivarArea(area.areaId);
     } catch {
       setErrorAccion(`No se pudo desactivar ${area.nombre}. Intenta de nuevo.`);
     } finally {
-      setAccionEnVueloId(null);
+      setAccionEnVuelo(null);
+    }
+  }
+
+  // El servidor ya trae el conteo humano en el mensaje de la guarda (ej. "No
+  // se puede eliminar: usada en 3 categorías."): se muestra tal cual, no se
+  // reformatea (a diferencia de desactivar, que no tiene guarda de negocio).
+  async function eliminar(area: Area): Promise<void> {
+    setErrorAccion(null);
+    setAccionEnVuelo({ id: area.areaId, tipo: "eliminar" });
+    try {
+      await repo.eliminarArea(area.areaId);
+    } catch (error) {
+      setErrorAccion(
+        error instanceof Error
+          ? error.message
+          : `No se pudo eliminar ${area.nombre}. Intenta de nuevo.`,
+      );
+    } finally {
+      setAccionEnVuelo(null);
+      setConfirmandoEliminarId(null);
+    }
+  }
+
+  async function reactivar(area: Area): Promise<void> {
+    setErrorAccion(null);
+    setAccionEnVuelo({ id: area.areaId, tipo: "reactivar" });
+    try {
+      await repo.reactivarArea(area.areaId);
+    } catch {
+      setErrorAccion(`No se pudo reactivar ${area.nombre}. Intenta de nuevo.`);
+    } finally {
+      setAccionEnVuelo(null);
     }
   }
 
@@ -78,20 +121,72 @@ export function AreasScreen() {
     {
       clave: "acciones",
       etiqueta: "Acciones",
-      render: (a) =>
-        a.activa ? (
-          <button
-            type="button"
-            onClick={() => void desactivar(a)}
-            disabled={accionEnVueloId === a.areaId}
-            className="inline-flex items-center gap-1.5 rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-riesgo hover:text-riesgo disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {accionEnVueloId === a.areaId && <Spinner className="size-3.5 shrink-0" />}
-            Desactivar
-          </button>
-        ) : (
-          "—"
-        ),
+      render: (a) => (
+        <div className="flex flex-wrap items-center gap-2">
+          {a.activa ? (
+            <>
+              <button
+                type="button"
+                onClick={() => void desactivar(a)}
+                disabled={accionEnVuelo?.id === a.areaId}
+                className="inline-flex items-center gap-1.5 rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-riesgo hover:text-riesgo disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {accionEnVuelo?.id === a.areaId && accionEnVuelo.tipo === "desactivar" && (
+                  <Spinner className="size-3.5 shrink-0" />
+                )}
+                Desactivar
+              </button>
+              {confirmandoEliminarId === a.areaId ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="text-micro text-tenue">
+                    ¿Eliminar {a.nombre} permanentemente? No se puede deshacer.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void eliminar(a)}
+                    disabled={accionEnVuelo?.id === a.areaId}
+                    className="inline-flex items-center gap-1.5 rounded-placa border border-riesgo px-2.5 py-1.5 text-micro text-tinta hover:bg-riesgo-placa disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {accionEnVuelo?.id === a.areaId && accionEnVuelo.tipo === "eliminar" && (
+                      <Spinner className="size-3.5 shrink-0" />
+                    )}
+                    Confirmar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmandoEliminarId(null)}
+                    className="rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tenue hover:text-tinta"
+                  >
+                    Cancelar
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmandoEliminarId(a.areaId)}
+                  disabled={accionEnVuelo?.id === a.areaId}
+                  className="inline-flex items-center gap-1.5 rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-riesgo hover:text-riesgo disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Icono nombre="papelera" className="size-3.5 shrink-0" />
+                  Eliminar
+                </button>
+              )}
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void reactivar(a)}
+              disabled={accionEnVuelo?.id === a.areaId}
+              className="inline-flex items-center gap-1.5 rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-senal hover:text-senal disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {accionEnVuelo?.id === a.areaId && accionEnVuelo.tipo === "reactivar" && (
+                <Spinner className="size-3.5 shrink-0" />
+              )}
+              Reactivar
+            </button>
+          )}
+        </div>
+      ),
     },
   ];
 

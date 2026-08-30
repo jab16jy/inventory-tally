@@ -44,6 +44,11 @@ const PATHS = {
   /** Puerta abierta + flecha saliente — botón "Salir" del sidebar (nunca el
    *  texto "Cerrar sesión": ver AdminLayout.tsx). */
   cerrar: "M14 3H5v18h9M20 12H9M16 8l4 4-4 4",
+
+  // ── borrado real con guardas (categorías, áreas, cajeros) ──
+  /** Papelera cuadrada: tapa recta, sin curva de tacho — botón "Eliminar" en
+   *  las pantallas de admin. */
+  papelera: "M4 6h16M9 6V4h6v2M6 6l1 14h10l1-14M10 10v6M14 10v6",
 } as const;
 
 export interface IconoProps extends Omit<SVGProps<SVGSVGElement>, "children"> {

@@ -177,4 +177,71 @@ describe("CajerosScreen (F2)", () => {
     expect(boton).toBeDisabled();
     expect(boton.querySelector("svg")).toHaveClass("animate-spin");
   });
+
+  it("pide confirmación con aviso de irreversibilidad antes de eliminar", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarUsuario(usuarioBase());
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /^eliminar$/i }));
+
+    // Todavía no se llamó al repositorio: sólo se pidió confirmación.
+    expect(repo.llamadas).toHaveLength(0);
+    expect(
+      screen.getByText(/¿eliminar a ana permanentemente\? no se puede deshacer\./i),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /confirmar/i }));
+
+    expect(repo.llamadas).toEqual([{ metodo: "eliminarCajero", payload: { uid: "uid_ana" } }]);
+  });
+
+  it("muestra el mensaje de la guarda del servidor tal cual cuando falla eliminar", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarUsuario(usuarioBase());
+    repo.eliminarCajero = vi
+      .fn()
+      .mockRejectedValue(new Error("No se puede eliminar: participó en 2 conteos."));
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /^eliminar$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirmar/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "No se puede eliminar: participó en 2 conteos.",
+    );
+  });
+
+  it("cierra la confirmación cuando falla eliminar", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarUsuario(usuarioBase());
+    repo.eliminarCajero = vi.fn().mockRejectedValue(new Error("network"));
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /^eliminar$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirmar/i }));
+
+    await screen.findByRole("alert");
+
+    expect(screen.queryByText(/¿eliminar a ana permanentemente/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^eliminar$/i })).toBeInTheDocument();
+  });
+
+  it("deshabilita Confirmar y muestra el spinner mientras eliminar está en vuelo", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarUsuario(usuarioBase());
+    repo.eliminarCajero = vi.fn(() => new Promise<never>(() => {}));
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /^eliminar$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirmar/i }));
+
+    const boton = screen.getByRole("button", { name: /confirmar/i });
+    expect(boton).toBeDisabled();
+    expect(boton.querySelector("svg")).toHaveClass("animate-spin");
+  });
 });
