@@ -179,4 +179,9 @@ export interface AdminRepository {
   desactivarCategoria(categoriaId: string): Promise<{ categoriaId: string; desactivada: true }>;
   crearArea(payload: CrearAreaPayload): Promise<{ areaId: string; creada: true }>;
   desactivarArea(areaId: string): Promise<{ areaId: string; desactivada: true }>;
+  eliminarCategoria(categoriaId: string): Promise<{ categoriaId: string; eliminada: true }>;
+  eliminarArea(areaId: string): Promise<{ areaId: string; eliminada: true }>;
+  eliminarCajero(uid: string): Promise<{ uid: string; eliminado: true }>;
+  reactivarCategoria(categoriaId: string): Promise<{ categoriaId: string; reactivada: true }>;
+  reactivarArea(areaId: string): Promise<{ areaId: string; reactivada: true }>;
 }

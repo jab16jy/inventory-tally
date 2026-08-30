@@ -319,6 +319,30 @@ export class FirestoreAdminRepository implements AdminRepository {
     return this.llamar("desactivarArea", { areaId });
   }
 
+  async eliminarCategoria(
+    categoriaId: string,
+  ): Promise<{ categoriaId: string; eliminada: true }> {
+    return this.llamar("eliminarCategoria", { categoriaId });
+  }
+
+  async eliminarArea(areaId: string): Promise<{ areaId: string; eliminada: true }> {
+    return this.llamar("eliminarArea", { areaId });
+  }
+
+  async eliminarCajero(uid: string): Promise<{ uid: string; eliminado: true }> {
+    return this.llamar("eliminarCajero", { uid });
+  }
+
+  async reactivarCategoria(
+    categoriaId: string,
+  ): Promise<{ categoriaId: string; reactivada: true }> {
+    return this.llamar("reactivarCategoria", { categoriaId });
+  }
+
+  async reactivarArea(areaId: string): Promise<{ areaId: string; reactivada: true }> {
+    return this.llamar("reactivarArea", { areaId });
+  }
+
   // ─────────── helpers privados ───────────
 
   private async llamar<Entrada, Salida>(nombre: string, payload: Entrada): Promise<Salida> {

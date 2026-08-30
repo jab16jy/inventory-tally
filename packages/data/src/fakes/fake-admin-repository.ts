@@ -284,6 +284,35 @@ export class FakeAdminRepository implements AdminRepository {
     return { areaId, desactivada: true };
   }
 
+  async eliminarCategoria(
+    categoriaId: string,
+  ): Promise<{ categoriaId: string; eliminada: true }> {
+    this.registrar("eliminarCategoria", { categoriaId });
+    return { categoriaId, eliminada: true };
+  }
+
+  async eliminarArea(areaId: string): Promise<{ areaId: string; eliminada: true }> {
+    this.registrar("eliminarArea", { areaId });
+    return { areaId, eliminada: true };
+  }
+
+  async eliminarCajero(uid: string): Promise<{ uid: string; eliminado: true }> {
+    this.registrar("eliminarCajero", { uid });
+    return { uid, eliminado: true };
+  }
+
+  async reactivarCategoria(
+    categoriaId: string,
+  ): Promise<{ categoriaId: string; reactivada: true }> {
+    this.registrar("reactivarCategoria", { categoriaId });
+    return { categoriaId, reactivada: true };
+  }
+
+  async reactivarArea(areaId: string): Promise<{ areaId: string; reactivada: true }> {
+    this.registrar("reactivarArea", { areaId });
+    return { areaId, reactivada: true };
+  }
+
   // ─────────── helpers privados ───────────
 
   private registrar(metodo: string, payload: unknown): void {
