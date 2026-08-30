@@ -1,5 +1,5 @@
 import { FakeConteoRepository } from "@conteo/data";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ConteoRepositoryProvider } from "../state/repositorio-contexto.js";
@@ -130,6 +130,8 @@ describe("ConteoScreen (doc 11 §4)", () => {
     expect(screen.queryByRole("button", { name: /cerrar|descartar/i })).not.toBeInTheDocument();
 
     fireEvent.click(boton);
+    const dialogo = screen.getByRole("dialog");
+    fireEvent.click(within(dialogo).getByRole("button", { name: /^salir$/i }));
     expect(onSalir).toHaveBeenCalledTimes(1);
   });
 

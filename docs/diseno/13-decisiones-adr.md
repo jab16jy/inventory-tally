@@ -27,6 +27,7 @@ una decisión no examinada.
 | [15](#adr-15) | **React + Vite sobre continuar con Flutter Web**    | 🆕 Aceptada                |
 | [16](#adr-16) | Filtros de auditoría de uno en uno                  | 🆕 Aceptada                |
 | [17](#adr-17) | IDs de proyecto Firebase reales, no `conteo-eficiente-*` | 🆕 Aceptada           |
+| [19](#adr-19) | Confirmación antes de "Salir" para el cajero        | 🆕 Aceptada                |
 
 ---
 
@@ -458,6 +459,39 @@ service accounts desde cero · ⚠️ cualquier doc o script que asuma el patró
 `.firebaserc`, no inferirlo del nombre del producto. Pendiente de resolver en el ticket de
 deploy (5/6/7): usar los dominios `*.web.app` por defecto o crear sitios de Hosting con
 alias custom.
+
+---
+
+## ADR-19 {#adr-19}
+
+### Confirmación antes de "Salir" para el cajero, desviación deliberada del patrón sin-diálogo
+
+**Contexto.** El patrón establecido en este repo (#56, "Abrir conteo") es ejecutar la
+acción directo al click, sin diálogo de confirmación, mostrando el resultado después.
+`BotonSalir` (`apps/web/src/ui/BotonSalir.tsx`) rompía ese patrón al revés de lo esperado:
+invocaba `onSalir` (`signOut(auth)` en `lib/router.tsx`) directo al click, sin ningún paso
+intermedio, y un toque accidental durante un conteo activo cerraba la sesión del cajero de
+golpe (issue #72).
+
+**Decisión.** Agregar confirmación sólo en `BotonSalir`, con un `<dialog>` nativo inline
+(mismo patrón que `ModalSesionCerrada.tsx`: `showModal()`/`close()` por ref, sin estado de
+React) con dos botones, Cancelar/Salir — así los 8 consumidores de `BotonSalir`
+(`CabeceraCajero` → `SucursalesScreen`/`PrepararScreen`/`FinalizarScreen`/`MisConteosScreen`,
+y `ConteoScreen` directo) quedan protegidos sin tocarlos. `AdminLayout.tsx` llama `onSalir`
+directo (dos botones, sidebar y barra inferior) y se dejó sin confirmar a propósito: el
+costo de un error ahí es menor — el admin no está a mitad de un conteo con datos en riesgo
+como el cajero.
+
+| Alternativa                                        | Por qué se descartó                                                          |
+| --------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Componente `<Modal>` genérico reutilizable          | Un solo consumidor real hoy (`BotonSalir`); YAGNI mientras no aparezca un segundo caso |
+| Confirmar también en `AdminLayout`                  | Costo de error distinto al del cajero — no está documentando un conteo a mitad de camino |
+
+**Consecuencias.** ✅ Un toque accidental en "Salir" ya no cierra la sesión del cajero a
+mitad de un conteo · ✅ los 8 consumidores existentes quedan protegidos sin cambios propios,
+porque `BotonSalir` es el único punto de entrada · ⚠️ `AdminLayout` sigue sin confirmación —
+un futuro lector no debería "corregir" `BotonSalir` para que combine con el resto de la app
+quitándole la confirmación, ni asumir que `AdminLayout` necesita la misma por consistencia.
 
 ---
 

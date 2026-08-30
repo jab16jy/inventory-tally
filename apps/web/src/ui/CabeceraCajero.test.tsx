@@ -1,7 +1,7 @@
 // apps/web/src/ui/CabeceraCajero.test.tsx — issue #40. Cabecera compartida
 // por SucursalesScreen/PrepararScreen/FinalizarScreen: mismo título callado
 // que ya tenían + Salir (variante A).
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CabeceraCajero } from "./CabeceraCajero.js";
 
@@ -19,11 +19,13 @@ describe("CabeceraCajero (issue #40)", () => {
     expect(screen.queryByRole("button", { name: /cerrar sesión/i })).not.toBeInTheDocument();
   });
 
-  it("al tocar Salir, llama a onSalir", () => {
+  it("al tocar Salir y confirmar, llama a onSalir (issue #72)", () => {
     const onSalir = vi.fn();
     render(<CabeceraCajero titulo="Sucursales" onSalir={onSalir} />);
 
     fireEvent.click(screen.getByRole("button", { name: /^salir$/i }));
+    const dialogo = screen.getByRole("dialog");
+    fireEvent.click(within(dialogo).getByRole("button", { name: /^salir$/i }));
 
     expect(onSalir).toHaveBeenCalledTimes(1);
   });

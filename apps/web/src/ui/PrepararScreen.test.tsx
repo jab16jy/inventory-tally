@@ -1,6 +1,6 @@
 // apps/web/src/ui/PrepararScreen.test.tsx (F3-B, doc 11 §3, plan §5)
 import { FakeConteoRepository } from "@conteo/data";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ConteoRepositoryProvider } from "../state/repositorio-contexto.js";
@@ -73,6 +73,8 @@ describe("PrepararScreen (F3-B, doc 11 §3)", () => {
     expect(screen.queryByRole("button", { name: /cerrar sesión/i })).not.toBeInTheDocument();
 
     fireEvent.click(boton);
+    const dialogo = screen.getByRole("dialog");
+    fireEvent.click(within(dialogo).getByRole("button", { name: /^salir$/i }));
     expect(onSalir).toHaveBeenCalledTimes(1);
   });
 });
