@@ -12,9 +12,12 @@
 import { FakeConteoRepository } from "@conteo/data";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ConteoRepositoryProvider } from "../state/repositorio-contexto.js";
-import { ConteoScreenPorSesion } from "./ConteoScreen.js";
+
+vi.mock("firebase/auth", () => ({ onAuthStateChanged: vi.fn() }));
+
+const { ConteoScreenPorSesion } = await import("./ConteoScreen.js");
 
 function lineaBase(categoriaId: string, etiqueta: string, valorUnitario: number) {
   return {
@@ -47,7 +50,10 @@ function renderConDosSesiones() {
       <ConteoRepositoryProvider repo={repoConDosSesiones()}>
         <Link to="/conteo/ses_b">Ir a sesión B</Link>
         <Routes>
-          <Route path="/conteo/:sesionId" element={<ConteoScreenPorSesion onSalir={() => {}} />} />
+          <Route
+            path="/conteo/:sesionId"
+            element={<ConteoScreenPorSesion auth={{} as never} onSalir={() => {}} />}
+          />
         </Routes>
       </ConteoRepositoryProvider>
     </MemoryRouter>,

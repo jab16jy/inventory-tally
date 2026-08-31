@@ -4,7 +4,23 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ConteoRepositoryProvider } from "../state/repositorio-contexto.js";
-import { FinalizarScreen } from "./FinalizarScreen.js";
+
+const onAuthStateChanged = vi.fn();
+
+vi.mock("firebase/auth", () => ({
+  onAuthStateChanged: (...args: unknown[]) =>
+    (onAuthStateChanged as (...a: unknown[]) => unknown)(...args),
+}));
+
+const { FinalizarScreen } = await import("./FinalizarScreen.js");
+
+function usuarioFake(rol: "admin" | "cajero") {
+  return {
+    uid: "u1",
+    displayName: null,
+    getIdTokenResult: () => Promise.resolve({ claims: { rol } }),
+  };
+}
 
 function lineaBase(
   categoriaId: string,
@@ -33,9 +49,10 @@ function renderPantalla(repo: FakeConteoRepository, sesionId = "ses_1", onSalir 
         <Routes>
           <Route
             path="/conteo/:sesionId/finalizar"
-            element={<FinalizarScreen onSalir={onSalir} />}
+            element={<FinalizarScreen auth={{} as never} onSalir={onSalir} />}
           />
           <Route path="/sucursales" element={<p>Pantalla de sucursales</p>} />
+          <Route path="/admin" element={<p>Pantalla de admin</p>} />
         </Routes>
       </ConteoRepositoryProvider>
     </MemoryRouter>,
@@ -114,7 +131,11 @@ describe("FinalizarScreen (F3-B, doc 11 §6)", () => {
 
   it("ofrece un control de salida en la cabecera, distinto de 'Confirmar y salir'", () => {
     const onSalir = vi.fn();
-    renderPantalla(new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" }), "ses_1", onSalir);
+    renderPantalla(
+      new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" }),
+      "ses_1",
+      onSalir,
+    );
 
     const boton = screen.getByRole("button", { name: /^salir$/i });
     expect(screen.queryByRole("button", { name: /cerrar sesión/i })).not.toBeInTheDocument();
@@ -161,9 +182,32 @@ describe("FinalizarScreen (F3-B, doc 11 §6)", () => {
 
     fireEvent.click(botonReintentar);
 
-    expect(
-      await screen.findByRole("button", { name: /confirmar y salir/i }),
-    ).toBeEnabled();
+    expect(await screen.findByRole("button", { name: /confirmar y salir/i })).toBeEnabled();
     expect(screen.queryByRole("button", { name: /reintentar envío/i })).not.toBeInTheDocument();
+  });
+
+  it("un admin ve 'Volver al panel' y navega a /admin sin cerrar sesión", async () => {
+    onAuthStateChanged.mockImplementation((_auth: unknown, cb: (u: unknown) => void) => {
+      cb(usuarioFake("admin"));
+      return () => {};
+    });
+
+    renderPantalla(new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: /volver al panel/i }));
+
+    expect(await screen.findByText("Pantalla de admin")).toBeInTheDocument();
+  });
+
+  it("un cajero normal no ve 'Volver al panel'", async () => {
+    onAuthStateChanged.mockImplementation((_auth: unknown, cb: (u: unknown) => void) => {
+      cb(usuarioFake("cajero"));
+      return () => {};
+    });
+
+    renderPantalla(new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" }));
+
+    await screen.findByText(/todo enviado/i);
+    expect(screen.queryByRole("button", { name: /volver al panel/i })).not.toBeInTheDocument();
   });
 });

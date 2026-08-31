@@ -119,7 +119,7 @@ export function AppRouter(): ReactNode {
           path="/conteo/:sesionId/preparar"
           element={
             <RequireAuth>
-              <PrepararScreen onSalir={() => signOut(auth)} />
+              <PrepararScreen auth={auth} onSalir={() => signOut(auth)} />
             </RequireAuth>
           }
         />
@@ -127,7 +127,7 @@ export function AppRouter(): ReactNode {
           path="/conteo/:sesionId"
           element={
             <RequireAuth>
-              <ConteoScreenPorSesion onSalir={() => signOut(auth)} />
+              <ConteoScreenPorSesion auth={auth} onSalir={() => signOut(auth)} />
             </RequireAuth>
           }
         />
@@ -135,7 +135,7 @@ export function AppRouter(): ReactNode {
           path="/conteo/:sesionId/finalizar"
           element={
             <RequireAuth>
-              <FinalizarScreen onSalir={() => signOut(auth)} />
+              <FinalizarScreen auth={auth} onSalir={() => signOut(auth)} />
             </RequireAuth>
           }
         />

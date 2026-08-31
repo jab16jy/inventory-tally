@@ -4,6 +4,7 @@
 // F2 (plan §7) completa la cabecera (progreso + ChipEstado), la búsqueda,
 // el filtro "sólo pendientes" (doc 10 §2, "la función más útil del
 // dashboard"), el Deck de totales y la Hoja con teclado numérico.
+import type { Auth } from "firebase/auth";
 import { useCallback, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -13,6 +14,7 @@ import {
   totalUnidadesSesion,
 } from "@conteo/shared";
 import { datos } from "../lib/formato.js";
+import { useAuthState } from "../state/useAuthState.js";
 import { useConteoRepository } from "../state/repositorio-contexto.js";
 import { useConexion } from "../state/useConexion.js";
 import { useConsumoDatos } from "../state/useConsumoDatos.js";
@@ -32,6 +34,7 @@ import { Icono } from "./primitivos/Icono.js";
 import { Placa } from "./primitivos/Placa.js";
 
 export interface ConteoScreenProps {
+  readonly auth: Auth;
   // issue #40: sin título de una línea como las otras 3 pantallas (esta
   // cabecera ya es progreso+búsqueda), así que "Salir" no pasa por
   // CabeceraCajero — se inserta directo en la fila de búsqueda/filtro con el
@@ -39,7 +42,10 @@ export interface ConteoScreenProps {
   readonly onSalir: () => void | Promise<void>;
 }
 
-export function ConteoScreen({ onSalir }: ConteoScreenProps) {
+export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
+  // Mismo criterio que PrepararScreen/FinalizarScreen: un admin que entró a
+  // contar desde /admin no tiene forma de volver salvo cerrar sesión.
+  const esAdmin = useAuthState(auth)?.esAdmin ?? false;
   // Valor por defecto para no romper las reglas de hooks con un return
   // condicional antes de useLineasSesion/usePendientes; la ruta siempre
   // provee :sesionId cuando este componente se monta desde el router.
@@ -226,6 +232,15 @@ export function ConteoScreen({ onSalir }: ConteoScreenProps) {
             Pendientes
           </button>
 
+          {esAdmin && (
+            <button
+              type="button"
+              onClick={() => navigate("/admin")}
+              className="shrink-0 text-micro text-tenue hover:text-tinta"
+            >
+              Volver al panel
+            </button>
+          )}
           <BotonSalir onSalir={onSalir} />
         </div>
 
@@ -350,7 +365,7 @@ export function ConteoScreen({ onSalir }: ConteoScreenProps) {
  * cuenta para quien CREA el elemento, no para el componente que lo contiene
  * (error real cometido y corregido durante esta ola).
  */
-export function ConteoScreenPorSesion({ onSalir }: ConteoScreenProps) {
+export function ConteoScreenPorSesion({ auth, onSalir }: ConteoScreenProps) {
   const { sesionId } = useParams<{ sesionId: string }>();
-  return <ConteoScreen key={sesionId} onSalir={onSalir} />;
+  return <ConteoScreen key={sesionId} auth={auth} onSalir={onSalir} />;
 }

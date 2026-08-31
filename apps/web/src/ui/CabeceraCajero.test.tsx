@@ -29,4 +29,20 @@ describe("CabeceraCajero (issue #40)", () => {
 
     expect(onSalir).toHaveBeenCalledTimes(1);
   });
+
+  it("sin onVolverAdmin no muestra ningún control de vuelta al panel", () => {
+    render(<CabeceraCajero titulo="Sucursales" onSalir={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: /volver al panel/i })).not.toBeInTheDocument();
+  });
+
+  it("con onVolverAdmin, muestra 'Volver al panel' y lo invoca sin diálogo de confirmación", () => {
+    const onVolverAdmin = vi.fn();
+    render(<CabeceraCajero titulo="Sucursales" onSalir={vi.fn()} onVolverAdmin={onVolverAdmin} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /volver al panel/i }));
+
+    expect(onVolverAdmin).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
 });

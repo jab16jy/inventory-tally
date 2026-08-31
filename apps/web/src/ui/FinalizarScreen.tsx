@@ -17,9 +17,11 @@
 // DE EQUIPO (`LineaConteo.cantidadTotal`, ya sincronizado por el trigger de
 // aportes), no el aporte propio del cajero — por eso no choca con la
 // limitación de arriba.
+import type { Auth } from "firebase/auth";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { estaPendiente, totalPorArea } from "@conteo/shared";
+import { useAuthState } from "../state/useAuthState.js";
 import { useConteoRepository } from "../state/repositorio-contexto.js";
 import { useEscriturasConError } from "../state/useEscriturasConError.js";
 import { useLineasSesion } from "../state/useLineasSesion.js";
@@ -28,6 +30,7 @@ import { CabeceraCajero } from "./CabeceraCajero.js";
 import { Icono } from "./primitivos/Icono.js";
 
 export interface FinalizarScreenProps {
+  readonly auth: Auth;
   // issue #40: "Salir" (variante A, decidida vía /prototype) entra por prop,
   // igual que en SucursalesScreen/PrepararScreen/AdminLayout. Distinto de
   // "Confirmar y salir": ese botón exige listo === true; éste sale sin
@@ -35,11 +38,14 @@ export interface FinalizarScreenProps {
   readonly onSalir: () => void | Promise<void>;
 }
 
-export function FinalizarScreen({ onSalir }: FinalizarScreenProps) {
+export function FinalizarScreen({ auth, onSalir }: FinalizarScreenProps) {
   const { sesionId = "" } = useParams<{ sesionId: string }>();
   const repo = useConteoRepository();
   const navigate = useNavigate();
   const uid = repo.uidActual();
+  // Mismo criterio que PrepararScreen: un admin que entró a contar desde
+  // /admin no tiene forma de volver salvo cerrar sesión.
+  const esAdmin = useAuthState(auth)?.esAdmin ?? false;
 
   const lineas = useLineasSesion(sesionId);
   const pendientes = usePendientes(sesionId);
@@ -84,7 +90,11 @@ export function FinalizarScreen({ onSalir }: FinalizarScreenProps) {
           tres pantallas del recorrido comparten patrón para que el cajero no
           reaprenda la jerarquía en cada paso. El contenido —cuánto contó y
           si ya se envió todo— es lo que debe pesar aquí. */}
-      <CabeceraCajero titulo="Finalizar tu conteo" onSalir={onSalir} />
+      <CabeceraCajero
+        titulo="Finalizar tu conteo"
+        onSalir={onSalir}
+        onVolverAdmin={esAdmin ? () => navigate("/admin") : undefined}
+      />
 
       <p className="text-base text-tinta">
         Contaste {contadas} {contadas === 1 ? "categoría" : "categorías"}.
@@ -141,10 +151,13 @@ export function FinalizarScreen({ onSalir }: FinalizarScreenProps) {
           para que el cajero pueda reintentarlo a mano en vez de quedar
           varado para siempre en "Esperando conexión". */}
       {escriturasConError > 0 && (
-        <div role="alert" className="mt-4 flex flex-col gap-2 border border-borde bg-placa rounded-placa px-3 py-2.5">
+        <div
+          role="alert"
+          className="mt-4 flex flex-col gap-2 border border-borde bg-placa rounded-placa px-3 py-2.5"
+        >
           <p className="text-base text-tinta">
-            No se pudo enviar {escriturasConError}{" "}
-            {escriturasConError === 1 ? "conteo" : "conteos"}. Tu conteo está guardado.
+            No se pudo enviar {escriturasConError} {escriturasConError === 1 ? "conteo" : "conteos"}
+            . Tu conteo está guardado.
           </p>
           <button
             type="button"

@@ -16,7 +16,9 @@
 // pantalla de esta ola pide. Esta pantalla sigue sin consumir ninguno de los
 // dos — ver el `ponytail:` sobre el <header> más abajo para la ruta de
 // escalamiento real que queda.
+import type { Auth } from "firebase/auth";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuthState } from "../state/useAuthState.js";
 import { useConexion } from "../state/useConexion.js";
 import { useLineasSesion } from "../state/useLineasSesion.js";
 import { usePendientes } from "../state/usePendientes.js";
@@ -33,12 +35,13 @@ const PASOS = [
 ] as const;
 
 export interface PrepararScreenProps {
+  readonly auth: Auth;
   // issue #40: "Salir" (variante A, decidida vía /prototype) entra por prop,
   // igual que en SucursalesScreen/AdminLayout.
   readonly onSalir: () => void | Promise<void>;
 }
 
-export function PrepararScreen({ onSalir }: PrepararScreenProps) {
+export function PrepararScreen({ auth, onSalir }: PrepararScreenProps) {
   // Mismo valor por defecto que ConteoScreen y por la misma razón: no
   // romper las reglas de hooks con un return condicional antes de los
   // hooks de estado — la ruta siempre provee :sesionId al montar.
@@ -48,6 +51,10 @@ export function PrepararScreen({ onSalir }: PrepararScreenProps) {
   const lineas = useLineasSesion(sesionId);
   const pendientes = usePendientes(sesionId);
   const enLinea = useConexion();
+  // Un admin que entró a contar desde /admin (PanelScreen "Contar →") no
+  // tiene forma de volver salvo cerrar sesión — esAdmin es del usuario, no
+  // de cómo navegó, así que funciona sin importar el punto de entrada.
+  const esAdmin = useAuthState(auth)?.esAdmin ?? false;
 
   const catalogoCargado = lineas.length > 0;
   const estadoSync: "sincronizado" | "pendiente" | "sin-conexion" = !enLinea
@@ -70,7 +77,11 @@ export function PrepararScreen({ onSalir }: PrepararScreenProps) {
           …)` aquí para el nombre, y `observarSucursales([sesion.sucursalId],
           …)` para el aviso de datos móviles, el día que una pantalla real lo
           necesite. */}
-      <CabeceraCajero titulo="Antes de empezar" onSalir={onSalir} />
+      <CabeceraCajero
+        titulo="Antes de empezar"
+        onSalir={onSalir}
+        onVolverAdmin={esAdmin ? () => navigate("/admin") : undefined}
+      />
 
       <ul className="flex flex-col gap-2">
         <li className="list-none">

@@ -3,14 +3,34 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ConteoRepositoryProvider } from "../state/repositorio-contexto.js";
-import { ConteoScreen } from "./ConteoScreen.js";
+
+const onAuthStateChanged = vi.fn();
+
+vi.mock("firebase/auth", () => ({
+  onAuthStateChanged: (...args: unknown[]) =>
+    (onAuthStateChanged as (...a: unknown[]) => unknown)(...args),
+}));
+
+const { ConteoScreen } = await import("./ConteoScreen.js");
+
+function usuarioFake(rol: "admin" | "cajero") {
+  return {
+    uid: "u1",
+    displayName: null,
+    getIdTokenResult: () => Promise.resolve({ claims: { rol } }),
+  };
+}
 
 function renderConteoScreen(repo: FakeConteoRepository, sesionId = "ses_1", onSalir = vi.fn()) {
   return render(
     <MemoryRouter initialEntries={[`/conteo/${sesionId}`]}>
       <ConteoRepositoryProvider repo={repo}>
         <Routes>
-          <Route path="/conteo/:sesionId" element={<ConteoScreen onSalir={onSalir} />} />
+          <Route
+            path="/conteo/:sesionId"
+            element={<ConteoScreen auth={{} as never} onSalir={onSalir} />}
+          />
+          <Route path="/admin" element={<p>Pantalla de admin</p>} />
         </Routes>
       </ConteoRepositoryProvider>
     </MemoryRouter>,
@@ -156,5 +176,30 @@ describe("ConteoScreen (doc 11 §4)", () => {
 
     expect(await screen.findByRole("button", { name: /sumar/i })).toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: /área/i })).not.toBeInTheDocument();
+  });
+
+  it("un admin ve 'Volver al panel' y navega a /admin sin cerrar sesión", async () => {
+    onAuthStateChanged.mockImplementation((_auth: unknown, cb: (u: unknown) => void) => {
+      cb(usuarioFake("admin"));
+      return () => {};
+    });
+
+    renderConteoScreen(new FakeConteoRepository());
+
+    fireEvent.click(await screen.findByRole("button", { name: /volver al panel/i }));
+
+    expect(await screen.findByText("Pantalla de admin")).toBeInTheDocument();
+  });
+
+  it("un cajero normal no ve 'Volver al panel'", async () => {
+    onAuthStateChanged.mockImplementation((_auth: unknown, cb: (u: unknown) => void) => {
+      cb(usuarioFake("cajero"));
+      return () => {};
+    });
+
+    renderConteoScreen(new FakeConteoRepository());
+
+    expect(await screen.findByRole("button", { name: /^salir$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /volver al panel/i })).not.toBeInTheDocument();
   });
 });
