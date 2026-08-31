@@ -60,6 +60,39 @@ describe("lineaConteoDesdeDoc (doc 04 §3)", () => {
       actualizadaPor: "uid_luis",
     });
   });
+
+  it("mapea aplicados cuando el doc lo trae (base de onAporteEscrito/reconciliarLineas)", () => {
+    const actualizadaEn = Timestamp.fromDate(new Date("2026-08-02T09:14:33Z"));
+    const linea = lineaConteoDesdeDoc("cat_5000", {
+      valorUnitario: 5000,
+      etiqueta: "$5.000",
+      area: "Efectivo",
+      cantidadTotal: 55,
+      numAportantes: 2,
+      versiones: { uid_ana: 3, uid_luis: 1 },
+      actualizadaEn,
+      actualizadaPor: "uid_luis",
+      aplicados: { uid_ana: 40, uid_luis: 15 },
+    });
+
+    expect(linea.aplicados).toEqual({ uid_ana: 40, uid_luis: 15 });
+  });
+
+  it("deja aplicados en undefined cuando el doc no lo trae (abrirSesion siembra líneas sin ese mapa)", () => {
+    const actualizadaEn = Timestamp.fromDate(new Date("2026-08-02T09:14:33Z"));
+    const linea = lineaConteoDesdeDoc("cat_5000", {
+      valorUnitario: 5000,
+      etiqueta: "$5.000",
+      area: "Efectivo",
+      cantidadTotal: 0,
+      numAportantes: 0,
+      versiones: {},
+      actualizadaEn,
+      actualizadaPor: "uid_admin",
+    });
+
+    expect(linea.aplicados).toBeUndefined();
+  });
 });
 
 describe("sesionConteoDesdeDoc (doc 04 §3)", () => {
