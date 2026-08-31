@@ -120,13 +120,20 @@ describe("SucursalesAdminScreen (F2)", () => {
     fireEvent.click(boton);
 
     expect(await screen.findByRole("status")).toHaveTextContent(/conteo abierto en norte/i);
-    expect(repo.llamadas).toEqual([{ metodo: "abrirSesion", payload: { sucursalId: "suc_norte" } }]);
+    expect(repo.llamadas).toEqual([
+      { metodo: "abrirSesion", payload: { sucursalId: "suc_norte" } },
+    ]);
   });
 
   it("deshabilita Abrir conteo si la sucursal está inactiva", () => {
     const repo = new FakeAdminRepository();
     repo.sembrarSucursal(
-      sucursalBase({ sucursalId: "suc_norte", nombre: "Norte", activa: false, sesionAbiertaId: null }),
+      sucursalBase({
+        sucursalId: "suc_norte",
+        nombre: "Norte",
+        activa: false,
+        sesionAbiertaId: null,
+      }),
     );
 
     renderPantalla(repo);
@@ -179,6 +186,16 @@ describe("SucursalesAdminScreen (F2)", () => {
     const boton = within(fila).getByRole("button", { name: /desactivar/i });
     expect(boton).toBeDisabled();
     expect(boton.querySelector("svg")).toHaveClass("animate-spin");
+  });
+
+  it("envuelve las acciones en varias líneas en vez de forzar el ancho de la fila", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSucursal(sucursalBase({ sucursalId: "suc_norte", nombre: "Norte" }));
+
+    renderPantalla(repo);
+
+    const contenedorAcciones = screen.getByRole("button", { name: "Editar" }).parentElement;
+    expect(contenedorAcciones).toHaveClass("flex-wrap");
   });
 
   it("deshabilita Abrir conteo y muestra el spinner mientras la acción está en vuelo", () => {

@@ -174,7 +174,7 @@ export function SucursalesAdminScreen() {
             ? "Ya hay un conteo abierto en esta sucursal"
             : undefined;
         return (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => abrirEdicion(s)}
