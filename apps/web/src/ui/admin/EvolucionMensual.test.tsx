@@ -1,5 +1,5 @@
 // apps/web/src/ui/admin/EvolucionMensual.test.tsx (docs/diseno/10-analisis-y-dashboards.md
-// §5-6) — mismo molde de prueba que Dona.test.tsx.
+// §5-6) — mismo molde de prueba que Sparkline.test.tsx.
 //
 // Cambio de diseño: el tooltip por punto se eliminó (docs/diseno/11 §314 exige
 // objetivos táctiles ≥48px; con LIMITE_SERIE_POR_DEFECTO=12 puntos en 280px

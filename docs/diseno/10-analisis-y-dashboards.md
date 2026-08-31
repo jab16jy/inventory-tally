@@ -189,10 +189,11 @@ contrario.
 El repositorio no tiene ninguna librería de gráficas (ni `recharts` ni ninguna otra) y no
 va a tenerla: la única pieza gráfica del sistema es `Sparkline.tsx`, una curva SVG propia
 (coordenadas + un `<circle>` por punto, sin dependencias) con su equivalente accesible en
-texto en paralelo — nunca sólo el SVG. `Dona.tsx` (pastel) y las barras horizontales que
-usaba el dashboard de sesión se retiraron de aquí: la agregación por categoría, por
-cajero y por área vive ahora en una sola tabla ordenable con selector de dimensión
-(§3), y "cuánto hay de cada X" se responde una vez, no tres con presentaciones distintas.
+texto en paralelo — nunca sólo el SVG. El componente de dona (pastel) y las barras
+horizontales que usaba el dashboard de sesión se eliminaron del repositorio: la
+agregación por categoría, por cajero y por área vive ahora en una sola tabla ordenable
+con selector de dimensión (§3), y "cuánto hay de cada X" se responde una vez, no tres
+con presentaciones distintas.
 
 | Métrica                                  | Gráfica            | Por qué                                             |
 | ------------------------------------------ | ------------------- | ---------------------------------------------------- |

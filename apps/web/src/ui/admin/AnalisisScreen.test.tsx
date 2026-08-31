@@ -30,7 +30,7 @@ afterEach(() => {
 
 /** `moneda()` inserta un espacio de no separación que Testing Library
  *  colapsa a uno normal antes de comparar (verificado en formato.test.ts,
- *  mismo helper que ComparativoScreen.test.tsx y Dona.test.tsx). */
+ *  mismo helper que ComparativoScreen.test.tsx y EvolucionMensual.test.tsx). */
 function textoDom(s: string): string {
   return s.split(ESPACIO_NO_SEPARABLE).join(" ");
 }

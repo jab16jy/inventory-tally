@@ -1,9 +1,10 @@
 // apps/web/src/ui/admin/EvolucionMensual.tsx (docs/diseno/10-analisis-y-dashboards.md
-// §5-6) — evolución mensual del valor total por sesión cerrada. Mismo molde
-// que Dona.tsx: SVG `aria-hidden` + equivalente accesible en paralelo con los
-// MISMOS valores en texto — la dualidad es la convención de accesibilidad
-// del repo para gráficas, no un adorno. La curva en sí (matemática de
-// coordenadas, círculo por punto) vive en Sparkline.tsx — no se duplica aquí.
+// §5-6) — evolución mensual del valor total por sesión cerrada. Misma
+// convención de accesibilidad que Sparkline.tsx: SVG `aria-hidden` +
+// equivalente accesible en paralelo con los MISMOS valores en texto — la
+// dualidad es la convención del repo para gráficas, no un adorno. La curva
+// en sí (matemática de coordenadas, círculo por punto) vive en
+// Sparkline.tsx — no se duplica aquí.
 //
 // `historicos` llega en orden `cerradaEn desc` (la consulta de
 // `historicosRecientesPorSucursal`): se invierte aquí para que el eje X sea

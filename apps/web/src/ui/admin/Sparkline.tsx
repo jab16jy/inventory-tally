@@ -9,7 +9,7 @@
 // no su magnitud relativa frente a otras filas. Apiladas en una columna de
 // tabla eso invita visualmente a compararlas; no lo son.
 //
-// El SVG es `aria-hidden` (misma convención que Dona.tsx y EvolucionMensual.tsx):
+// El SVG es `aria-hidden` (misma convención que EvolucionMensual.tsx):
 // NUNCA lleva su propio equivalente accesible. Quien monte este componente
 // es responsable de aportar los valores como texto en el DOM al lado — un
 // tooltip o el SVG solo no bastan, sería una celda muda para lectores de
