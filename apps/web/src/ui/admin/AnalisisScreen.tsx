@@ -1,7 +1,9 @@
 // apps/web/src/ui/admin/AnalisisScreen.tsx (docs/plan-panel-administrador.md
 // §5, fase F5) — dashboard de análisis de UNA sesión: cabecera, 3 KPI,
-// sincronización, barras, dona, extremos, tabla ordenable y comparativo, en
-// ese orden exacto (docs/diseno/10-analisis-y-dashboards.md:120-142). El
+// sincronización, barras, dona, extremos y tabla ordenable, en ese orden
+// exacto (docs/diseno/10-analisis-y-dashboards.md:120-142). ADR-20 quitó el
+// panel de Comparativo de aquí: pasó a rankear ejecución de toda la red, no
+// responde nada sobre ESTA sesión, y ya es uno de los 7 destinos del nav. El
 // bloque de sincronización va ARRIBA de las gráficas a propósito: es lo que
 // el admin necesita antes de decidir si puede cerrar el conteo (mismo motivo
 // que documenta CierreScreen.tsx, alcanzado desde el botón "Análisis →" que
@@ -35,7 +37,6 @@ import { useConexion } from "../../state/useConexion.js";
 import { Icono } from "../primitivos/Icono.js";
 import { Numeral } from "../primitivos/Numeral.js";
 import { Placa } from "../primitivos/Placa.js";
-import { ComparativoScreen } from "./ComparativoScreen.js";
 import { Dona } from "./Dona.js";
 import { EvolucionMensual } from "./EvolucionMensual.js";
 import { Tabla, type ColumnaTabla } from "./Tabla.js";
@@ -483,14 +484,6 @@ export function AnalisisScreen() {
         </h2>
         <EvolucionMensual historicos={historicos} etiqueta="Evolución mensual" />
       </div>
-
-      {/* Composición, no extracción: `ComparativoScreen` ya trae su propio
-          fetch, el comentario del fan-out N+1, las barras y la tabla —
-          montarlo tal cual reusa todo eso con una línea de diferencia y deja
-          ComparativoScreen.test.tsx intacto. */}
-      <div data-seccion="comparativo">
-        <ComparativoScreen anidado />
-      </div>
     </section>
   );
 }
@@ -538,7 +531,6 @@ function EsqueletoAnalisis({ columnas }: { readonly columnas: ColumnaTabla<FilaD
         data-seccion="evolucion"
         className="mb-4 h-32 animate-pulse rounded-placa bg-placa-alta"
       />
-      <div data-seccion="comparativo" className="h-32 animate-pulse rounded-placa bg-placa-alta" />
     </section>
   );
 }
