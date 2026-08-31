@@ -12,6 +12,7 @@ import type { LineaConteo, SesionConteo } from "@conteo/shared";
 import { totalMonetarioSesion, totalUnidadesSesion } from "@conteo/shared";
 import { moneda, numero } from "../../lib/formato.js";
 import { useAdminRepository } from "../../state/admin-contexto.js";
+import { useDisenoAdaptativo } from "../../state/useDisenoAdaptativo.js";
 import { Numeral } from "../primitivos/Numeral.js";
 import { Placa } from "../primitivos/Placa.js";
 
@@ -46,6 +47,7 @@ export function PanelScreen() {
   const sesionIds = sesiones.map((s) => s.sesionId);
   const lineasPorSesion = useLineasPorSesion(sesionIds);
   const navigate = useNavigate();
+  const diseno = useDisenoAdaptativo();
 
   return (
     <section className="p-6">
@@ -79,6 +81,70 @@ export function PanelScreen() {
                       <span className="h-3 w-24 animate-pulse rounded-placa bg-placa-alta" />
                     </div>
                     <span className="h-6 w-20 shrink-0 animate-pulse rounded-placa bg-placa-alta" />
+                  </Placa>
+                </li>
+              );
+            }
+
+            // Mismo contenido, dos formas de DOM: en <600px los 6 hijos de
+            // una sola fila (nombre+estado, 2 KPI, 3 botones) no caben sin
+            // desbordarse — mismo criterio de useDisenoAdaptativo que ya usan
+            // AdminLayout.tsx y Tabla.tsx para esta misma pantalla.
+            if (diseno === "movil") {
+              return (
+                <li key={sesion.sesionId} className="list-none" data-testid="fila-movil">
+                  <Placa className="flex flex-col gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-semibold text-tinta">
+                        {sesion.sucursalNombre}
+                      </p>
+                      <p className="text-micro text-tenue">Sesión abierta</p>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-micro text-tenue">Unidades</p>
+                        <Numeral tamano="base" className="text-tinta">
+                          {numero(totalUnidadesSesion(lineas))}
+                        </Numeral>
+                      </div>
+
+                      <div className="text-right">
+                        <p className="text-micro text-tenue">Total</p>
+                        <Numeral tamano="base" className="font-semibold text-tinta">
+                          {moneda(totalMonetarioSesion(lineas))}
+                        </Numeral>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/admin/sesiones/${sesion.sesionId}/analisis`)}
+                        aria-label={`Análisis — ${sesion.sucursalNombre}`}
+                        className="flex-1 rounded-placa border border-borde px-3 py-2 text-micro font-semibold text-tinta transition-colors duration-150 ease-out hover:border-senal hover:text-senal"
+                      >
+                        Análisis →
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/conteo/${sesion.sesionId}/preparar`)}
+                        aria-label={`Contar — ${sesion.sucursalNombre}`}
+                        className="flex-1 rounded-placa border border-borde px-3 py-2 text-micro font-semibold text-tinta transition-colors duration-150 ease-out hover:border-senal hover:text-senal"
+                      >
+                        Contar →
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/admin/sesiones/${sesion.sesionId}/cerrar`)}
+                        aria-label={`Cerrar sesión — ${sesion.sucursalNombre}`}
+                        className="flex-1 rounded-placa border border-borde px-3 py-2 text-micro font-semibold text-tinta transition-colors duration-150 ease-out hover:border-senal hover:text-senal"
+                      >
+                        Cerrar →
+                      </button>
+                    </div>
                   </Placa>
                 </li>
               );

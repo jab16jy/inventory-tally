@@ -4,9 +4,19 @@ import { FakeAdminRepository } from "@conteo/data";
 import type { LineaConteo, SesionConteo } from "@conteo/shared";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { AdminRepositoryProvider } from "../../state/admin-contexto.js";
 import { PanelScreen } from "./PanelScreen.js";
+
+const ANCHO_ORIGINAL = window.innerWidth;
+
+function fijarAncho(ancho: number): void {
+  Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: ancho });
+}
+
+afterEach(() => {
+  fijarAncho(ANCHO_ORIGINAL);
+});
 
 function sesionBase(overrides: Partial<SesionConteo> = {}): SesionConteo {
   return {
@@ -128,5 +138,29 @@ describe("PanelScreen (R0, F1)", () => {
 
     expect(screen.getByText(/no hay sesiones de conteo abiertas/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /cerrar/i })).not.toBeInTheDocument();
+  });
+
+  it("a 375px sigue ofreciendo las tres acciones accesibles (issue overflow móvil)", () => {
+    fijarAncho(375);
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(sesionBase());
+    repo.sembrarLinea("ses_norte", lineaBase("cat_5000", 5000, 10));
+
+    renderPanel(repo);
+
+    expect(screen.getByRole("button", { name: /análisis/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /contar/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /cerrar/i })).toBeInTheDocument();
+    expect(screen.getByTestId("fila-movil")).toBeInTheDocument();
+  });
+
+  it("a 1024px (escritorio) no usa la estructura de fila móvil", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(sesionBase());
+    repo.sembrarLinea("ses_norte", lineaBase("cat_5000", 5000, 10));
+
+    renderPanel(repo);
+
+    expect(screen.queryByTestId("fila-movil")).not.toBeInTheDocument();
   });
 });
