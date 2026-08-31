@@ -21,6 +21,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { CAJEROS } from "./datos-prueba.ts";
 import {
+  AREA_POR_CATEGORIA,
   CATEGORIAS_CONTEO,
   MARCADOR,
   NUM_CONTEOS,
@@ -50,6 +51,28 @@ function generarSesionId(sucursalId: string, fecha: Date): string {
 
 function entero(min: number, max: number): number {
   return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+/**
+ * Reparte `total` unidades entre `n` participantes de forma que la suma sea
+ * EXACTAMENTE `total` — el resto se distribuye de a una unidad entre los
+ * primeros, igual que el método del mayor resto de `distribuirRedondeo`.
+ *
+ * El invariante importa: el trigger real escribe `cantidadTotal` y `aplicados`
+ * en la misma transacción, así que en producción siempre cuadran. Si el
+ * seeder los dejara descuadrados, el desglose por cajero mostraría una fila
+ * "Sin atribuir" que no existe en datos reales.
+ *
+ * ponytail: sin test — `tools/` no tiene runner (sólo `typecheck`) y montar
+ * vitest aquí para una función de siembra sería andamiaje. Techo: si `tools/`
+ * gana lógica propia de verdad, se le monta vitest y ésta es la primera que
+ * lo estrena.
+ */
+function repartir(total: number, n: number): number[] {
+  if (n <= 0) return [];
+  const base = Math.floor(total / n);
+  const resto = total - base * n;
+  return Array.from({ length: n }, (_, i) => base + (i < resto ? 1 : 0));
 }
 
 async function sembrarSucursalesNuevas(): Promise<void> {
@@ -102,14 +125,26 @@ async function sembrarConteo(sucursalId: string, uids: string[], diasAtras: numb
   const porCategoria = Object.fromEntries(
     lineas.map((l) => [
       l.categoriaId,
-      { cantidad: l.cantidadTotal, subtotal: l.cantidadTotal * l.valorUnitario, actualizadaEn: fecha },
+      {
+        cantidad: l.cantidadTotal,
+        subtotal: l.cantidadTotal * l.valorUnitario,
+        actualizadaEn: fecha,
+      },
     ]),
   );
   const ordenadas = [...lineas].sort((a, b) => b.cantidadTotal - a.cantidadTotal);
   const mayor = ordenadas[0]!;
   const menor = ordenadas[ordenadas.length - 1]!;
-  const categoriaMayor = { categoriaId: mayor.categoriaId, etiqueta: mayor.etiqueta, cantidad: mayor.cantidadTotal };
-  const categoriaMenor = { categoriaId: menor.categoriaId, etiqueta: menor.etiqueta, cantidad: menor.cantidadTotal };
+  const categoriaMayor = {
+    categoriaId: mayor.categoriaId,
+    etiqueta: mayor.etiqueta,
+    cantidad: mayor.cantidadTotal,
+  };
+  const categoriaMenor = {
+    categoriaId: menor.categoriaId,
+    etiqueta: menor.etiqueta,
+    cantidad: menor.cantidadTotal,
+  };
 
   const lote = db.batch();
 
@@ -129,13 +164,20 @@ async function sembrarConteo(sucursalId: string, uids: string[], diasAtras: numb
   });
 
   for (const linea of lineas) {
+    // `aplicados` es la atribución por persona que lee el desglose por cajero
+    // del análisis de sesión — el mismo campo que escribe `onAporteEscrito`.
+    // Sin él, la dimensión "Cajero" saldría vacía con datos sembrados; sin
+    // `area`, la dimensión "Área" agruparía todo bajo una clave ausente.
+    const porUid = repartir(linea.cantidadTotal, uids.length);
     lote.set(db.doc(`sesiones/${sesionId}/lineas/${linea.categoriaId}`), {
       categoriaId: linea.categoriaId,
       valorUnitario: linea.valorUnitario,
       etiqueta: linea.etiqueta,
+      area: AREA_POR_CATEGORIA[linea.categoriaId] ?? "Sin área",
       cantidadTotal: linea.cantidadTotal,
       numAportantes: uids.length || 1,
       versiones: Object.fromEntries(uids.map((uid) => [uid, 1])),
+      aplicados: Object.fromEntries(uids.map((uid, i) => [uid, porUid[i]!])),
       actualizadaEn: fecha,
       actualizadaPor: uids[0] ?? MARCADOR,
     });
