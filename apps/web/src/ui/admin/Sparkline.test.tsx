@@ -50,6 +50,22 @@ describe("Sparkline", () => {
     expect(container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });
 
+  // Sin esta aserción, `radioPunto` no lo ejercita nadie: romper su cableado
+  // (o cambiarle el valor por defecto) encogería en silencio los puntos de
+  // EvolucionMensual, que pasa 3 justamente para conservar los círculos que
+  // tenía antes de que la curva se extrajera a este componente.
+  it("radioPunto fija el radio de los puntos, y por defecto es 2", () => {
+    const { container: porDefecto } = render(<Sparkline valores={[1, 2, 3]} />);
+    for (const punto of porDefecto.querySelectorAll("circle")) {
+      expect(punto).toHaveAttribute("r", "2");
+    }
+
+    const { container: custom } = render(<Sparkline valores={[1, 2, 3]} radioPunto={3} />);
+    for (const punto of custom.querySelectorAll("circle")) {
+      expect(punto).toHaveAttribute("r", "3");
+    }
+  });
+
   it("respeta ancho/alto custom en el viewBox", () => {
     const { container } = render(<Sparkline valores={[1, 2]} ancho={64} alto={24} />);
 

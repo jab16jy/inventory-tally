@@ -206,6 +206,30 @@ describe("ComparativoScreen (ADR-20: mide ejecución, no tamaño)", () => {
     expect(celdas[5]).toHaveTextContent("—");
   });
 
+  // La variación se calcula contra el cierre ANTERIOR, así que un cierre
+  // anterior en 0 dividiría por cero y pintaría "Infinity%". La guarda existía
+  // pero no la ejercitaba ningún test: todos los históricos sembrados usan el
+  // mismo totalMonetario.
+  it("Tendencia muestra '—' cuando el cierre anterior fue 0, sin dividir por cero", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSucursal(sucursalBase({ sucursalId: "suc_norte", nombre: "Sucursal Norte" }));
+    repo.sembrarHistorico(
+      "suc_norte",
+      historicoBase({ sesionId: "ses_1", cerradaEn: hace(5), totalMonetario: 100_000 }),
+    );
+    // El más antiguo es el "anterior" de la variación: en cero a propósito.
+    repo.sembrarHistorico(
+      "suc_norte",
+      historicoBase({ sesionId: "ses_0", cerradaEn: hace(35), totalMonetario: 0 }),
+    );
+
+    renderPantalla(repo);
+
+    const celdas = await celdasDeFila("Sucursal Norte");
+    expect(celdas[5]).toHaveTextContent("—");
+    expect(celdas[5]).not.toHaveTextContent(/Infinity|NaN/);
+  });
+
   it("muestra un esqueleto con la forma final mientras carga", () => {
     const repo = new FakeAdminRepository();
     repo.sembrarSucursal(sucursalBase());
