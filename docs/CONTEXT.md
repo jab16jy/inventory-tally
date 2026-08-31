@@ -41,3 +41,11 @@ _Avoid_: sesión (a secas), cuando pueda confundirse con la sesión de autentica
 **Sesión de autenticación**:
 La sesión de un usuario autenticado en la app, independiente de si hay una sesión de conteo abierta.
 _Avoid_: cerrar sesión (a secas), cuando pueda confundirse con el cierre de una sesión de conteo.
+
+### Análisis
+
+**Histórico**:
+El registro inmutable que queda de una sesión de conteo al cerrarse. Es el único material del que se hacen comparativos y tendencias.
+
+**Comparativo**:
+La vista que confronta la ejecución del conteo entre sucursales.

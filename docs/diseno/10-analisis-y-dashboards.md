@@ -193,27 +193,50 @@ contrario.
 Se construye sobre `historicos`, no sobre sesiones abiertas: comparar un conteo a medio
 hacer contra uno terminado produce conclusiones falsas.
 
+**El comparativo mide ejecución del conteo, no tamaño de sucursal** ([ADR-20](13-decisiones-adr.md#adr-20)).
+Rankear por dinero o por participación porcentual del último histórico premia siempre a la
+sucursal más grande y no señala ninguna acción posible: participación es cuota sobre el
+total de la red, sigue siendo una medida de tamaño aunque se exprese en porcentaje.
+
+Columnas: Sucursal · Días sin contar · Último cierre · Duración · Unidades · Tendencia.
+`Total $` aparece sólo en escritorio, como contexto secundario — nunca como criterio de
+orden. Orden por defecto: **días sin contar descendente**, para que lo primero que se vea
+sea la excepción que necesita atención, no la sucursal de siempre.
+
+El umbral de "atrasada" es auto-calibrado por sucursal: se compara contra la mediana de
+días entre sus propios cierres, no contra una constante fija para toda la red — una
+sucursal de conteo quincenal y otra mensual se juzgan cada una contra su propia cadencia.
+
 ```typescript
-async function compararUltimosConteos(): Promise<ComparativoSucursal[]> {
+async function compararEjecucion(): Promise<ComparativoSucursal[]> {
   const sucursales = await getDocs(collection(db, "sucursales"));
-  return Promise.all(
-    sucursales.docs.map(async (s) => {
-      const ultimo = await getDocs(
-        query(collection(s.ref, "historicos"), orderBy("cerradaEn", "desc"), limit(1)),
-      );
-      return comparativoSucursalFromSnapshot(s, ultimo.docs.at(0));
-    }),
-  );
+  const [series, sesionesCerradas] = await Promise.all([
+    Promise.all(
+      sucursales.docs.map((s) => historicosRecientesPorSucursal(s.id /* límite 12 */)),
+    ),
+    listarSesiones({ estado: "cerrada" }),
+  ]);
+  return construirComparativo(sucursales.docs, series, sesionesCerradas);
 }
 ```
 
-Costo: **N+1 lecturas** (6 con 5 sucursales), constante en el tiempo.
+Datos: fan-out de `historicosRecientesPorSucursal` (ya existe, límite 12,
+`packages/data/src/firebase/firestore-admin-repository.ts`) para la serie temporal de cada
+sucursal, más **una** consulta `listarSesiones({estado: "cerrada"})` para calcular la
+duración de cada conteo (`abiertaEn` → `cerradaEn`, dato que `Historico` no guarda). Sin
+índices nuevos, sin reglas nuevas, sin Cloud Functions.
 
-Advertencia que la UI debe mostrar: las sucursales tienen tamaños distintos, así que el
-comparativo destaca **participación porcentual** y no sólo totales absolutos.
+Costo: **N+1 lecturas** para la serie (6 con 5 sucursales) más 1 consulta adicional para
+duraciones, constante en el tiempo — no crece con el volumen de conteos.
+
+`collectionGroup("historicos")` sigue prohibido para traer todo de una sola consulta: no
+existe regla `match /{path=**}/historicos/{id}` ni índice `COLLECTION_GROUP` para esa
+colección, así que esa consulta pasa en el emulador y **falla en producción** por la
+denegación por defecto de `infra/firestore.rules`.
 
 > Con conteo mensual, el comparativo gana valor: cada punto de la serie es un mes, y en
-> un año hay 12 puntos por sucursal — suficiente para ver tendencias reales.
+> un año hay 12 puntos por sucursal — suficiente para ver tendencias reales y calibrar el
+> umbral de "atrasada" con un historial significativo.
 
 ---
 
