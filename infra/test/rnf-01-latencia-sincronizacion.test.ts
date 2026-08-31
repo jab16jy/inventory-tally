@@ -146,6 +146,10 @@ describe("RNF-01 · latencia de sincronización entre dos dispositivos (issue #6
 
       expect(resumen.p95).toBeLessThan(UMBRAL_MS);
     },
-    30_000,
+    // ponytail: 90s de margen de test (no del umbral RNF-01, que sigue en
+    // UMBRAL_MS=3000) porque el emulador arranca en frío en CI (runner
+    // compartido) y las 8 rondas secuenciales agotaban los 30s originales
+    // sin completar ni una. Subir si vuelve a agotarse.
+    90_000,
   );
 });
