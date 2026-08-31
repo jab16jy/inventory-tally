@@ -13,8 +13,7 @@ Orden obligatorio antes de tocar código:
 2. `docs/diseno/README.md` — índice de los 13 documentos de diseño. **Son la autoridad.**
 3. El documento concreto del área que vas a tocar (04 datos, 05 concurrencia,
    08 contratos, 09 seguridad…). No trabajes de memoria ni por inferencia del código.
-4. Si el cambio es de UI: `docs/PRODUCT.md`, `docs/DESIGN.md` y
-   `docs/plan-diseno-visual-pwa.md`.
+4. Si el cambio es de UI: `docs/PRODUCT.md` y `docs/DESIGN.md`.
 
 Si el código contradice un documento, **el documento gana**. Si el documento está
 mal, se corrige el documento en el mismo commit — no se deja la divergencia viva.
