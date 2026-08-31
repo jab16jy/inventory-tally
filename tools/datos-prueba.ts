@@ -4,7 +4,7 @@
  * sembrar creó (mismos IDs/correos), sin arrastrar otros datos reales.
  */
 export const SUCURSAL_ID = "suc_norte";
-export const NUM_CATEGORIAS = 60;
+export const NUM_CATEGORIAS = 15;
 export const CAJEROS = [
   { nombre: "Ana Ramírez", correo: "ana@negocio.com" },
   { nombre: "Luis Pérez", correo: "luis@negocio.com" },
