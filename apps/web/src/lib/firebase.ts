@@ -10,7 +10,7 @@ import {
 import { instalarMonitorPersistencia } from "./persistencia-monitor.js";
 
 // Los valores demo sólo son válidos bajo el Emulator Suite (`--project
-// demo-conteo-eficiente`, ver infra/firebase.json). En un build real
+// demo-conteo-eficiente`, ver firebase.json en la raíz del repo). En un build real
 // (`vite build`, PROD=true) sin emuladores, una VITE_FIREBASE_* faltante
 // debe tumbar el build en vez de publicar en silencio una app que apunta a
 // un proyecto de Firebase inexistente. `esBuildReal` distingue esto de

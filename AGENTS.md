@@ -125,7 +125,7 @@ Propón SDD sólo si una propuesta/spec/diseño/tareas duradero reduce ambigüed
 - **Regla de dependencia:** las flechas apuntan hacia abajo. `shared` no importa
   nada del proyecto; `data` importa `shared` y `contracts`; `apps/web` importa todo.
   Sólo `packages/data/firebase` toca el SDK de Firebase — lo impone ESLint.
-- Todo comando de firebase lleva `--config infra/firebase.json`.
+- `firebase.json` vive en la raíz del repo: los comandos de firebase no necesitan `--config`.
 - Node 22 (`.nvmrc`): Cloud Functions v2 no soporta runtime 24.
 
 ---

@@ -25,6 +25,10 @@ const db = getFirestore();
 const SUCURSAL_ID = "suc_norte";
 const NUM_CATEGORIAS = 60;
 const PASSWORD_TEMPORAL = "Temp2026#";
+// Id fijo (no randomUUID, a diferencia de abrirSesionImpl/abrir-conteo.ts):
+// el E2E de Playwright navega directo a /conteo/{id}/preparar sin pasar por
+// la UI de apertura, que hoy no existe (PanelScreen aún no tiene botón).
+const SESION_ID = "sesion_e2e_norte";
 
 async function crearUsuario(
   nombre: string,
@@ -57,9 +61,70 @@ async function sembrarSucursal(): Promise<void> {
     direccion: "Cra 43 #75-120",
     conectividad: "datos",
     activa: true,
-    sesionAbiertaId: null,
+    // I-1: la sucursal apunta a la sesión abierta que sembrarSesionAbierta()
+    // crea más abajo — mismo campo que abrirSesionImpl escribe atómicamente.
+    sesionAbiertaId: SESION_ID,
     creadaEn: FieldValue.serverTimestamp(),
   });
+}
+
+/**
+ * sembrarSesionAbierta — réplica de lo que escribe `abrirSesionImpl`
+ * (packages/functions/src/callables/abrir-sesion.ts: sesión + una línea por
+ * categoría activa), pero con SESION_ID fijo en vez de generado, para que el
+ * E2E de Playwright navegue directo a /conteo/{id}/preparar sin pasar por la
+ * UI de apertura (que hoy no existe en PanelScreen).
+ */
+async function sembrarSesionAbierta(anaUid: string): Promise<void> {
+  await db.doc(`sesiones/${SESION_ID}`).set({
+    sucursalId: SUCURSAL_ID,
+    sucursalNombre: "Sucursal Norte",
+    estado: "abierta",
+    abiertaEn: FieldValue.serverTimestamp(),
+    abiertaPor: "seed",
+    cerradaEn: null,
+    cerradaPor: null,
+    participantes: [],
+    totalUnidades: 0,
+    sesionCorregidaId: null,
+  });
+
+  // El trigger `onAporteEscrito` (packages/functions/src/triggers/on-aporte-escrito.ts)
+  // normalmente crea la entrada de cada participante aquí en su primer aporte
+  // — pero el E2E corre sólo contra auth+firestore (ConteoRepository escribe
+  // directo a Firestore, doc 08 §3), sin el emulador de Functions que dispara
+  // triggers. `confirmarSincronizacion` (FinalizarScreen) hace `updateDoc`
+  // (exige que el doc ya exista), y la Security Rule (infra/firestore.rules,
+  // "sincronización RF-16") diffea `participantes[miUid()]` contra la entrada
+  // VIEJA del propio documento — con el mapa vacío, esa clave no existe y la
+  // regla lanza un evaluation error. Se siembra ya con la entrada de Ana (la
+  // única cajera que corre `flujo-conteo.spec.ts`) para que el `.diff()` de
+  // la regla tenga algo contra qué comparar.
+  await db.doc(`sesiones/${SESION_ID}/sincronizacion/estado`).set({
+    participantes: { [anaUid]: {} },
+    actualizadoEn: FieldValue.serverTimestamp(),
+  });
+
+  // ponytail: sin colección `areas` sembrada (no la pide ningún E2E de esta
+  // ola) — "General" fija en vez de sacarla de `nombresPorArea` como hace
+  // abrirSesionImpl. Ruta de escalamiento: sembrar `areas` el día que un test
+  // necesite el selector de área de ConteoScreen (sólo aparece con 2+ áreas).
+  const lote = db.batch();
+  for (let i = 1; i <= NUM_CATEGORIAS; i++) {
+    const valor = i * 500;
+    lote.set(db.doc(`sesiones/${SESION_ID}/lineas/cat_${valor}`), {
+      categoriaId: `cat_${valor}`,
+      valorUnitario: valor,
+      etiqueta: `$${valor.toLocaleString("es-CO")}`,
+      area: "General",
+      cantidadTotal: 0,
+      numAportantes: 0,
+      versiones: {},
+      actualizadaEn: FieldValue.serverTimestamp(),
+      actualizadaPor: "seed",
+    });
+  }
+  await lote.commit();
 }
 
 async function sembrarCategorias(): Promise<void> {
@@ -80,12 +145,14 @@ async function sembrarCategorias(): Promise<void> {
 async function sembrar(): Promise<void> {
   await sembrarSucursal();
   await crearUsuario("Admin Principal", "admin@negocio.com", "admin", []);
-  await crearUsuario("Ana Ramírez", "ana@negocio.com", "cajero", [SUCURSAL_ID]);
+  const anaUid = await crearUsuario("Ana Ramírez", "ana@negocio.com", "cajero", [SUCURSAL_ID]);
   await crearUsuario("Luis Pérez", "luis@negocio.com", "cajero", [SUCURSAL_ID]);
   await sembrarCategorias();
+  await sembrarSesionAbierta(anaUid);
 
   console.log(
-    `Seed completo: 1 sucursal (${SUCURSAL_ID}), 1 admin, 2 cajeros, ${NUM_CATEGORIAS} categoriasValor.`,
+    `Seed completo: 1 sucursal (${SUCURSAL_ID}), 1 admin, 2 cajeros, ${NUM_CATEGORIAS} categoriasValor, ` +
+      `1 sesión abierta (${SESION_ID}).`,
   );
 }
 

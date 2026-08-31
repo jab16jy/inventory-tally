@@ -69,6 +69,27 @@ jobs:
       - run: npm run test --workspace packages/data
       - run: npm run build --workspace apps/web
 
+  # E2E de Playwright contra el Emulator Suite (auth + firestore): mismo
+  # filtro de rutas que `web` — cubre exactamente lo que este job ejercita en
+  # el navegador. Java porque los emuladores son JVM, igual que el job `reglas`.
+  web-e2e:
+    needs: cambios
+    if: needs.cambios.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+
   contratos:
     needs: cambios
     if: needs.cambios.outputs.contratos == 'true'

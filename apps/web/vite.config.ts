@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 // issue #12 (D1/D7, corregido en RDD — R4-001): versión actual = tag de git
 // exacto sobre HEAD, sin prefijo "v". `--always` hace que sin tags (caso
@@ -82,5 +82,9 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test-setup.ts"],
+    // e2e/ son specs de Playwright (test.describe propio, distinto del
+    // global de vitest) — sin esto, vitest los recoge también por el glob
+    // *.spec.ts por defecto y choca con el runner de Playwright.
+    exclude: [...configDefaults.exclude, "e2e/**"],
   },
 });
