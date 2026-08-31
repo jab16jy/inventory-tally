@@ -66,6 +66,18 @@ npm run typecheck && npm run lint && npm test
 npm run test:rules   # si tocaste infra/firestore.rules
 ```
 
+### Mutation testing (Stryker)
+
+Cuando una unidad tiene lógica de bifurcación propia que ningún otro test
+cubre transitivamente (ramas, cálculo con casos borde), se extrae a un helper
+puro y se le agrega mutation testing con Stryker +
+`@stryker-mutator/vitest-runner`, en un `stryker.<nombre>.conf.json` acotado a
+ese archivo — no un gate de todo el repo. Referencia:
+`stryker.percentiles.conf.json` (raíz, mutea `infra/test/percentiles.ts`) y
+`apps/web/stryker.conf.json` (mutea `src/ui/BotonSalir.tsx`). Se corre con
+`npx stryker run <config>`; no forma parte del checklist obligatorio salvo que
+exista ese config para el archivo que tocaste.
+
 ---
 
 ## 3. RDD — revisión adversarial antes del commit
@@ -77,6 +89,10 @@ npm run test:rules   # si tocaste infra/firestore.rules
   escriben.
 - El candidato queda congelado: cambiar bytes invalida el recibo y obliga a una
   revisión nueva.
+- El checklist de la sección 2 (`typecheck && lint && test`, y Stryker cuando
+  exista config para el archivo tocado) tiene que estar en verde **antes** de
+  pedir la revisión. RDD no reemplaza TDD: corre después, sobre un candidato
+  que ya pasó sus propios tests.
 - Hay **una sola** transacción de corrección por candidato. Si la validación
   dirigida falla, se acabó — reejecutar el validador esperando otro veredicto es el
   bucle que el contrato prohíbe.
