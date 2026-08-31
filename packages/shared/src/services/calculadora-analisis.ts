@@ -162,3 +162,78 @@ export function agruparConOtros(
 
   return [...principales, { etiqueta: "Otros", monto: montoOtros }];
 }
+
+// ── cadencia de conteo (ADR-20) ──
+// El comparativo entre sucursales mide EJECUCIÓN, no tamaño: la señal es
+// cuánto lleva una sucursal sin cerrar un conteo, juzgada contra su propia
+// cadencia histórica y no contra una constante fija para toda la red.
+
+const MS_POR_DIA = 24 * 60 * 60 * 1000;
+
+/**
+ * diasEntre(desde, hasta) — días *completos* transcurridos entre dos fechas.
+ * Aritmética simple sobre milisegundos, sin librería de fechas: no hay zona
+ * horaria que decidir, sólo la diferencia entre dos instantes.
+ *
+ * Trunca, no redondea: 1 día y 12 horas de diferencia da 1, no 2. Para
+ * "días sin contar" (el uso previsto) redondear inflaría la mora de una
+ * sucursal medio día antes de que el día realmente se complete — el mismo
+ * criterio que separa "vencido hoy" de "vencido mañana" en cualquier plazo.
+ */
+export function diasEntre(desde: Date, hasta: Date): number {
+  return Math.trunc((hasta.getTime() - desde.getTime()) / MS_POR_DIA);
+}
+
+function medianaDe(numeros: readonly number[]): number {
+  const ordenados = [...numeros].sort((a, b) => a - b);
+  const mitad = Math.floor(ordenados.length / 2);
+  if (ordenados.length % 2 === 1) return ordenados[mitad]!;
+  return (ordenados[mitad - 1]! + ordenados[mitad]!) / 2;
+}
+
+/**
+ * medianaIntervaloDias(cierres) — la cadencia habitual de UNA sucursal: la
+ * mediana de los días transcurridos entre cierres consecutivos.
+ *
+ * El repositorio entrega los cierres en orden `cerradaEn` DESC (más
+ * reciente primero); esta función no asume ningún orden y ordena por su
+ * cuenta antes de calcular intervalos, para no heredar un bug si quien
+ * llama cambia el orden de la consulta.
+ *
+ * Con menos de 2 cierres devuelve `null`: un único cierre (o ninguno) no
+ * define un intervalo, y no hay cadencia histórica que una sucursal nueva
+ * pueda incumplir todavía.
+ *
+ * Con un número par de intervalos, la mediana es el promedio de los dos
+ * centrales (definición estándar de mediana).
+ */
+export function medianaIntervaloDias(cierres: readonly Date[]): number | null {
+  if (cierres.length < 2) return null;
+
+  const ordenados = [...cierres].sort((a, b) => a.getTime() - b.getTime());
+  const intervalos: number[] = [];
+  for (let i = 1; i < ordenados.length; i++) {
+    intervalos.push(diasEntre(ordenados[i - 1]!, ordenados[i]!));
+  }
+  return medianaDe(intervalos);
+}
+
+/**
+ * estaAtrasada(diasSinContar, mediana) — ¿esta sucursal va atrasada según
+ * SU propia cadencia histórica? Sin umbral fijo: se compara contra
+ * `medianaIntervaloDias` de la misma sucursal, así una que cuenta quincenal
+ * y otra mensual se juzgan cada una contra lo suyo.
+ *
+ * `mediana === null` (sin historial) siempre da `false`: no se puede
+ * incumplir una cadencia que todavía no existe, y marcarla como atrasada
+ * penalizaría a una sucursal nueva sin datos para juzgarla.
+ *
+ * Estrictamente mayor (`>`), no `>=`: estar exactamente en la mediana es
+ * cumplir el ritmo habitual (la mitad de sus cierres históricos tardaron
+ * eso o más), no incumplirlo. La mora empieza en el primer día que excede
+ * lo habitual.
+ */
+export function estaAtrasada(diasSinContar: number, mediana: number | null): boolean {
+  if (mediana === null) return false;
+  return diasSinContar > mediana;
+}

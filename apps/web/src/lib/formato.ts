@@ -69,3 +69,33 @@ export function datos(bytes: number): string {
   if (kb < 1024) return `${FORMATO_DATOS.format(kb)} KB`;
   return `${FORMATO_DATOS.format(kb / 1024)} MB`;
 }
+
+const MS_POR_MINUTO = 60_000;
+const MS_POR_HORA = 60 * MS_POR_MINUTO;
+const MS_POR_DIA_DURACION = 24 * MS_POR_HORA;
+
+/** Duración de un conteo (`abiertaEn` → `cerradaEn`, ADR-20, comparativo por
+ *  ejecución). En HORAS/minutos, no en días: `diasEntre`
+ *  (calculadora-analisis.ts) trunca a `0` cualquier conteo del mismo día, que
+ *  es el caso normal — perdería toda la señal.
+ *
+ *  Escala variable con el tamaño, para no mostrar más precisión de la que
+ *  aporta: minutos bajo una hora, horas + minutos bajo un día, días + horas
+ *  de ahí en más (los minutos ya no importan a esa escala). Cada tramo
+ *  TRUNCA, nunca redondea — mismo criterio que `diasEntre`: redondear
+ *  inflaría la duración mostrada antes de que el tramo realmente se
+ *  complete. El componente menor se omite cuando es 0 (p. ej. "1 h", no
+ *  "1 h 0 min"), para no colgar un cero que no aporta nada. */
+export function duracion(ms: number): string {
+  if (ms < MS_POR_HORA) {
+    return `${Math.trunc(ms / MS_POR_MINUTO)} min`;
+  }
+  if (ms < MS_POR_DIA_DURACION) {
+    const horas = Math.trunc(ms / MS_POR_HORA);
+    const minutos = Math.trunc((ms % MS_POR_HORA) / MS_POR_MINUTO);
+    return minutos === 0 ? `${horas} h` : `${horas} h ${minutos} min`;
+  }
+  const dias = Math.trunc(ms / MS_POR_DIA_DURACION);
+  const horas = Math.trunc((ms % MS_POR_DIA_DURACION) / MS_POR_HORA);
+  return horas === 0 ? `${dias} d` : `${dias} d ${horas} h`;
+}

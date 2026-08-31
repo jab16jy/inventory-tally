@@ -29,6 +29,7 @@ una decisión no examinada.
 | [17](#adr-17) | IDs de proyecto Firebase reales, no `conteo-eficiente-*` | 🆕 Aceptada           |
 | [18](#adr-18) | Medir RNF-01 con dos clientes contra el emulador   | 🆕 Aceptada                |
 | [19](#adr-19) | Confirmación antes de "Salir" para el cajero        | 🆕 Aceptada                |
+| [20](#adr-20) | El comparativo mide ejecución, no tamaño            | 🆕 Aceptada                |
 
 ---
 
@@ -529,6 +530,74 @@ mitad de un conteo · ✅ los 8 consumidores existentes quedan protegidos sin ca
 porque `BotonSalir` es el único punto de entrada · ⚠️ `AdminLayout` sigue sin confirmación —
 un futuro lector no debería "corregir" `BotonSalir` para que combine con el resto de la app
 quitándole la confirmación, ni asumir que `AdminLayout` necesita la misma por consistencia.
+
+---
+
+## ADR-20 {#adr-20}
+
+### El comparativo mide ejecución, no tamaño
+
+**Contexto.** [10 §6](10-analisis-y-dashboards.md#6-comparativo-entre-sucursales) ya había
+detectado el problema de fondo: "las sucursales tienen tamaños distintos, así que el
+comparativo destaca participación porcentual y no sólo totales absolutos". El diagnóstico
+era correcto — pero la receta no lo cura, porque la **participación porcentual sigue
+siendo una medida de tamaño**: es la cuota de esa sucursal sobre el total de la red, no su
+desempeño. `ComparativoScreen.tsx` ordena hoy por esa participación en dinero del último
+histórico cerrado, así que la sucursal más grande encabeza siempre la tabla — llueva o
+truene, cuente al día o lleve dos meses sin cerrar — y la pantalla no señala ninguna acción
+posible: un admin no puede hacer nada distinto sabiendo que Norte pesa el 40 % de la red.
+
+**Decisión.** El comparativo mide **ejecución del conteo**, no tamaño. Columnas: Sucursal ·
+Días sin contar · Último cierre · Duración · Unidades · Tendencia (`Total $` sólo en
+escritorio, como contexto, nunca como criterio de orden). Orden por defecto: días sin
+contar descendente — lo primero que se ve es la excepción, no la sucursal más grande.
+
+El umbral de "atrasada" es **auto-calibrado**: cada sucursal se compara contra la mediana
+de días entre sus propios cierres, así que una sucursal que cuenta quincenal y otra que
+cuenta mensual se juzgan cada una contra su propia cadencia, sin constante mágica ni
+pantalla de configuración.
+
+Datos: fan-out de `historicosRecientesPorSucursal` (ya existe, límite 12,
+`packages/data/src/firebase/firestore-admin-repository.ts`) para la serie temporal —
+exactamente lo que [10 §6](10-analisis-y-dashboards.md#6-comparativo-entre-sucursales) ya
+pedía en su párrafo final y nunca se construyó — más UNA consulta
+`listarSesiones({estado:"cerrada"})` para las duraciones (`abiertaEn` → `cerradaEn`, que
+`Historico` no guarda). Sin índices nuevos, sin reglas nuevas, sin Cloud Functions.
+
+Siguen vigentes las restricciones que ya fijaba
+[10 §6](10-analisis-y-dashboards.md#6-comparativo-entre-sucursales): se construye sólo
+sobre `historicos`, nunca sobre sesiones abiertas — comparar un conteo a medio hacer
+contra uno terminado produce conclusiones falsas, y es [ADR-02](#adr-02) el que hace del
+histórico el único registro definitivo del período. El fan-out N+1 sigue siendo
+deliberado, y
+`collectionGroup("historicos")` sigue prohibido: no existe regla
+`match /{path=**}/historicos/{id}` ni índice `COLLECTION_GROUP` para esa colección, así que
+esa consulta pasa en el emulador y falla en producción por la denegación por defecto de
+`infra/firestore.rules`.
+
+| Alternativa                                  | Por qué se descartó                                                                                              |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Mantener el ranking por dinero                | Mide tamaño, no desempeño: la sucursal más grande encabeza siempre y la pantalla no señala ninguna acción posible |
+| Umbral fijo de días para toda la red          | Injusto para quien cuenta quincenal y ciego para quien cuenta mensual: una sola constante no sirve a dos cadencias |
+| `collectionGroup("historicos")`               | No existe regla `/{path=**}/historicos/{id}` ni índice `COLLECTION_GROUP`: funciona en el emulador y falla en producción |
+
+**Consecuencias.** ✅ La primera fila visible es la excepción que necesita acción, no la
+sucursal más grande de siempre · ✅ El umbral se auto-calibra por sucursal, sin constante
+mágica ni pantalla de configuración · ✅ Reutiliza datos y consultas existentes: cero
+índices nuevos, cero reglas nuevas, cero Cloud Functions · ⚠️ Dos fuentes de lectura en vez
+de una (fan-out de `historicos` + `listarSesiones`) — más lecturas que el ranking simple
+por dinero, aunque el costo sigue siendo N+1 constante, no crece con el uso · ⚠️ El dinero
+deja de ser el criterio de orden; un lector acostumbrado al ranking anterior puede
+extrañarlo — se mantiene visible como columna de contexto en escritorio para no perderlo
+del todo.
+
+**Detonante de reevaluación:** si el negocio pide comparar ejecución por área o categoría
+de valor entre sucursales, no sólo a nivel de sesión completa, hace falta un campo
+`porArea` en `Historico` que hoy no existe. Añadirlo está fuera de alcance de este ADR
+porque exige tocar el trigger de cierre en Cloud Functions y no puede aplicarse
+retroactivamente: los históricos son inmutables una vez escritos ([ADR-02](#adr-02)), así
+que sólo alimentaría con datos las sesiones cerradas después del cambio, no el histórico
+acumulado hasta hoy.
 
 ---
 

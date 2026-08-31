@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   agruparConOtros,
+  diasEntre,
   distribuirRedondeo,
+  estaAtrasada,
   extremosPorSubtotal,
+  medianaIntervaloDias,
   participacion,
   type PorcionAnalisis,
 } from "./calculadora-analisis.js";
@@ -193,5 +196,143 @@ describe("agruparConOtros", () => {
 
   it("con maximo menor a 1 no devuelve basura: arreglo vacío", () => {
     expect(agruparConOtros([porcion("a", 10)], 0)).toEqual([]);
+  });
+});
+
+/** Fecha en medianoche UTC, para que los tests no dependan de la zona
+ * horaria de quien los corre. */
+function fecha(iso: string): Date {
+  return new Date(`${iso}T00:00:00.000Z`);
+}
+
+describe("diasEntre", () => {
+  it("la misma fecha da 0 días", () => {
+    expect(diasEntre(fecha("2026-01-01"), fecha("2026-01-01"))).toBe(0);
+  });
+
+  it("un día exacto de diferencia da 1", () => {
+    expect(diasEntre(fecha("2026-01-01"), fecha("2026-01-02"))).toBe(1);
+  });
+
+  it("trunca, no redondea: un día completo más unas horas sigue dando 1", () => {
+    // 2026-01-02T12:00:00Z: un día y medio después de fecha("2026-01-01").
+    // Redondear daría 2; truncar (días *completos* transcurridos) da 1 — no
+    // se cumplió un segundo día entero todavía.
+    const hasta = new Date("2026-01-02T12:00:00.000Z");
+    expect(diasEntre(fecha("2026-01-01"), hasta)).toBe(1);
+  });
+
+  it("23 horas y 59 minutos NO llegan a completar un día: da 0, no 1", () => {
+    const hasta = new Date("2026-01-01T23:59:00.000Z");
+    expect(diasEntre(fecha("2026-01-01"), hasta)).toBe(0);
+  });
+
+  it("varios días exactos de diferencia", () => {
+    expect(diasEntre(fecha("2026-01-01"), fecha("2026-01-15"))).toBe(14);
+  });
+});
+
+describe("medianaIntervaloDias", () => {
+  it("cero cierres devuelve null: sin historial no hay cadencia que incumplir", () => {
+    expect(medianaIntervaloDias([])).toBeNull();
+  });
+
+  it("un solo cierre devuelve null: un punto no define un intervalo", () => {
+    expect(medianaIntervaloDias([fecha("2026-01-01")])).toBeNull();
+  });
+
+  it("dos cierres devuelve el único intervalo entre ellos", () => {
+    expect(medianaIntervaloDias([fecha("2026-01-01"), fecha("2026-01-11")])).toBe(10);
+  });
+
+  it("número impar de intervalos devuelve el intervalo central", () => {
+    // Cierres cada 10, 20, 30 días → intervalos [10, 20, 30], central 20.
+    const cierres = [
+      fecha("2026-01-01"),
+      fecha("2026-01-11"),
+      fecha("2026-01-31"),
+      fecha("2026-03-02"),
+    ];
+    expect(medianaIntervaloDias(cierres)).toBe(20);
+  });
+
+  it("número par de intervalos promedia los dos centrales", () => {
+    // Cierres separados por 10, 20, 30, 40 días → intervalos [10, 20, 30, 40],
+    // centrales 20 y 30 → mediana 25.
+    const cierres = [
+      fecha("2026-01-01"),
+      fecha("2026-01-11"),
+      fecha("2026-01-31"),
+      fecha("2026-03-02"),
+      fecha("2026-04-11"),
+    ];
+    expect(medianaIntervaloDias(cierres)).toBe(25);
+  });
+
+  it("los intervalos se ordenan por magnitud antes de tomar el central, no por orden cronológico", () => {
+    // Cadencia irregular: +30, +5, +15 días entre cierres consecutivos — el
+    // orden cronológico de los intervalos no coincide con su orden de
+    // magnitud. Sin ordenar los intervalos antes de tomar el central, la
+    // mediana saldría mal (5, el primer intervalo cronológico, en vez de 15).
+    const cierres = [
+      fecha("2026-01-01"),
+      fecha("2026-01-31"), // +30
+      fecha("2026-02-05"), // +5
+      fecha("2026-02-20"), // +15
+    ];
+    expect(medianaIntervaloDias(cierres)).toBe(15);
+  });
+
+  it("no asume orden: una entrada desordenada da el mismo resultado que ordenada", () => {
+    const ordenadas = [
+      fecha("2026-01-01"),
+      fecha("2026-01-11"),
+      fecha("2026-01-31"),
+      fecha("2026-03-02"),
+    ];
+    const desordenadas = [ordenadas[2]!, ordenadas[0]!, ordenadas[3]!, ordenadas[1]!];
+    expect(medianaIntervaloDias(desordenadas)).toBe(medianaIntervaloDias(ordenadas));
+  });
+});
+
+describe("estaAtrasada", () => {
+  it("sin mediana (sin historial) nunca está atrasada: no se marca lo que no se puede juzgar", () => {
+    expect(estaAtrasada(999, null)).toBe(false);
+  });
+
+  it("justo en el umbral NO está atrasada: cumplir la cadencia habitual es estar al día, no tarde", () => {
+    expect(estaAtrasada(15, 15)).toBe(false);
+  });
+
+  it("por debajo del umbral no está atrasada", () => {
+    expect(estaAtrasada(10, 15)).toBe(false);
+  });
+
+  it("por encima del umbral sí está atrasada", () => {
+    expect(estaAtrasada(16, 15)).toBe(true);
+  });
+
+  it("auto-calibrado: la misma cantidad de días sin contar es atrasada para una sucursal quincenal pero no para una mensual", () => {
+    // Sucursal quincenal: cierra cada ~15 días.
+    const cierresQuincenal = [
+      fecha("2026-01-01"),
+      fecha("2026-01-16"),
+      fecha("2026-01-31"),
+      fecha("2026-02-15"),
+    ];
+    // Sucursal mensual: cierra cada ~30 días.
+    const cierresMensual = [
+      fecha("2026-01-01"),
+      fecha("2026-01-31"),
+      fecha("2026-03-02"),
+      fecha("2026-04-01"),
+    ];
+
+    const medianaQuincenal = medianaIntervaloDias(cierresQuincenal);
+    const medianaMensual = medianaIntervaloDias(cierresMensual);
+    const diasSinContar = 20;
+
+    expect(estaAtrasada(diasSinContar, medianaQuincenal)).toBe(true);
+    expect(estaAtrasada(diasSinContar, medianaMensual)).toBe(false);
   });
 });
