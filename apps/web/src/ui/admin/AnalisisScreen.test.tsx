@@ -1,16 +1,17 @@
 // apps/web/src/ui/admin/AnalisisScreen.test.tsx (docs/plan-panel-administrador.md
-// §5, fase F5; issue #20 item 3 para los 5 estados degradados de
-// docs/diseno/10-analisis-y-dashboards.md:220-228) — dashboard de análisis de
-// una sesión.
+// §5, fase F5; rediseño rama rediseno-analisis-sesion,
+// docs/diseno/10-analisis-y-dashboards.md §3) — dashboard de análisis de una
+// sesión: cabecera, resumen y una tabla con selector de dimensión.
 import { FakeAdminRepository } from "@conteo/data";
 import type { EstadoSincronizacion } from "@conteo/data";
 import type { Historico } from "@conteo/shared/models/historico.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
-import { render, screen } from "@testing-library/react";
+import type { Usuario } from "@conteo/shared/models/usuario.js";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
-import { fecha, moneda } from "../../lib/formato.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fecha, moneda, porcentaje } from "../../lib/formato.js";
 import { AdminRepositoryProvider } from "../../state/admin-contexto.js";
 import { AnalisisScreen } from "./AnalisisScreen.js";
 
@@ -82,6 +83,20 @@ function crearHistorico(overrides: Partial<Historico> = {}): Historico {
   };
 }
 
+function usuarioBase(overrides: Partial<Usuario> = {}): Usuario {
+  return {
+    uid: "uid_x",
+    nombre: "Usuario X",
+    correo: "x@example.com",
+    rol: "cajero",
+    sucursalesAsignadas: [],
+    activo: true,
+    creadoEn: new Date("2026-01-01T00:00:00Z"),
+    creadoPor: "uid_admin",
+    ...overrides,
+  };
+}
+
 function todosSincronizados(): EstadoSincronizacion {
   return {
     participantes: [{ uid: "uid_ana", nombre: "Ana Ramírez", sincronizado: true }],
@@ -110,8 +125,17 @@ function sembrarSesionCompleta(repo: FakeAdminRepository) {
   repo.sembrarSincronizacion("ses_1", todosSincronizados());
 }
 
-describe("AnalisisScreen (F5)", () => {
-  it("presenta las secciones en el orden: cabecera, KPIs, sincronización, barras, dona, extremos, detalle", async () => {
+async function irADimension(valor: "categoria" | "cajero" | "area"): Promise<void> {
+  // `getByRole("combobox", ...)`, no `findByLabelText`: el <table> también
+  // lleva un `aria-label` que empieza por "Desglose por" (rótulo dinámico
+  // según dimensión), y `getByLabelText` matchea `aria-label` en CUALQUIER
+  // elemento, no sólo en el <select> — ambigüedad falsa que el rol evita.
+  const select = await screen.findByRole("combobox", { name: /desglose por/i });
+  fireEvent.change(select, { target: { value: valor } });
+}
+
+describe("AnalisisScreen (rediseño)", () => {
+  it("presenta las secciones en el orden: cabecera, resumen, tabla", async () => {
     const repo = new FakeAdminRepository();
     sembrarSesionCompleta(repo);
 
@@ -126,17 +150,7 @@ describe("AnalisisScreen (F5)", () => {
       (nodo) => nodo.getAttribute("data-seccion"),
     );
 
-    expect(secciones).toEqual([
-      "cabecera",
-      "kpis",
-      "sincronizacion",
-      "barras",
-      "dona",
-      "extremos",
-      "detalle",
-      "areas",
-      "evolucion",
-    ]);
+    expect(secciones).toEqual(["cabecera", "resumen", "tabla"]);
   });
 
   it('no monta ningún elemento con data-seccion="comparativo" (ADR-20: Comparativo pasó a panel de red, ya no es composición de esta pantalla)', async () => {
@@ -150,37 +164,7 @@ describe("AnalisisScreen (F5)", () => {
     expect(container.querySelector('[data-seccion="comparativo"]')).not.toBeInTheDocument();
   });
 
-  it("desglosa unidades por área reusando totalPorArea, sin agregación propia", async () => {
-    const repo = new FakeAdminRepository();
-    sembrarSesionCompleta(repo); // las 3 líneas comparten area: "Aseo"
-
-    renderPantalla(repo);
-
-    const seccionAreas = (await screen.findByText("Unidades por área")).closest(
-      '[data-seccion="areas"]',
-    )!;
-    // totalPorArea suma cantidadTotal por área: 310 + 2 + 0 = 312 en "Aseo".
-    expect(seccionAreas).toHaveTextContent("Aseo");
-    expect(seccionAreas).toHaveTextContent("312");
-  });
-
-  it("la evolución mensual pinta la serie de históricos de la sucursal de la sesión", async () => {
-    const repo = new FakeAdminRepository();
-    sembrarSesionCompleta(repo);
-    repo.sembrarHistorico(
-      "suc_norte",
-      crearHistorico({ sesionId: "ses_previa", cerradaEn: new Date("2026-07-01T00:00:00Z") }),
-    );
-
-    const { container } = renderPantalla(repo);
-
-    await screen.findByText("Sucursal Norte", { exact: false });
-    const seccionEvolucion = container.querySelector('[data-seccion="evolucion"]')!;
-    expect(seccionEvolucion.querySelector("svg")).not.toBeNull();
-    expect(seccionEvolucion).toHaveTextContent(textoDom(moneda(crearHistorico().totalMonetario)));
-  });
-
-  it("usa el numeral de 32px sólo en las tres tarjetas KPI", async () => {
+  it("usa el numeral de 32px sólo una vez, en la card Valor contado", async () => {
     const repo = new FakeAdminRepository();
     sembrarSesionCompleta(repo);
 
@@ -189,80 +173,30 @@ describe("AnalisisScreen (F5)", () => {
     await screen.findByText("Sucursal Norte", { exact: false });
 
     // `Numeral` con `tamano="placa"` (el default) pinta la clase
-    // `text-numeral`; ni CierreScreen/PanelScreen (tamano="base") lo usan,
-    // así que contar en TODA la pantalla prueba que no se roció el numeral
-    // de 32px fuera de las 3 tarjetas.
+    // `text-numeral`; Valor por unidad y Unidades usan `tamano="medio"`, así
+    // que contar en TODA la pantalla prueba que no se roció el numeral de
+    // 32px fuera de la card Valor contado.
+    await screen.findByText("Sucursal Norte", { exact: false });
     const numerales32px = container.querySelectorAll(".text-numeral");
-    expect(numerales32px).toHaveLength(3);
-
-    const kpis = container.querySelector('[data-seccion="kpis"]')!;
-    numerales32px.forEach((nodo) => {
-      expect(kpis.contains(nodo)).toBe(true);
-    });
+    expect(numerales32px).toHaveLength(1);
+    expect(numerales32px[0]).toHaveTextContent(textoDom(moneda(920_000)));
   });
 
-  it("la tabla de detalle usa text-base", async () => {
-    const repo = new FakeAdminRepository();
-    sembrarSesionCompleta(repo);
-
-    renderPantalla(repo);
-
-    const tabla = await screen.findByRole("table", { name: /detalle por categoría/i });
-    expect(tabla).toHaveClass("text-base");
-  });
-
-  it("calcula el total monetario de las 3 tarjetas KPI desde las líneas, no desde resumen", async () => {
+  it("calcula el total monetario y de unidades desde las líneas, no desde resumen", async () => {
     const repo = new FakeAdminRepository();
     sembrarSesionCompleta(repo);
 
     const { container } = renderPantalla(repo);
 
-    // 310×2.000 + 2×150.000 + 0×5.000 = 620.000 + 300.000 = 920.000.
-    expect(await screen.findByText(textoDom(moneda(920_000)))).toBeInTheDocument();
-    // Unidades: 310 + 2 + 0 = 312. Todas las líneas de sembrarSesionCompleta
-    // comparten área ("Aseo"), así que la sección "areas" muestra el mismo
-    // 312 — se acota a "kpis" para que la prueba no dependa de eso.
-    const kpis = container.querySelector('[data-seccion="kpis"]')!;
-    expect(kpis).toHaveTextContent("312");
-  });
-
-  it("muestra 'categorías contadas' como líneas con cantidadTotal > 0 sobre el total de líneas de la sesión", async () => {
-    const repo = new FakeAdminRepository();
-    sembrarSesionCompleta(repo);
-
-    renderPantalla(repo);
-
-    // 2 líneas contadas (cat_a, cat_b) de 3 líneas totales (incluye cat_c en 0).
-    expect(await screen.findByText("2 / 3")).toBeInTheDocument();
-  });
-
-  it("muestra los extremos con su subtotal y su cantidad", async () => {
-    const repo = new FakeAdminRepository();
-    sembrarSesionCompleta(repo);
-
-    renderPantalla(repo);
-
-    // Mayor subtotal: cat_a (620.000, 310 u). Menor de las CONTADAS: cat_b
-    // (300.000, 2 u) — cat_c queda fuera por cantidadTotal 0.
-    const mayor = await screen.findByText(/mayor: \$2000/i);
-    expect(mayor).toHaveTextContent("310");
-    const menor = screen.getByText(/menor: \$150000/i);
-    expect(menor).toHaveTextContent(/\(2 u\.\)/);
-  });
-
-  it("sin ninguna categoría contada, los extremos muestran una línea vacía honesta, nunca un cero fabricado", async () => {
-    const repo = new FakeAdminRepository();
-    repo.sembrarSesion(sesionBase());
-    repo.sembrarLinea("ses_1", lineaBase("cat_a", 2000, 0));
-    repo.sembrarSincronizacion("ses_1", todosSincronizados());
-
-    renderPantalla(repo);
-
     await screen.findByText("Sucursal Norte", { exact: false });
-
-    expect(screen.getByText(/todavía no hay categorías contadas/i)).toBeInTheDocument();
-    expect(screen.queryByText(/mayor:/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/menor:/i)).not.toBeInTheDocument();
+    // 310×2.000 + 2×150.000 + 0×5.000 = 620.000 + 300.000 = 920.000.
+    // La tabla de detalle también pinta esta cifra (fila cat_a + fila total),
+    // así que se acota a "resumen" para no depender de eso.
+    const resumen = container.querySelector('[data-seccion="resumen"]')!;
+    expect(resumen).toHaveTextContent(textoDom(moneda(920_000)));
+    // Unidades: 310 + 2 + 0 = 312.
+    expect(resumen).toHaveTextContent("312");
+    expect(resumen).toHaveTextContent("2 / 3 categorías contadas");
   });
 
   it("muestra la alerta de sincronización degradada con role=alert", async () => {
@@ -281,7 +215,7 @@ describe("AnalisisScreen (F5)", () => {
     );
   });
 
-  it("muestra un esqueleto con la forma final mientras carga, nunca un spinner (estado 'Cargando', doc 10 §220-228)", () => {
+  it("muestra un esqueleto con la forma final mientras carga, nunca un spinner", () => {
     const repo = new FakeAdminRepository();
     // Sin sembrar nada: el fake entrega su primer valor sincrónicamente en
     // `observarSesion`/`observarSincronizacion`, así que para capturar el
@@ -314,27 +248,6 @@ describe("AnalisisScreen (F5)", () => {
     expect(await screen.findByText(/no se encontró la sesión/i)).toBeInTheDocument();
     expect(screen.queryByTestId("fila-esqueleto")).not.toBeInTheDocument();
   });
-});
-
-describe("AnalisisScreen · estados degradados (issue #20 item 3, doc 10 §220-228)", () => {
-  it("'Sesión sin aportes': sin líneas todavía, cada sección lo dice honesto en vez de un cero fabricado", async () => {
-    const repo = new FakeAdminRepository();
-    repo.sembrarSesion(sesionBase());
-    // Ninguna línea sembrada: sesión abierta pero sin ningún aporte todavía.
-    repo.sembrarSincronizacion("ses_1", todosSincronizados());
-
-    renderPantalla(repo);
-
-    await screen.findByText("Sucursal Norte", { exact: false });
-
-    expect(screen.getByText("0 / 0")).toBeInTheDocument();
-    expect(screen.getByText(/todavía no hay unidades contadas/i)).toBeInTheDocument();
-    expect(screen.getByText(/todavía no hay categorías contadas/i)).toBeInTheDocument();
-    // La tabla de detalle usa un texto ligeramente distinto ("No hay..." sin
-    // "Todavía"): coincide como subcadena con la línea de arriba, de ahí el
-    // ancla `^`.
-    expect(screen.getByText(/^No hay categorías contadas\.$/)).toBeInTheDocument();
-  });
 
   it("'Sin conexión': con el navegador offline, muestra que los datos son de caché junto a su fecha", async () => {
     fijarEnLinea(false);
@@ -361,7 +274,7 @@ describe("AnalisisScreen · estados degradados (issue #20 item 3, doc 10 §220-2
     expect(screen.queryByText(/mostrando datos guardados/i)).not.toBeInTheDocument();
   });
 
-  it("'Datos inconsistentes': con un evento RECONCILIACION de esta sesión, muestra un aviso discreto (no role=alert)", async () => {
+  it("'Datos inconsistentes': con un evento RECONCILIACION de esta sesión, muestra un aviso discreto con role=status (nunca alert)", async () => {
     const repo = new FakeAdminRepository();
     sembrarSesionCompleta(repo);
     repo.sembrarAuditoria({
@@ -377,6 +290,11 @@ describe("AnalisisScreen · estados degradados (issue #20 item 3, doc 10 §220-2
     renderPantalla(repo);
 
     const aviso = await screen.findByText(/se corrigieron automáticamente/i);
+    // Región "polite" propia: llega ASÍNCRONO (useHayReconciliacion resuelve
+    // después del primer render), así que necesita anunciarse sola — es
+    // hermana del párrafo de estado de la cabecera, no está anidada en él,
+    // y por eso no compite con esa región (ver comentario en
+    // AnalisisScreen.tsx).
     expect(aviso).toHaveAttribute("role", "status");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
@@ -399,5 +317,360 @@ describe("AnalisisScreen · estados degradados (issue #20 item 3, doc 10 §220-2
 
     await screen.findByText("Sucursal Norte", { exact: false });
     expect(screen.queryByText(/se corrigieron automáticamente/i)).not.toBeInTheDocument();
+  });
+
+  it("dimensión Cajero muestra el nombre de cada participante con sus unidades y su dinero", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(sesionBase());
+    repo.sembrarUsuario(usuarioBase({ uid: "uid_ana", nombre: "Ana Ramírez" }));
+    repo.sembrarLinea("ses_1", lineaBase("cat_a", 2000, 10, { aplicados: { uid_ana: 10 } }));
+    repo.sembrarSincronizacion("ses_1", todosSincronizados());
+
+    renderPantalla(repo);
+    await irADimension("cajero");
+
+    const fila = (await screen.findByText("Ana Ramírez")).closest("tr")!;
+    expect(fila).toHaveTextContent("10");
+    expect(fila).toHaveTextContent(textoDom(moneda(20_000)));
+  });
+
+  it("un uid en aplicados sin Usuario sembrado cae al propio uid, nunca a cadena vacía", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(sesionBase());
+    repo.sembrarLinea("ses_1", lineaBase("cat_a", 2000, 5, { aplicados: { uid_fantasma: 5 } }));
+    repo.sembrarSincronizacion("ses_1", todosSincronizados());
+
+    renderPantalla(repo);
+    await irADimension("cajero");
+
+    expect(await screen.findByText("uid_fantasma")).toBeInTheDocument();
+  });
+
+  it("cambiar de dimensión no invoca ningún método del repositorio", async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo);
+
+    const metodos = [
+      "observarSesion",
+      "observarSincronizacion",
+      "observarLineasSesion",
+      "observarUsuarios",
+      "historicosRecientesPorSucursal",
+      "listarAuditoria",
+    ] as const;
+    const espias = metodos.map((metodo) => {
+      const original = repo[metodo].bind(repo);
+      const espia = vi.fn(original as (...args: unknown[]) => unknown);
+      // @ts-expect-error — asignación dinámica del mismo método por nombre.
+      repo[metodo] = espia;
+      return espia;
+    });
+
+    renderPantalla(repo);
+    await screen.findByText("Sucursal Norte", { exact: false });
+
+    const llamadasAntes = espias.reduce((total, espia) => total + espia.mock.calls.length, 0);
+
+    await irADimension("cajero");
+    await irADimension("area");
+
+    const llamadasDespues = espias.reduce((total, espia) => total + espia.mock.calls.length, 0);
+
+    expect(llamadasDespues).toBe(llamadasAntes);
+  });
+
+  it("el orden elegido por el usuario sobrevive al cambio de dimensión", async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo);
+
+    renderPantalla(repo);
+    const encabezadoUnidades = await screen.findByRole("columnheader", { name: /unidades/i });
+    fireEvent.click(within(encabezadoUnidades).getByRole("button"));
+    expect(encabezadoUnidades).toHaveAttribute("aria-sort", "ascending");
+
+    await irADimension("area");
+
+    const encabezadoUnidadesDespues = screen.getByRole("columnheader", { name: /unidades/i });
+    expect(encabezadoUnidadesDespues).toHaveAttribute("aria-sort", "ascending");
+  });
+
+  it('la tabla arranca por Valor descendente y la columna Valor reporta aria-sort="descending"', async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo);
+
+    renderPantalla(repo);
+
+    const encabezadoValor = await screen.findByRole("columnheader", { name: /valor/i });
+    expect(encabezadoValor).toHaveAttribute("aria-sort", "descending");
+
+    const filas = screen.getAllByRole("row");
+    // filas[0] es el encabezado; filas[1] es la primera fila de datos, que
+    // con orden Valor desc debe ser cat_a (620.000), no cat_b (300.000).
+    expect(filas[1]).toHaveTextContent("$2000");
+  });
+
+  it("la fila de total cuadra con la card Valor contado en las tres dimensiones", async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo);
+
+    renderPantalla(repo);
+    await screen.findByText("Sucursal Norte", { exact: false });
+
+    for (const dimension of ["categoria", "cajero", "area"] as const) {
+      await irADimension(dimension);
+      const filas = screen.getAllByRole("row");
+      const filaTotal = filas.at(-1)!;
+      expect(filaTotal).toHaveTextContent(textoDom(moneda(920_000)));
+      // El invariante que protege el comentario de `filaTotal.pct` en
+      // AnalisisScreen.tsx: 100 literal, NUNCA la suma de los floats de
+      // `distribuirRedondeo` (que puede dar 99,99999999999999).
+      expect(filaTotal).toHaveTextContent(porcentaje(100));
+    }
+  });
+
+  it("con historicos que incluyen el propio sesionId (sesión cerrada), el delta se calcula contra el segundo", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(
+      sesionBase({ estado: "cerrada", cerradaEn: new Date("2026-08-01T12:00:00Z") }),
+    );
+    repo.sembrarLinea("ses_1", lineaBase("cat_a", 2000, 100)); // 200.000
+    repo.sembrarSincronizacion("ses_1", todosSincronizados());
+    repo.sembrarHistorico(
+      "suc_norte",
+      crearHistorico({
+        sesionId: "ses_1",
+        cerradaEn: new Date("2026-08-01T12:00:00Z"),
+        totalMonetario: 200_000,
+        totalUnidades: 100,
+      }),
+    );
+    repo.sembrarHistorico(
+      "suc_norte",
+      crearHistorico({
+        sesionId: "ses_previa",
+        cerradaEn: new Date("2026-07-01T00:00:00Z"),
+        totalMonetario: 100_000,
+        // Distinto de la variación de dinero (100 %) a propósito: si el
+        // delta se calculara contra el propio histórico de "ses_1" (0 % en
+        // ambos casos) o si dinero/unidades se confundieran entre sí, este
+        // valor lo delataría.
+        totalUnidades: 80,
+      }),
+    );
+
+    renderPantalla(repo);
+    await screen.findByText("Sucursal Norte", { exact: false });
+
+    // variacion(200.000, 100.000) = +100,0 %, nunca comparado contra sí misma
+    // (que daría 0 %). Se acota a la card "Valor contado": la card
+    // "Unidades" también pinta un delta (+25,0 %, variacion(100, 80)).
+    const cardValorContado = (await screen.findByText("Valor contado")).closest("div")!;
+    expect(cardValorContado).toHaveTextContent(`+${porcentaje(100)}`);
+  });
+
+  it("un delta de cero se pinta sin signo: «+0,0 %» se leería como crecimiento", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(sesionBase());
+    repo.sembrarLinea("ses_1", lineaBase("cat_a", 2000, 100)); // 200.000
+    repo.sembrarSincronizacion("ses_1", todosSincronizados());
+    repo.sembrarHistorico(
+      "suc_norte",
+      crearHistorico({ sesionId: "ses_previa", totalMonetario: 200_000, totalUnidades: 100 }),
+    );
+
+    renderPantalla(repo);
+    await screen.findByText("Sucursal Norte", { exact: false });
+
+    const cardValorContado = (await screen.findByText("Valor contado")).closest("div")!;
+    expect(cardValorContado).toHaveTextContent(porcentaje(0));
+    expect(cardValorContado).not.toHaveTextContent(`+${porcentaje(0)}`);
+  });
+
+  it("sin sesión anterior, el chip está disabled y no aparece ningún delta", async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo); // sin históricos sembrados
+
+    renderPantalla(repo);
+
+    const chip = await screen.findByRole("button", { name: /sin sesión anterior/i });
+    expect(chip).toBeDisabled();
+    expect(screen.queryByText(/^[+−]/)).not.toBeInTheDocument();
+  });
+
+  it("sesión con una sola categoría y un solo participante se renderiza sin romperse", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(sesionBase({ participantes: ["uid_ana"] }));
+    repo.sembrarLinea("ses_1", lineaBase("cat_a", 1000, 5));
+    repo.sembrarSincronizacion("ses_1", todosSincronizados());
+
+    renderPantalla(repo);
+
+    expect(await screen.findByText("Sucursal Norte", { exact: false })).toBeInTheDocument();
+    expect(screen.getByRole("table")).toBeInTheDocument();
+  });
+
+  it('una línea sin area cae en el grupo "Sin área"', async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(sesionBase());
+    repo.sembrarLinea("ses_1", lineaBase("cat_a", 1000, 5, { area: "" }));
+    repo.sembrarSincronizacion("ses_1", todosSincronizados());
+
+    renderPantalla(repo);
+    await irADimension("area");
+
+    expect(await screen.findByText("Sin área")).toBeInTheDocument();
+  });
+
+  it("sesión sin ninguna línea: 'Valor por unidad' no revienta (moneda(0), nunca NaN/Infinity) y la tabla queda vacía", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(sesionBase());
+    // Ninguna línea sembrada.
+    repo.sembrarSincronizacion("ses_1", todosSincronizados());
+
+    renderPantalla(repo);
+    await screen.findByText("Sucursal Norte", { exact: false });
+
+    expect(screen.getByText("0 / 0 categorías contadas")).toBeInTheDocument();
+    // Guarda de división por cero de `valorPorUnidad`: moneda(0), nunca un
+    // NaN o Infinity fabricados por 0/0.
+    const cardValorPorUnidad = screen.getByText("Valor por unidad").closest("div")!;
+    expect(cardValorPorUnidad).toHaveTextContent(textoDom(moneda(0)));
+    expect(screen.queryByText(/NaN|Infinity/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Todavía no hay unidades contadas.")).toBeInTheDocument();
+  });
+
+  it("dimensión Área suma varias líneas que comparten área en una sola fila", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(sesionBase());
+    repo.sembrarLinea("ses_1", lineaBase("cat_a", 2000, 100, { area: "Bodega" })); // 200.000
+    repo.sembrarLinea("ses_1", lineaBase("cat_b", 3000, 50, { area: "Bodega" })); // 150.000
+    repo.sembrarSincronizacion("ses_1", todosSincronizados());
+
+    renderPantalla(repo);
+    await irADimension("area");
+
+    const fila = (await screen.findByText("Bodega")).closest("tr")!;
+    expect(fila).toHaveTextContent("150"); // unidades: 100 + 50
+    expect(fila).toHaveTextContent(textoDom(moneda(350_000))); // 200.000 + 150.000
+  });
+
+  it("dimensión Cajero suma varias líneas del mismo uid en una sola fila, nunca un promedio", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(sesionBase());
+    repo.sembrarUsuario(usuarioBase({ uid: "uid_ana", nombre: "Ana Ramírez" }));
+    repo.sembrarLinea("ses_1", lineaBase("cat_a", 2000, 10, { aplicados: { uid_ana: 10 } })); // 20.000
+    repo.sembrarLinea("ses_1", lineaBase("cat_b", 3000, 5, { aplicados: { uid_ana: 5 } })); // 15.000
+    repo.sembrarSincronizacion("ses_1", todosSincronizados());
+
+    renderPantalla(repo);
+    await irADimension("cajero");
+
+    const fila = (await screen.findByText("Ana Ramírez")).closest("tr")!;
+    expect(fila).toHaveTextContent("15"); // unidades: 10 + 5
+    // Suma de aplicados[uid] × valorUnitario de cada línea (20.000 + 15.000
+    // = 35.000), nunca un promedio ni una división entre líneas.
+    expect(fila).toHaveTextContent(textoDom(moneda(35_000)));
+  });
+
+  it("estadoChip: sin conexión manda sobre sincronización aunque todos los participantes hayan confirmado", async () => {
+    fijarEnLinea(false);
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo); // todosSincronizados()
+
+    renderPantalla(repo);
+
+    expect(await screen.findByText("Sin conexión")).toBeInTheDocument();
+    expect(screen.queryByText("Sincronizado")).not.toBeInTheDocument();
+  });
+
+  it("estadoChip: sincronizado cuando está en línea y todos los participantes confirmaron", async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo); // todosSincronizados()
+
+    renderPantalla(repo);
+
+    expect(await screen.findByText("Sincronizado")).toBeInTheDocument();
+  });
+
+  it("estadoChip: pendiente cuando está en línea y falta al menos un participante por confirmar", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(sesionBase());
+    repo.sembrarLinea("ses_1", lineaBase("cat_a", 2000, 10));
+    repo.sembrarSincronizacion("ses_1", {
+      participantes: [
+        { uid: "uid_ana", nombre: "Ana Ramírez", sincronizado: true },
+        { uid: "uid_luis", nombre: "Luis Pérez", sincronizado: false },
+      ],
+    });
+
+    renderPantalla(repo);
+
+    expect(await screen.findByText("Sincronizando")).toBeInTheDocument();
+  });
+
+  it("el chip «vs. sesión anterior» activa y desactiva los deltas de las tres cards a la vez", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(sesionBase());
+    repo.sembrarLinea("ses_1", lineaBase("cat_a", 3000, 100)); // 300.000, valor/u 3.000
+    repo.sembrarSincronizacion("ses_1", todosSincronizados());
+    repo.sembrarHistorico(
+      "suc_norte",
+      // valor/u anterior = 200.000 / 80 = 2.500. Los tres deltas resultan
+      // distintos entre sí (+50 %, +25 %, +20 %) para que cada aserción sólo
+      // pueda pasar leyendo la card correcta, no cualquier delta visible.
+      crearHistorico({ sesionId: "ses_previa", totalMonetario: 200_000, totalUnidades: 80 }),
+    );
+
+    const { container } = renderPantalla(repo);
+    await screen.findByText("Sucursal Norte", { exact: false });
+
+    const resumen = within(container.querySelector('[data-seccion="resumen"]')!);
+    const chip = resumen.getByRole("button", { name: /vs\. sesión anterior/i });
+    const cardValorContado = resumen.getByText("Valor contado").closest("div")!;
+    const cardValorPorUnidad = resumen.getByText("Valor por unidad").closest("div")!;
+    const cardUnidades = resumen.getByText("Unidades").closest("div")!;
+
+    // Arranca activo (doc: "arranca activo"): los tres deltas visibles.
+    expect(chip).toHaveAttribute("aria-pressed", "true");
+    expect(cardValorContado).toHaveTextContent(`+${porcentaje(50)}`);
+    expect(cardValorPorUnidad).toHaveTextContent(`+${porcentaje(20)}`);
+    expect(cardUnidades).toHaveTextContent(`+${porcentaje(25)}`);
+
+    fireEvent.click(chip);
+
+    expect(chip).toHaveAttribute("aria-pressed", "false");
+    expect(cardValorContado).not.toHaveTextContent(`+${porcentaje(50)}`);
+    expect(cardValorPorUnidad).not.toHaveTextContent(`+${porcentaje(20)}`);
+    expect(cardUnidades).not.toHaveTextContent(`+${porcentaje(25)}`);
+
+    fireEvent.click(chip);
+
+    expect(chip).toHaveAttribute("aria-pressed", "true");
+    expect(cardValorContado).toHaveTextContent(`+${porcentaje(50)}`);
+    expect(cardValorPorUnidad).toHaveTextContent(`+${porcentaje(20)}`);
+    expect(cardUnidades).toHaveTextContent(`+${porcentaje(25)}`);
+  });
+
+  it('la card "Valor contado" monta la evolución mensual con su SVG y el monto de un cierre histórico', async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo);
+    repo.sembrarHistorico(
+      "suc_norte",
+      crearHistorico({
+        sesionId: "ses_previa",
+        cerradaEn: new Date("2026-07-01T00:00:00Z"),
+        totalMonetario: 654_321,
+      }),
+    );
+
+    renderPantalla(repo);
+    await screen.findByText("Sucursal Norte", { exact: false });
+
+    const cardValorContado = screen.getByText("Valor contado").closest("div")!;
+    expect(cardValorContado.querySelector("svg")).not.toBeNull();
+    // La lista de valores arranca `sr-only` pero SIGUE en el DOM (nunca
+    // `hidden`), así que el monto del cierre histórico es consultable por
+    // texto sin desplegarla.
+    expect(cardValorContado).toHaveTextContent(textoDom(moneda(654_321)));
   });
 });
