@@ -74,4 +74,14 @@ describe("Sparkline", () => {
     expect(svg).toHaveAttribute("width", "64");
     expect(svg).toHaveAttribute("height", "24");
   });
+
+  it("pasa className al <svg>, y sin la prop no la agrega", () => {
+    const { container: sinClase } = render(<Sparkline valores={[1, 2]} />);
+    expect(sinClase.querySelector("svg")).not.toHaveAttribute("class");
+
+    const { container: conClase } = render(
+      <Sparkline valores={[1, 2]} className="h-full w-full" />,
+    );
+    expect(conClase.querySelector("svg")).toHaveClass("h-full", "w-full");
+  });
 });

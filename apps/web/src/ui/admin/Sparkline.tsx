@@ -20,6 +20,11 @@ export interface SparklineProps {
   readonly alto?: number;
   readonly pad?: number;
   readonly radioPunto?: number;
+  // Se pasa tal cual al <svg>. Aditiva: quien no la use conserva el markup
+  // de siempre. Existe porque `ancho` fijo (280 en EvolucionMensual) desborda
+  // una card angosta en pantallas de 320px si el consumidor no puede pedirle
+  // al SVG que ocupe el ancho real de su contenedor en vez del atributo fijo.
+  readonly className?: string;
 }
 
 const ANCHO_POR_DEFECTO = 64;
@@ -48,6 +53,7 @@ export function Sparkline({
   alto = ALTO_POR_DEFECTO,
   pad = PAD_POR_DEFECTO,
   radioPunto = RADIO_PUNTO_POR_DEFECTO,
+  className,
 }: SparklineProps) {
   // ponytail: serie vacía, nada que dibujar — quien llama decide el mensaje
   // (EvolucionMensual ya lo hace antes de llegar aquí).
@@ -56,7 +62,13 @@ export function Sparkline({
   const coords = puntos(valores, ancho, alto, pad);
 
   return (
-    <svg aria-hidden="true" viewBox={`0 0 ${ancho} ${alto}`} width={ancho} height={alto}>
+    <svg
+      aria-hidden="true"
+      viewBox={`0 0 ${ancho} ${alto}`}
+      width={ancho}
+      height={alto}
+      className={className}
+    >
       {/* ponytail: con un solo valor una polyline de un punto no se ve —
           se pinta sólo el círculo (marca "hay un dato", sin insinuar
           tendencia); a partir de 2 puntos se añade la línea. */}

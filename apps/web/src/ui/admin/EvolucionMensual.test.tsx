@@ -1,6 +1,12 @@
 // apps/web/src/ui/admin/EvolucionMensual.test.tsx (docs/diseno/10-analisis-y-dashboards.md
 // §5-6) — mismo molde de prueba que Dona.test.tsx.
-import { render, screen } from "@testing-library/react";
+//
+// Cambio de diseño: el tooltip por punto se eliminó (docs/diseno/11 §314 exige
+// objetivos táctiles ≥48px; con LIMITE_SERIE_POR_DEFECTO=12 puntos en 280px
+// cada columna mide ~23px, aritméticamente imposible en un teléfono de 320px).
+// La lista de valores está SIEMPRE en el DOM y en el árbol de accesibilidad;
+// un botón «Ver valores» sólo alterna si se ve (sr-only) o no.
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { Historico } from "@conteo/shared/models/historico.js";
 import { fecha, moneda } from "../../lib/formato.js";
@@ -22,11 +28,12 @@ function historico(sesionId: string, cerradaEn: string, totalMonetario: number):
 }
 
 describe("EvolucionMensual (1.7)", () => {
-  it("sin históricos no dibuja svg y muestra un mensaje vacío", () => {
+  it("sin históricos no dibuja svg, no hay botón y muestra el mensaje honesto", () => {
     const { container } = render(<EvolucionMensual historicos={[]} etiqueta="Prueba" />);
 
     expect(container.querySelector("svg")).toBeNull();
-    expect(screen.getByText(/sin históricos/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByText("Sin cierres anteriores para comparar.")).toBeInTheDocument();
   });
 
   it("un solo histórico: pinta el punto pero ninguna polyline (no se ve con un solo punto)", () => {
@@ -62,12 +69,41 @@ describe("EvolucionMensual (1.7)", () => {
     expect(puntos[1]![1]).toBeLessThan(puntos[0]![1]!);
   });
 
-  it("el equivalente accesible en <ul> muestra fecha y dinero de cada histórico", () => {
+  it("los valores de cada cierre están en el DOM como texto SIEMPRE, colapsada o desplegada", () => {
     const serie = [historico("ses_1", "2026-08-01T00:00:00Z", 250_000)];
     render(<EvolucionMensual historicos={serie} etiqueta="Prueba" />);
 
+    // Colapsada (estado inicial): el texto ya está en el DOM, sólo sr-only.
     expect(screen.getByText(fecha(new Date("2026-08-01T00:00:00Z")))).toBeInTheDocument();
     expect(screen.getByText(textoDom(moneda(250_000)))).toBeInTheDocument();
+
+    // Desplegada: sigue estando, ahora visible.
+    fireEvent.click(screen.getByRole("button", { name: /ver valores/i }));
+    expect(screen.getByText(fecha(new Date("2026-08-01T00:00:00Z")))).toBeInTheDocument();
+    expect(screen.getByText(textoDom(moneda(250_000)))).toBeInTheDocument();
+  });
+
+  it('el botón "Ver valores" alterna aria-expanded y la clase sr-only de la lista', () => {
+    const serie = [historico("ses_1", "2026-08-01T00:00:00Z", 250_000)];
+    const { container } = render(<EvolucionMensual historicos={serie} etiqueta="Prueba" />);
+
+    const boton = screen.getByRole("button", { name: /ver valores/i });
+    expect(boton).toHaveAttribute("aria-expanded", "false");
+    expect(container.querySelector("ul")).toHaveClass("sr-only");
+
+    fireEvent.click(boton);
+    expect(screen.getByRole("button", { name: /ocultar valores/i })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(container.querySelector("ul")).not.toHaveClass("sr-only");
+
+    fireEvent.click(screen.getByRole("button", { name: /ocultar valores/i }));
+    expect(screen.getByRole("button", { name: /ver valores/i })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(container.querySelector("ul")).toHaveClass("sr-only");
   });
 
   it("el <svg> es aria-hidden y la figura expone su etiqueta como nombre accesible", () => {
