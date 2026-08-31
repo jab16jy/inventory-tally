@@ -1,19 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  agruparConOtros,
   agruparPorDimension,
   diasEntre,
   distribuirRedondeo,
   estaAtrasada,
-  extremosPorSubtotal,
   medianaIntervaloDias,
   participacion,
   variacion,
   type FilaDimension,
   type LineaAgrupable,
-  type PorcionAnalisis,
 } from "./calculadora-analisis.js";
-import type { LineaSumable } from "./calculadora.js";
 
 /** El invariante real de distribuirRedondeo vive en las décimas enteras, NO
  * en la suma en coma flotante de los valores devueltos: `33.4 + 33.3 + 33.3`
@@ -89,117 +85,6 @@ describe("distribuirRedondeo", () => {
     // (verificado a mano). El método del mayor resto reparte el único
     // sobrante entre los dos primeros empatados y da exactamente 100.0.
     expect(distribuirRedondeo([10, 10, 10, 1])).toEqual([32.3, 32.3, 32.2, 3.2]);
-  });
-});
-
-interface LineaDePrueba extends LineaSumable {
-  readonly etiqueta: string;
-}
-
-function crearLineaPrueba(overrides: Partial<LineaDePrueba> = {}): LineaDePrueba {
-  return {
-    etiqueta: "línea",
-    cantidadTotal: 1,
-    valorUnitario: 1,
-    ...overrides,
-  };
-}
-
-describe("extremosPorSubtotal", () => {
-  it("ignora las líneas sin contar (cantidadTotal 0) aunque tengan el valorUnitario más alto", () => {
-    // Una implementación que no filtre por cantidadTotal calcularía el
-    // subtotal de "sin-contar" como 0 (0 * 999) y lo elegiría como "menor"
-    // en vez de la línea realmente más barata entre las contadas.
-    const sinContar = crearLineaPrueba({
-      etiqueta: "sin-contar",
-      cantidadTotal: 0,
-      valorUnitario: 999,
-    });
-    const barata = crearLineaPrueba({ etiqueta: "barata", cantidadTotal: 5, valorUnitario: 10 }); // subtotal 50
-    const cara = crearLineaPrueba({ etiqueta: "cara", cantidadTotal: 3, valorUnitario: 100 }); // subtotal 300
-
-    const extremos = extremosPorSubtotal([sinContar, barata, cara]);
-
-    expect(extremos?.mayor.etiqueta).toBe("cara");
-    expect(extremos?.menor.etiqueta).toBe("barata");
-  });
-
-  it("una sola línea contada es a la vez mayor y menor", () => {
-    const unica = crearLineaPrueba({ etiqueta: "única", cantidadTotal: 4, valorUnitario: 25 });
-    const extremos = extremosPorSubtotal([unica]);
-    expect(extremos?.mayor.etiqueta).toBe("única");
-    expect(extremos?.menor.etiqueta).toBe("única");
-  });
-
-  it("devuelve null cuando ninguna línea está contada", () => {
-    const lineas = [
-      crearLineaPrueba({ etiqueta: "a", cantidadTotal: 0 }),
-      crearLineaPrueba({ etiqueta: "b", cantidadTotal: 0 }),
-    ];
-    expect(extremosPorSubtotal(lineas)).toBeNull();
-  });
-
-  it("un empate en el subtotal resuelve al índice más bajo, tanto para mayor como para menor", () => {
-    const lineas = [
-      crearLineaPrueba({ etiqueta: "primera-alta", cantidadTotal: 10, valorUnitario: 10 }), // 100
-      crearLineaPrueba({ etiqueta: "primera-baja", cantidadTotal: 5, valorUnitario: 10 }), // 50
-      crearLineaPrueba({ etiqueta: "segunda-alta", cantidadTotal: 20, valorUnitario: 5 }), // 100, empata
-      crearLineaPrueba({ etiqueta: "segunda-baja", cantidadTotal: 10, valorUnitario: 5 }), // 50, empata
-    ];
-    const extremos = extremosPorSubtotal(lineas);
-    expect(extremos?.mayor.etiqueta).toBe("primera-alta");
-    expect(extremos?.menor.etiqueta).toBe("primera-baja");
-  });
-});
-
-describe("agruparConOtros", () => {
-  function porcion(etiqueta: string, monto: number): PorcionAnalisis {
-    return { etiqueta, monto };
-  }
-
-  it("con menos porciones que el máximo, devuelve todas ordenadas sin fila «Otros»", () => {
-    const porciones = [porcion("b", 20), porcion("a", 30)];
-    expect(agruparConOtros(porciones, 5)).toEqual([porcion("a", 30), porcion("b", 20)]);
-  });
-
-  it("con exactamente el máximo de porciones, no agrupa (doblar 1 en «Otros» sería peor que nombrarla)", () => {
-    const porciones = [porcion("a", 30), porcion("b", 20), porcion("c", 10)];
-    const resultado = agruparConOtros(porciones, 3);
-    expect(resultado).toEqual([porcion("a", 30), porcion("b", 20), porcion("c", 10)]);
-    expect(resultado.some((p) => p.etiqueta === "Otros")).toBe(false);
-  });
-
-  it("con un elemento más que el máximo, agrupa la cola en «Otros» al final", () => {
-    const porciones = [porcion("a", 40), porcion("b", 30), porcion("c", 20), porcion("d", 10)];
-    const resultado = agruparConOtros(porciones, 3);
-    expect(resultado).toEqual([porcion("a", 40), porcion("b", 30), porcion("Otros", 30)]);
-    expect(resultado).toHaveLength(3);
-  });
-
-  it("descarta las porciones en 0 antes de agrupar (no dibujan arco ni deben aparecer)", () => {
-    const porciones = [porcion("a", 30), porcion("cero", 0), porcion("b", 20)];
-    const resultado = agruparConOtros(porciones, 5);
-    expect(resultado).toEqual([porcion("a", 30), porcion("b", 20)]);
-    expect(resultado.some((p) => p.monto === 0)).toBe(false);
-  });
-
-  it("un empate en monto resuelve al índice original más bajo (orden estable, sin agrupar)", () => {
-    // Si la implementación desempatara alfabéticamente por etiqueta, "z"
-    // quedaría después de "a"; el criterio correcto es el índice original.
-    const porciones = [porcion("z", 50), porcion("a", 50)];
-    expect(agruparConOtros(porciones, 5)).toEqual([porcion("z", 50), porcion("a", 50)]);
-  });
-
-  it("un empate en monto en el borde del recorte resuelve al índice original más bajo dentro de «Otros»", () => {
-    const porciones = [porcion("a", 100), porcion("b", 100), porcion("c", 50)];
-    const resultado = agruparConOtros(porciones, 2);
-    // "a" y "b" empatan en 100: gana el índice más bajo ("a" queda nombrada),
-    // "b" se pliega dentro de "Otros" junto con "c".
-    expect(resultado).toEqual([porcion("a", 100), porcion("Otros", 150)]);
-  });
-
-  it("con maximo menor a 1 no devuelve basura: arreglo vacío", () => {
-    expect(agruparConOtros([porcion("a", 10)], 0)).toEqual([]);
   });
 });
 

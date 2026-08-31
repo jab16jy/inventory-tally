@@ -1,5 +1,5 @@
 import type { LineaConteo } from "../models/linea-conteo.js";
-import { subtotal, type LineaSumable } from "./calculadora.js";
+import { subtotal } from "./calculadora.js";
 
 /**
  * Calculadora de análisis — porcentajes para los dashboards F4/F5
@@ -76,92 +76,6 @@ export function distribuirRedondeo(valores: readonly number[]): number[] {
   }
 
   return decimasBase.map((d) => d / 10);
-}
-
-/**
- * extremosPorSubtotal(líneas) — la línea de mayor y de menor subtotal
- * (doc 10 §3), para destacar "categoría más valiosa" / "menos valiosa" en el
- * dashboard.
- *
- * Sólo entran en la comparación las líneas realmente contadas
- * (`cantidadTotal > 0`): de lo contrario toda categoría sin contar empataría
- * en subtotal 0 y "menor" dejaría de señalar la existencia real más barata,
- * volviéndose ruido.
- *
- * Devuelve `null` cuando ninguna línea está contada: una sesión vacía no
- * tiene extremos, y fabricar una línea en cero convertiría en un hecho algo
- * que no lo es.
- *
- * Genérica en `T` para que quien llame reciba su propia línea de vuelta
- * (con `etiqueta` y cualquier otro campo intacto), sin inventar un DTO.
- *
- * Empate en subtotal → gana el índice más bajo, siempre (misma razón que
- * `distribuirRedondeo`: un criterio inestable haría parpadear la UI entre
- * renders con los mismos datos).
- */
-export function extremosPorSubtotal<T extends LineaSumable>(
-  lineas: readonly T[],
-): { readonly mayor: T; readonly menor: T } | null {
-  const contadas = lineas.filter((linea) => linea.cantidadTotal > 0);
-  if (contadas.length === 0) return null;
-
-  let mayor = contadas[0]!;
-  let menor = contadas[0]!;
-  for (let i = 1; i < contadas.length; i++) {
-    const linea = contadas[i]!;
-    // Comparación estricta: en empate se conserva el elegido primero (índice
-    // más bajo), nunca se reemplaza.
-    if (subtotal(linea) > subtotal(mayor)) mayor = linea;
-    if (subtotal(linea) < subtotal(menor)) menor = linea;
-  }
-  return { mayor, menor };
-}
-
-/** Una porción de un gráfico de participación (dinero o unidades): una
- * etiqueta y su monto. */
-export interface PorcionAnalisis {
-  readonly etiqueta: string;
-  readonly monto: number;
-}
-
-/**
- * agruparConOtros(porciones, máximo) — recorta una lista de porciones a lo
- * sumo `máximo` entradas, plegando la cola en una fila "Otros" al final
- * (doc 10 §5: pastel "top 6 + Otros", regla de legibilidad de ≤8 series).
- *
- * Descarta antes de agrupar las porciones en `monto === 0`: una porción en
- * cero no dibuja arco en el pastel y sólo agregaría una fila de leyenda
- * ilegible ("0,0 %"); producir un conjunto parte-a-todo legible es parte del
- * trabajo de esta función.
- *
- * Sólo pliega cuando eso efectivamente acorta la lista (`length > máximo`):
- * con `length <= máximo` devuelve todas ordenadas, sin fila "Otros" —
- * plegar 1 elemento dentro de "Otros" es estrictamente peor que nombrarlo.
- * Al plegar, el resultado tiene exactamente `máximo` entradas: `máximo - 1`
- * nombradas + "Otros".
- *
- * Empate en `monto` → gana el índice original más bajo (orden estable,
- * `Array.prototype.sort` es estable desde ES2019), misma razón anti-
- * parpadeo que `distribuirRedondeo`.
- */
-export function agruparConOtros(
-  porciones: readonly PorcionAnalisis[],
-  maximo: number,
-): PorcionAnalisis[] {
-  // ponytail: sin una noción de "máximo" válida (< 1) no hay forma sensata
-  // de recortar; devolver [] es más honesto que devolver basura.
-  if (maximo < 1) return [];
-
-  const conMonto = porciones.filter((p) => p.monto !== 0);
-  const ordenadas = [...conMonto].sort((a, b) => b.monto - a.monto);
-
-  if (ordenadas.length <= maximo) return ordenadas;
-
-  const principales = ordenadas.slice(0, maximo - 1);
-  const resto = ordenadas.slice(maximo - 1);
-  const montoOtros = resto.reduce((total, p) => total + p.monto, 0);
-
-  return [...principales, { etiqueta: "Otros", monto: montoOtros }];
 }
 
 // ── cadencia de conteo (ADR-20) ──
