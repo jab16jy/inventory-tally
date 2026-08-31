@@ -111,7 +111,7 @@ function sembrarSesionCompleta(repo: FakeAdminRepository) {
 }
 
 describe("AnalisisScreen (F5)", () => {
-  it("presenta las secciones en el orden: cabecera, KPIs, sincronización, barras, dona, extremos, detalle, comparativo", async () => {
+  it("presenta las secciones en el orden: cabecera, KPIs, sincronización, barras, dona, extremos, detalle", async () => {
     const repo = new FakeAdminRepository();
     sembrarSesionCompleta(repo);
 
@@ -136,8 +136,18 @@ describe("AnalisisScreen (F5)", () => {
       "detalle",
       "areas",
       "evolucion",
-      "comparativo",
     ]);
+  });
+
+  it('no monta ningún elemento con data-seccion="comparativo" (ADR-20: Comparativo pasó a panel de red, ya no es composición de esta pantalla)', async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo);
+
+    const { container } = renderPantalla(repo);
+
+    await screen.findByText("Sucursal Norte", { exact: false });
+
+    expect(container.querySelector('[data-seccion="comparativo"]')).not.toBeInTheDocument();
   });
 
   it("desglosa unidades por área reusando totalPorArea, sin agregación propia", async () => {
@@ -179,10 +189,9 @@ describe("AnalisisScreen (F5)", () => {
     await screen.findByText("Sucursal Norte", { exact: false });
 
     // `Numeral` con `tamano="placa"` (el default) pinta la clase
-    // `text-numeral`; ni CierreScreen/PanelScreen (tamano="base") ni
-    // ComparativoScreen (texto plano) la usan, así que contar en TODA la
-    // pantalla —incluido el <ComparativoScreen /> compuesto— prueba que no
-    // se roció el numeral de 32px fuera de las 3 tarjetas.
+    // `text-numeral`; ni CierreScreen/PanelScreen (tamano="base") lo usan,
+    // así que contar en TODA la pantalla prueba que no se roció el numeral
+    // de 32px fuera de las 3 tarjetas.
     const numerales32px = container.querySelectorAll(".text-numeral");
     expect(numerales32px).toHaveLength(3);
 
@@ -190,41 +199,6 @@ describe("AnalisisScreen (F5)", () => {
     numerales32px.forEach((nodo) => {
       expect(kpis.contains(nodo)).toBe(true);
     });
-  });
-
-  it("tiene un solo h1: el comparativo compuesto baja a h2 en vez de competir con el título", async () => {
-    const repo = new FakeAdminRepository();
-    sembrarSesionCompleta(repo);
-
-    renderPantalla(repo);
-
-    await screen.findByText("Sucursal Norte", { exact: false });
-
-    // `ComparativoScreen` pinta un <h1> cuando es la pantalla completa de
-    // /admin/comparativo. Compuesto aquí sin bajar de nivel, el documento
-    // quedaba con DOS <h1> y "Comparativo" —una subsección— se anunciaba como
-    // par del título de la página al navegar por encabezados.
-    const nivel1 = screen.getAllByRole("heading", { level: 1 });
-    expect(nivel1).toHaveLength(1);
-    expect(nivel1[0]).toHaveTextContent(/análisis/i);
-    expect(screen.getByRole("heading", { level: 2, name: /comparativo/i })).toBeInTheDocument();
-  });
-
-  it("el comparativo anidado no repite el relleno p-6 de la pantalla que lo contiene", async () => {
-    const repo = new FakeAdminRepository();
-    sembrarSesionCompleta(repo);
-
-    const { container } = renderPantalla(repo);
-
-    await screen.findByText("Sucursal Norte", { exact: false });
-
-    // `ComparativoScreen` trae `p-6` cuando ES la pantalla de
-    // /admin/comparativo. Anidada sin quitarlo, su sección quedaba con 48 px
-    // de relleno contra los 24 px de todas sus secciones hermanas: visiblemente
-    // desalineada en una pantalla cuyo trabajo es barrerse de un vistazo.
-    const seccionComparativo = container.querySelector('[data-seccion="comparativo"] section')!;
-    expect(seccionComparativo).not.toBeNull();
-    expect(seccionComparativo).not.toHaveClass("p-6");
   });
 
   it("la tabla de detalle usa text-base", async () => {
