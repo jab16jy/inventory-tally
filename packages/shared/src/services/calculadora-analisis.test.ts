@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   agruparConOtros,
+  agruparPorDimension,
   diasEntre,
   distribuirRedondeo,
   estaAtrasada,
   extremosPorSubtotal,
   medianaIntervaloDias,
   participacion,
+  variacion,
+  type FilaDimension,
+  type LineaAgrupable,
   type PorcionAnalisis,
 } from "./calculadora-analisis.js";
 import type { LineaSumable } from "./calculadora.js";
@@ -334,5 +338,165 @@ describe("estaAtrasada", () => {
 
     expect(estaAtrasada(diasSinContar, medianaQuincenal)).toBe(true);
     expect(estaAtrasada(diasSinContar, medianaMensual)).toBe(false);
+  });
+});
+
+function crearLineaAgrupable(overrides: Partial<LineaAgrupable> = {}): LineaAgrupable {
+  return {
+    categoriaId: "cat-1",
+    etiqueta: "línea",
+    area: "área",
+    cantidadTotal: 1,
+    valorUnitario: 1,
+    ...overrides,
+  };
+}
+
+describe("agruparPorDimension", () => {
+  const sumaUnidades = (filas: readonly FilaDimension[]) =>
+    filas.reduce((total, f) => total + f.unidades, 0);
+  const sumaValor = (filas: readonly FilaDimension[]) =>
+    filas.reduce((total, f) => total + f.valor, 0);
+
+  it("las tres dimensiones dan el mismo total de unidades y de dinero sobre el mismo conjunto de líneas", () => {
+    const lineas: LineaAgrupable[] = [
+      crearLineaAgrupable({
+        categoriaId: "cat-a",
+        etiqueta: "Categoría A",
+        area: "Barra",
+        cantidadTotal: 10,
+        valorUnitario: 5,
+        aplicados: { uid1: 6, uid2: 4 },
+      }),
+      crearLineaAgrupable({
+        categoriaId: "cat-b",
+        etiqueta: "Categoría B",
+        area: "Cocina",
+        cantidadTotal: 20,
+        valorUnitario: 2,
+        aplicados: { uid1: 20 },
+      }),
+    ];
+
+    const porCategoria = agruparPorDimension(lineas, "categoria");
+    const porArea = agruparPorDimension(lineas, "area");
+    const porCajero = agruparPorDimension(lineas, "cajero");
+
+    expect(sumaUnidades(porCategoria)).toBe(30);
+    expect(sumaUnidades(porArea)).toBe(30);
+    expect(sumaUnidades(porCajero)).toBe(30);
+    expect(sumaValor(porCategoria)).toBe(90); // 10*5 + 20*2
+    expect(sumaValor(porArea)).toBe(90);
+    expect(sumaValor(porCajero)).toBe(90);
+  });
+
+  it("cajero reparte el dinero proporcional a las unidades de cada aportante, nunca en partes iguales", () => {
+    // uidA aportó 8 de 10 unidades, uidB sólo 2 — dividir el subtotal (100) en
+    // partes iguales (50/50) atribuiría dinero que ninguno de los dos aportó.
+    const linea = crearLineaAgrupable({
+      cantidadTotal: 10,
+      valorUnitario: 10,
+      aplicados: { uidA: 8, uidB: 2 },
+    });
+    const filas = agruparPorDimension([linea], "cajero");
+    const filaA = filas.find((f) => f.clave === "uidA");
+    const filaB = filas.find((f) => f.clave === "uidB");
+    expect(filaA?.valor).toBe(80);
+    expect(filaB?.valor).toBe(20);
+  });
+
+  it("un uid sin entrada en nombres cae al propio uid, nunca a cadena vacía", () => {
+    const linea = crearLineaAgrupable({ cantidadTotal: 3, aplicados: { "uid-sin-nombre": 3 } });
+    const filas = agruparPorDimension([linea], "cajero", new Map([["otro-uid", "Otro"]]));
+    expect(filas[0]?.etiqueta).toBe("uid-sin-nombre");
+    expect(filas[0]?.etiqueta).not.toBe("");
+  });
+
+  it("aplicados ausente en la línea no revienta", () => {
+    const linea = crearLineaAgrupable({ cantidadTotal: 0, valorUnitario: 5, aplicados: undefined });
+    expect(agruparPorDimension([linea], "cajero")).toEqual([]);
+  });
+
+  // El caso de arriba usa cantidadTotal 0, así que pasaría igual con el guard
+  // roto: no demuestra nada por sí solo (AGENTS.md §2). Éste es su par
+  // afirmativo — una línea de sesión vieja, contada pero sin el mapa
+  // `aplicados`, tiene que volcarse ENTERA en "Sin atribuir" en vez de
+  // desaparecer del desglose y hacer que la tabla muestre menos dinero del
+  // que hay.
+  it("una línea contada sin aplicados vuelca todas sus unidades en «Sin atribuir»", () => {
+    const linea = crearLineaAgrupable({ cantidadTotal: 7, valorUnitario: 5, aplicados: undefined });
+    expect(agruparPorDimension([linea], "cajero")).toEqual([
+      { clave: "__sin_atribuir", etiqueta: "Sin atribuir", unidades: 7, valor: 35 },
+    ]);
+  });
+
+  it("cuando la suma de aplicados es menor que cantidadTotal aparece la fila «Sin atribuir» y el total sigue cuadrando", () => {
+    const linea = crearLineaAgrupable({
+      cantidadTotal: 10,
+      valorUnitario: 3,
+      aplicados: { uidA: 7 },
+    });
+    const filas = agruparPorDimension([linea], "cajero");
+    const sinAtribuir = filas.find((f) => f.clave === "__sin_atribuir");
+    expect(sinAtribuir?.etiqueta).toBe("Sin atribuir");
+    expect(sinAtribuir?.unidades).toBe(3);
+    expect(sinAtribuir?.valor).toBe(9);
+    expect(sumaUnidades(filas)).toBe(10);
+    expect(sumaValor(filas)).toBe(30);
+  });
+
+  it("una línea con area vacía cae en «Sin área» (mismo rótulo que abrir-sesion.ts)", () => {
+    const linea = crearLineaAgrupable({ area: "", cantidadTotal: 4, valorUnitario: 2 });
+    const filas = agruparPorDimension([linea], "area");
+    expect(filas).toEqual([{ clave: "Sin área", etiqueta: "Sin área", unidades: 4, valor: 8 }]);
+  });
+
+  it("ordena por valor descendente y desempata por etiqueta ascendente, de forma determinística", () => {
+    const lineas = [
+      crearLineaAgrupable({
+        categoriaId: "z",
+        etiqueta: "Zeta",
+        cantidadTotal: 5,
+        valorUnitario: 2,
+      }), // 10
+      crearLineaAgrupable({
+        categoriaId: "a",
+        etiqueta: "Alfa",
+        cantidadTotal: 10,
+        valorUnitario: 1,
+      }), // 10
+      crearLineaAgrupable({
+        categoriaId: "m",
+        etiqueta: "Media",
+        cantidadTotal: 100,
+        valorUnitario: 1,
+      }), // 100
+    ];
+    const filas = agruparPorDimension(lineas, "categoria");
+    expect(filas.map((f) => f.etiqueta)).toEqual(["Media", "Alfa", "Zeta"]);
+  });
+
+  it("lineas vacío devuelve arreglo vacío en las tres dimensiones", () => {
+    expect(agruparPorDimension([], "categoria")).toEqual([]);
+    expect(agruparPorDimension([], "area")).toEqual([]);
+    expect(agruparPorDimension([], "cajero")).toEqual([]);
+  });
+});
+
+describe("variacion", () => {
+  it("crecimiento devuelve el porcentaje positivo", () => {
+    expect(variacion(150, 100)).toBe(50);
+  });
+
+  it("decrecimiento devuelve el porcentaje negativo", () => {
+    expect(variacion(80, 100)).toBe(-20);
+  });
+
+  it("sin cambio devuelve 0", () => {
+    expect(variacion(100, 100)).toBe(0);
+  });
+
+  it("anterior en 0 devuelve null: crecer desde cero no tiene porcentaje", () => {
+    expect(variacion(50, 0)).toBeNull();
   });
 });
