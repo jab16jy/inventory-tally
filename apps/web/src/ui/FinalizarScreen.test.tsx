@@ -186,6 +186,25 @@ describe("FinalizarScreen (F3-B, doc 11 §6)", () => {
     expect(screen.queryByRole("button", { name: /reintentar envío/i })).not.toBeInTheDocument();
   });
 
+  it("un admin que confirma y sale vuelve a /admin, no a /sucursales", async () => {
+    onAuthStateChanged.mockImplementation((_auth: unknown, cb: (u: unknown) => void) => {
+      cb(usuarioFake("admin"));
+      return () => {};
+    });
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarLinea(
+      "ses_1",
+      lineaBase("cat_1000", "$1.000", 1000, { versiones: { uid_ana: 1 } }),
+    );
+
+    renderPantalla(repo);
+
+    fireEvent.click(await screen.findByRole("button", { name: /confirmar y salir/i }));
+
+    expect(await screen.findByText("Pantalla de admin")).toBeInTheDocument();
+    expect(screen.queryByText("Pantalla de sucursales")).not.toBeInTheDocument();
+  });
+
   it("un admin ve 'Volver al panel' y navega a /admin sin cerrar sesión", async () => {
     onAuthStateChanged.mockImplementation((_auth: unknown, cb: (u: unknown) => void) => {
       cb(usuarioFake("admin"));

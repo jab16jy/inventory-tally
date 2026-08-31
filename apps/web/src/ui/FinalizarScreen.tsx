@@ -81,7 +81,10 @@ export function FinalizarScreen({ auth, onSalir }: FinalizarScreenProps) {
       setFallo(true);
       return;
     }
-    navigate("/sucursales");
+    // Un admin que contó desde /admin no tiene "sucursales" propio (esa
+    // pantalla es el home del cajero, doc 11 §2) — el flujo real para él es
+    // volver al panel, mismo destino que "Volver al panel" en la cabecera.
+    navigate(esAdmin ? "/admin" : "/sucursales");
   }
 
   return (
