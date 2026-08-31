@@ -1,3 +1,4 @@
+import type { LineaConteo } from "../models/linea-conteo.js";
 import { subtotal, type LineaSumable } from "./calculadora.js";
 
 /**
@@ -236,4 +237,123 @@ export function medianaIntervaloDias(cierres: readonly Date[]): number | null {
 export function estaAtrasada(diasSinContar: number, mediana: number | null): boolean {
   if (mediana === null) return false;
   return diasSinContar > mediana;
+}
+
+// ── agrupación por dimensión (F6, tablas del panel) ──
+
+/** Las tres formas de partir el mismo conjunto de líneas en el panel: por
+ * categoría (una fila por línea), por área física, o por cajero (repartiendo
+ * cada línea entre quienes aportaron). */
+export type DimensionAnalisis = "categoria" | "cajero" | "area";
+
+/** Proyección mínima de una línea para agrupar — mismo criterio que
+ *  `LineaSumable` de calculadora.ts: el helper no pide una `LineaConteo`
+ *  entera para que los tests no tengan que fabricar campos irrelevantes. */
+export type LineaAgrupable = Pick<
+  LineaConteo,
+  "categoriaId" | "etiqueta" | "area" | "cantidadTotal" | "valorUnitario" | "aplicados"
+>;
+
+/** Una fila de una tabla agrupada por dimensión: `clave` identifica la fila
+ * (categoriaId, nombre de área o uid de cajero) y `etiqueta` es lo que se
+ * pinta en pantalla. */
+export interface FilaDimension {
+  readonly clave: string;
+  readonly etiqueta: string;
+  readonly unidades: number;
+  readonly valor: number;
+}
+
+/** Rótulo para línea sin área asignada — el mismo exacto que usa
+ * `abrirSesion` en producción (`packages/functions/src/callables/abrir-sesion.ts`)
+ * cuando la categoría no tiene `areaId`, para que una línea con área vacía
+ * caiga en la misma fila que las que ya nacieron sin área. */
+const SIN_AREA = "Sin área";
+
+/** Clave de la fila que absorbe unidades sin atribuir a ningún cajero. */
+const SIN_ATRIBUIR = "__sin_atribuir";
+
+/**
+ * agruparPorDimension(líneas, dimensión, nombres) — parte las líneas de una
+ * sesión en filas de tabla según `dimensión` (doc 10, tablas del panel F6).
+ *
+ * - `"categoria"`: una fila por línea (clave = categoriaId).
+ * - `"area"`: agrupa por `linea.area`; área vacía cae en `"Sin área"`, el
+ *   mismo rótulo que ya usa `abrir-sesion.ts` en producción, para que una
+ *   línea con área vacía no invente una segunda categoría "vacía" distinta
+ *   de la que ya existe.
+ * - `"cajero"`: reparte cada línea entre los uid de `linea.aplicados`,
+ *   proporcional a las unidades que cada uno aportó (`unidades × valorUnitario`).
+ *   **Nunca** se reparte `subtotal(linea) / numAportantes`: dividir el
+ *   dinero en partes iguales entre personas que aportaron cantidades
+ *   distintas inventa una atribución que el dato no dice. Un uid sin nombre
+ *   en `nombres` muestra el propio uid (nunca `""`).
+ *
+ *   Si `cantidadTotal - Σ aplicados !== 0`, el resto se suma a una fila
+ *   `"Sin atribuir"`. // ponytail: en producción este resto siempre es 0 —
+ *   el trigger `onAporteEscrito` escribe `cantidadTotal` y `aplicados` en la
+ *   misma transacción y `reconciliarLineas` los reescribe juntos — pero la
+ *   fila existe como techo defensivo: si algún día divergen, el total de la
+ *   tabla nunca debe mostrar menos dinero del que hay.
+ *
+ * Si dos líneas caen en la misma clave, gana la etiqueta de la primera vista
+ * (mismo criterio que "no reinventar un dato que ya existe").
+ *
+ * Orden de salida: `valor` descendente; empate → `etiqueta` ascendente con
+ * `localeCompare`. Mismo criterio anti-parpadeo que documenta
+ * `distribuirRedondeo` en este archivo: un desempate inestable haría
+ * parpadear la UI entre renders con los mismos datos.
+ */
+export function agruparPorDimension(
+  lineas: readonly LineaAgrupable[],
+  dimension: DimensionAnalisis,
+  nombres: ReadonlyMap<string, string> = new Map(),
+): FilaDimension[] {
+  const filas = new Map<string, { etiqueta: string; unidades: number; valor: number }>();
+
+  function acumular(clave: string, etiqueta: string, unidades: number, valor: number): void {
+    const existente = filas.get(clave);
+    if (existente) {
+      existente.unidades += unidades;
+      existente.valor += valor;
+    } else {
+      filas.set(clave, { etiqueta, unidades, valor });
+    }
+  }
+
+  for (const linea of lineas) {
+    if (dimension === "categoria") {
+      acumular(linea.categoriaId, linea.etiqueta, linea.cantidadTotal, subtotal(linea));
+    } else if (dimension === "area") {
+      const nombreArea = linea.area || SIN_AREA;
+      acumular(nombreArea, nombreArea, linea.cantidadTotal, subtotal(linea));
+    } else {
+      const aplicados = linea.aplicados ?? {};
+      let unidadesAplicadas = 0;
+      for (const [uid, unidades] of Object.entries(aplicados)) {
+        unidadesAplicadas += unidades;
+        acumular(uid, nombres.get(uid) ?? uid, unidades, unidades * linea.valorUnitario);
+      }
+      const resto = linea.cantidadTotal - unidadesAplicadas;
+      if (resto !== 0) {
+        acumular(SIN_ATRIBUIR, "Sin atribuir", resto, resto * linea.valorUnitario);
+      }
+    }
+  }
+
+  return [...filas.entries()]
+    .map(([clave, fila]) => ({ clave, ...fila }))
+    .sort((a, b) => b.valor - a.valor || a.etiqueta.localeCompare(b.etiqueta));
+}
+
+/**
+ * variacion(actual, anterior) — variación de `actual` frente a `anterior`,
+ * en escala 0–100 (la misma que espera `porcentaje()` y que devuelve
+ * `participacion`). `anterior === 0` devuelve `null`: crecer desde cero no
+ * tiene porcentaje, y "+∞ %" en un dashboard de dinero es ruido, no
+ * información.
+ */
+export function variacion(actual: number, anterior: number): number | null {
+  if (anterior === 0) return null;
+  return ((actual - anterior) / anterior) * 100;
 }
