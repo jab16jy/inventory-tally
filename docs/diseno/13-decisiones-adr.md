@@ -27,6 +27,7 @@ una decisión no examinada.
 | [15](#adr-15) | **React + Vite sobre continuar con Flutter Web**    | 🆕 Aceptada                |
 | [16](#adr-16) | Filtros de auditoría de uno en uno                  | 🆕 Aceptada                |
 | [17](#adr-17) | IDs de proyecto Firebase reales, no `conteo-eficiente-*` | 🆕 Aceptada           |
+| [18](#adr-18) | Medir RNF-01 con dos clientes contra el emulador   | 🆕 Aceptada                |
 | [19](#adr-19) | Confirmación antes de "Salir" para el cajero        | 🆕 Aceptada                |
 
 ---
@@ -459,6 +460,42 @@ service accounts desde cero · ⚠️ cualquier doc o script que asuma el patró
 `.firebaserc`, no inferirlo del nombre del producto. Pendiente de resolver en el ticket de
 deploy (5/6/7): usar los dominios `*.web.app` por defecto o crear sitios de Hosting con
 alias custom.
+
+---
+
+## ADR-18 {#adr-18}
+
+### Medir RNF-01 con dos clientes contra el emulador
+
+**Contexto.** RNF-01 ([01](01-requisitos-y-alcance.md) §4) exige "cambio visible en otro
+dispositivo en < 3 s con red estable" pero nunca se había medido — el único concepto de
+"latencia" en el repo era `retrasoSincronizacionMs`
+(`packages/data/src/fakes/fake-conteo-repository.ts`), un `setTimeout` de UI en el fake de
+pruebas, que no mide propagación real (issue #62).
+
+**Decisión.** Test de integración automatizado (`infra/test/rnf-01-latencia-sincronizacion.test.ts`)
+que abre dos clientes contra el emulador de Firestore — dos cajeros distintos de la misma
+sucursal, reutilizando el patrón de conexión ya establecido en
+`infra/test/reglas.test.ts` (`@firebase/rules-unit-testing` + reglas reales) — escribe un
+aporte real desde uno (mismo shape que `FirestoreConteoRepository.registrarAporte`) y
+cronometra con `onSnapshot` cuánto tarda el otro en verlo, en varias iteraciones (p50/p95).
+El resultado real queda registrado en el propio ticket (#62), no en una nota aparte.
+
+| Alternativa                          | Por qué se descartó                                                          |
+| ------------------------------------- | ----------------------------------------------------------------------------- |
+| Smoke manual documentado              | No corre en CI; depende de que alguien lo repita a mano antes de cada release |
+| Medir contra producción               | El emulador ya es el patrón establecido en este repo para este tipo de prueba |
+
+**Consecuencias.** ✅ Corre en CI, cifra reproducible · ✅ Usa el mismo camino de escritura y
+lectura que la app real (`aportes/{uid}`, `onSnapshot`), no una escritura de prueba
+arbitraria · ⚠️ El emulador local no reproduce la latencia de red real de producción — el
+umbral de 3 s se valida ampliamente de sobra en el emulador (decenas de ms), lo cual acota
+la propagación de Firestore en sí, no la variable de red que RNF-01 también contempla ·
+⚠️ Encontrado en el camino: los archivos de `infra/test/` comparten una sola instancia del
+emulador (mismo `projectId`); correrlos en paralelo (por defecto en vitest) provoca
+contención real contra ese estado externo compartido en cuanto hay 3 o más archivos. Se
+corrigió con `fileParallelism: false` en `vitest.config.ts` (raíz), sin tocar el contenido
+de los tests existentes.
 
 ---
 

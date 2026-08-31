@@ -1,0 +1,24 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_comment": "Acotado a infra/test/percentiles.ts (issue #62): es la única lógica de bifurcación propia que rnf-01-latencia-sincronizacion.test.ts necesita; el resto del test ejercita código de producción ya cubierto por sus propios tests.",
+  "packageManager": "npm",
+  "testRunner": "vitest",
+  "mutate": ["infra/test/percentiles.ts"],
+  "ignorePatterns": [
+    ".claude",
+    ".git",
+    ".codegraph",
+    ".stryker-tmp",
+    "node_modules",
+    "openspec",
+    "apps",
+    "packages",
+    "contracts",
+    "tools"
+  ],
+  "vitest": {
+    "configFile": "vitest.percentiles.config.ts"
+  },
+  "reporters": ["clear-text", "progress"],
+  "coverageAnalysis": "perTest"
+}
