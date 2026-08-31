@@ -160,7 +160,7 @@ jobs:
   # bloquea si el run quedó obsoleto por un push más nuevo (el `concurrency`
   # del propio workflow cancela ejecuciones en curso).
   deploy-dev:
-    needs: [cambios, web, contratos, functions, reglas]
+    needs: [cambios, web, web-e2e, contratos, functions, reglas]
     if: >-
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       !cancelled() && !failure()
