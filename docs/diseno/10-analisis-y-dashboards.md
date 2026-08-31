@@ -14,13 +14,20 @@ que no se responden con la misma pantalla:
 | **Pregunta que responde** | "¿Cuánto llevo y qué me falta?"      | "¿Qué me dice este inventario?"          |
 | **Unidad**                | Unidades contadas                    | Unidades **y dinero**                    |
 | **Alcance**               | La sesión en curso, su sucursal      | Todas las sucursales, histórico incluido |
-| **Fuente**                | `lineas` (ya en caché por el conteo) | `resumen` + `historicos`                 |
+| **Fuente**                | `lineas` (ya en caché por el conteo) | `lineas` en tiempo real + `historicos`   |
 | **Frescura**              | Tiempo real (< 3 s)                  | Hasta 30 s de desfase                    |
-| **Gráficas**              | Barra de progreso                    | Barras, pastel, series temporales        |
+| **Gráficas**              | Barra de progreso                    | Series temporales (sparkline)            |
 | **Costo de lectura**      | 0 extra                              | 1 documento                              |
 
 Mezclarlos daría al cajero el valor monetario consolidado del inventario, que es
 justamente lo que la separación de datos impide ([04 §2](04-modelo-de-datos-firestore.md)).
+
+> **La fuente real del dashboard del administrador es `lineas`, no `resumen`.**
+> `AnalisisScreen.tsx` tiene prohibido en su propia cabecera leer `resumen/actual`:
+> lo refresca un cron y puede quedar `dirty` indefinidamente, así que el dinero se
+> calcula en cliente con `totalMonetarioSesion`/`subtotal` sobre el mismo listener
+> de `lineas` en tiempo real que ya usa el cajero — el diseño original de esta
+> sección asumía `resumen` como fuente y el código nunca lo hizo así.
 
 ---
 
@@ -84,19 +91,22 @@ flowchart LR
 
 ### Métricas
 
-| Métrica                            | Fórmula                            | Fuente                               |
-| ---------------------------------- | ---------------------------------- | ------------------------------------ |
-| Unidades por categoría             | `Σ aportes`                        | `resumen.porCategoria[cat].cantidad` |
-| Subtotal por categoría             | `cantidad × valorUnitario`         | `resumen.porCategoria[cat].subtotal` |
-| Categoría con más unidades         | `max(cantidad)`                    | `resumen.categoriaMayor`             |
-| Categoría con menos unidades       | `min(cantidad)` entre las contadas | `resumen.categoriaMenor`             |
-| Total de unidades                  | `Σ cantidades`                     | `resumen.totalUnidades`              |
-| Total monetario                    | `Σ subtotales`                     | `resumen.totalMonetario`             |
-| Participación en unidades          | `cantidad / totalUnidades × 100`   | calculado al presentar               |
-| Participación en dinero            | `subtotal / totalMonetario × 100`  | calculado al presentar               |
-| Última actualización por categoría | `max(actualizadaEn)`               | `resumen.porCategoria[cat]`          |
-| Comparativo entre sucursales       | métricas por sucursal              | `historicos`                         |
-| Evolución mensual                  | serie de sesiones cerradas         | `historicos` ordenados               |
+| Métrica                          | Fórmula                                              | Fuente                                       |
+| --------------------------------- | ----------------------------------------------------- | --------------------------------------------- |
+| Unidades y valor por categoría   | `Σ cantidadTotal`, `cantidadTotal × valorUnitario`     | `agruparPorDimension(lineas, "categoria")`   |
+| Unidades y valor por cajero      | `Σ aplicados[uid]`, `aplicados[uid] × valorUnitario`   | `agruparPorDimension(lineas, "cajero")`      |
+| Unidades y valor por área        | `Σ cantidadTotal`, `Σ subtotal`, agrupado por `area`   | `agruparPorDimension(lineas, "area")`        |
+| Total de unidades                | `Σ cantidadTotal`                                      | `totalUnidadesSesion(lineas)`                |
+| Total monetario                  | `Σ subtotal`                                           | `totalMonetarioSesion(lineas)`               |
+| Participación de cada fila (%)   | método del mayor resto sobre `valor` de todas las filas | `distribuirRedondeo`, calculado al presentar |
+| Variación vs. sesión anterior    | `(actual − anterior) / anterior × 100`                 | `variacion`, sobre `historicos`              |
+| Comparativo entre sucursales     | métricas por sucursal                                  | `historicos`                                 |
+| Evolución mensual (valor por cierre) | serie de sesiones cerradas                         | `historicos` ordenados                       |
+
+> **"Categoría con más/menos unidades" no es una métrica propia.** Es la primera y la
+> última fila de la misma tabla ordenable por Valor — pedirle al dato una segunda
+> representación (`resumen.categoriaMayor`/`categoriaMenor`) duplicaba algo que ordenar
+> ya resuelve.
 
 > **Los porcentajes no se almacenan.** Almacenarlos genera inconsistencias por redondeo
 > cada vez que cambia el total, y no ahorra nada.
@@ -117,32 +127,46 @@ export function distribuirRedondeo(porcentajes: number[]): number[] {
 
 ### Composición
 
+El dashboard de sesión (`AnalisisScreen.tsx`) se redujo de 9 bloques —que repetían la
+misma agregación por categoría tres veces (barras, pastel, tabla) más "Unidades por
+área" y "Evolución mensual" aparte— a **3 secciones**, en este orden exacto:
+
 ```
 ┌──────────────────────────────────────────────────────┐
-│  Sucursal Norte · Conteo de agosto · 🟢 En curso      │
-│  Actualizado hace 12 s                                │
-├────────────────────┬────────────────────┬────────────┤
-│ Total unidades     │ Valor total        │ Categorías │
-│ 1.840              │ $12.450.000        │ 47 / 60    │
-├────────────────────┴────────────────────┴────────────┤
-│  🔄 Sincronización: 3 de 4 cajeros confirmados        │
-│     ⚠️ Luis Pérez — sin confirmar                      │
+│  Análisis · Sucursal Norte          🟡 Sincronizado  │  ← cabecera
+│  Sesión abierta · 1/08/2026, 5:05 a. m.               │
+│  ⚠️ Luis Pérez — sin confirmar                         │
 ├──────────────────────────────────────────────────────┤
-│  📊 Unidades por categoría de valor    [barras]       │
+│  [ vs. sesión anterior ]                              │  ← resumen
+│  Valor contado           $12.450.000  +8,2 %          │
+│  ╱‾‾╲___╱‾‾ (sparkline "Valor contado por cierre")    │
+│  Valor por unidad  $6.766  +1,1 %  │  Unidades  1.840  │
+│                                       47/60 categorías │
 ├──────────────────────────────────────────────────────┤
-│  🥧 Participación en dinero             [pastel]      │
-├──────────────────────────────────────────────────────┤
-│  ▲ Mayor: $2.000 (310 u)   ▼ Menor: $150.000 (2 u)   │
-├──────────────────────────────────────────────────────┤
-│  Tabla detallada · ordenable                          │
-│  Valor │ Unidades │ Subtotal │ % Und │ % $ │ Últ.act. │
-├──────────────────────────────────────────────────────┤
-│  🏢 Comparativo entre sucursales        [barras]      │
+│  Desglose por: [ Categoría ▾ ]                        │  ← tabla
+│  Categoría │ Unidades │  Valor  │  %                  │
+│  $150.000  │      2   │ $300.000│ 32,6 %               │
+│  $2.000    │    310   │ $620.000│ 67,4 %               │
+│  Total     │    312   │ $920.000│ 100,0 %              │
 └──────────────────────────────────────────────────────┘
 ```
 
-> El bloque de sincronización es nuevo en la v2 y está deliberadamente **arriba**: es la
-> información que el administrador necesita antes de decidir si puede cerrar el conteo.
+Cabecera, resumen y tabla reemplazan uno a uno los bloques viejos:
+
+- **Cabecera**: el chip de sincronización (`ChipEstado`) sustituye al bloque
+  "Estado de sincronización" completo — sólo quedan visibles, con nombre, los cajeros
+  que **faltan** por confirmar; los que ya confirmaron viven ahora en el desglose por
+  cajero de la tabla (ver §7).
+- **Resumen**: el chip «vs. sesión anterior» más la card "Valor contado" (con la
+  sparkline de evolución mensual dentro) y el par Valor por unidad/Unidades reemplazan
+  las 3 tarjetas KPI, "Participación en dinero" (pastel) y "Extremos".
+- **Tabla**: el `<select>` "Desglose por" (Categoría/Cajero/Área) reemplaza "Unidades
+  por categoría" (barras), "Unidades por área" (barras duplicadas) y la tabla de
+  detalle — las tres eran la misma pregunta ("cuánto hay de cada X") respondida tres
+  veces con presentaciones distintas.
+
+El comparativo entre sucursales no vive aquí (ADR-20): es uno de los 7 destinos del nav
+del panel, no una sección de esta pantalla.
 
 ---
 
@@ -162,29 +186,22 @@ contrario.
 
 ## 5. Elección de gráfica
 
-| Métrica                      | Gráfica                     | Por qué                                |
-| ---------------------------- | --------------------------- | -------------------------------------- |
-| Unidades por categoría       | Barras horizontales         | Muchas categorías con etiquetas largas |
-| Participación en dinero      | Pastel, **top 6 + "Otros"** | Un pastel con 60 porciones es ilegible |
-| Comparativo entre sucursales | Barras agrupadas            | Comparación directa entre pocas series |
-| Evolución mensual            | Líneas                      | Serie temporal sobre sesiones cerradas |
+El repositorio no tiene ninguna librería de gráficas (ni `recharts` ni ninguna otra) y no
+va a tenerla: la única pieza gráfica del sistema es `Sparkline.tsx`, una curva SVG propia
+(coordenadas + un `<circle>` por punto, sin dependencias) con su equivalente accesible en
+texto en paralelo — nunca sólo el SVG. `Dona.tsx` (pastel) y las barras horizontales que
+usaba el dashboard de sesión se retiraron de aquí: la agregación por categoría, por
+cajero y por área vive ahora en una sola tabla ordenable con selector de dimensión
+(§3), y "cuánto hay de cada X" se responde una vez, no tres con presentaciones distintas.
 
-> **Regla de legibilidad:** ninguna gráfica muestra más de 8 series. Con 60 categorías se
-> grafican las principales y se agrupa el resto; el detalle completo vive en la tabla.
+| Métrica                                  | Gráfica            | Por qué                                             |
+| ------------------------------------------ | ------------------- | ---------------------------------------------------- |
+| Comparativo entre sucursales (Tendencia) | Líneas (Sparkline) | Serie temporal compacta, una por fila de la tabla    |
+| Evolución mensual (valor por cierre)     | Líneas (Sparkline) | Serie temporal sobre sesiones cerradas de una sesión |
 
-```tsx
-<BarChart data={filas.slice(0, 8)}>
-  <CartesianGrid vertical={false} />
-  <XAxis dataKey="etiqueta" tick={{ fontSize: 10 }} />
-  <YAxis />
-  <Bar dataKey="cantidad" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
-</BarChart>
-```
-
-> **Nota de bundle:** las gráficas sólo aparecen en vistas de administrador, que se
-> consumen mayoritariamente en escritorio. El peso de `recharts` no afecta a la ruta
-> crítica del cajero — pero conviene cargarlas con `React.lazy` para no inflar el bundle
-> inicial ([06](06-plataforma-web.md)).
+> **Regla de legibilidad:** ninguna gráfica muestra más de 8 series. Su único usuario
+> hoy es el comparativo entre sucursales (§6) — 12 puntos por sucursal, unas pocas
+> sucursales a la vez; el detalle completo, cuando hace falta, vive en la tabla.
 
 ---
 
@@ -245,10 +262,10 @@ denegación por defecto de `infra/firestore.rules`.
 | Estado                | Qué se muestra                                                    |
 | --------------------- | ----------------------------------------------------------------- |
 | Cargando              | _Skeleton_ con la forma final del dashboard, no un spinner        |
-| Sesión sin aportes    | "Aún no hay conteos registrados en esta sesión"                   |
-| Sin conexión          | Últimos datos en caché + "Mostrando datos guardados · hace 8 min" |
-| Datos inconsistentes  | Aviso discreto si `reconciliarLineas` detectó discrepancias       |
-| Cajeros sin confirmar | Bloque destacado con nombres                                      |
+| Sesión sin aportes    | Resumen en "0 / 0 categorías contadas"; la tabla pinta "Todavía no hay unidades contadas." |
+| Sin conexión          | Últimos datos en caché + "Mostrando datos guardados · {fecha}" (`fecha()`, no un relativo "hace X min") |
+| Datos inconsistentes  | Aviso discreto (`role="status"`) si `reconciliarLineas` detectó discrepancias |
+| Cajeros sin confirmar | Bloque destacado con nombres — sólo los que faltan; los confirmados con sus cifras viven en el desglose por cajero |
 
 > El _skeleton_ de "Cargando" es sobre carga de página/panel; el botón en vuelo de una
 > acción que llama a una Cloud Function se especifica en `docs/DESIGN.md` ("Botón primario").
