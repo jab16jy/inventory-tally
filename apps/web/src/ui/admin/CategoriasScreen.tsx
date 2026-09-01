@@ -7,7 +7,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 import type { Area } from "@conteo/shared/models/area.js";
 import type { CategoriaValor } from "@conteo/shared/models/categoria-valor.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
-import type { CrearCategoriaPayload } from "@conteo/data";
+import type { ActualizarCategoriaPayload, CrearCategoriaPayload } from "@conteo/data";
 import { moneda } from "../../lib/formato.js";
 import { useAdminRepository } from "../../state/admin-contexto.js";
 import { Icono } from "../primitivos/Icono.js";
@@ -62,13 +62,17 @@ function useCategorias(): { categorias: CategoriaValor[]; cargando: boolean } {
   return { categorias, cargando };
 }
 
+type EstadoFormulario =
+  | { readonly modo: "crear" }
+  | { readonly modo: "editar"; readonly categoria: CategoriaValor };
+
 export function CategoriasScreen() {
   const repo = useAdminRepository();
   const { categorias, cargando: cargandoCategorias } = useCategorias();
   const { areas, cargando: cargandoAreas } = useAreas();
   const cargando = cargandoCategorias || cargandoAreas;
 
-  const [formularioAbierto, setFormularioAbierto] = useState(false);
+  const [formulario, setFormulario] = useState<EstadoFormulario | null>(null);
   const [errorFormulario, setErrorFormulario] = useState<string | null>(null);
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
   // categoriaId + tipo de acción en vuelo — deshabilita el botón de esa fila
@@ -84,13 +88,36 @@ export function CategoriasScreen() {
   // CajerosScreen.tsx para eliminarCajero.
   const [confirmandoEliminarId, setConfirmandoEliminarId] = useState<string | null>(null);
 
+  function abrirCreacion(): void {
+    setFormulario({ modo: "crear" });
+    setErrorFormulario(null);
+  }
+
+  function abrirEdicion(categoria: CategoriaValor): void {
+    setFormulario({ modo: "editar", categoria });
+    setErrorFormulario(null);
+  }
+
+  function cerrarFormulario(): void {
+    setFormulario(null);
+    setErrorFormulario(null);
+  }
+
   async function crear(payload: CrearCategoriaPayload): Promise<void> {
     try {
       await repo.crearCategoria(payload);
-      setFormularioAbierto(false);
-      setErrorFormulario(null);
+      cerrarFormulario();
     } catch {
       setErrorFormulario("No se pudo crear la categoría. Intenta de nuevo.");
+    }
+  }
+
+  async function editar(payload: ActualizarCategoriaPayload): Promise<void> {
+    try {
+      await repo.actualizarCategoria(payload);
+      cerrarFormulario();
+    } catch {
+      setErrorFormulario("No se pudo guardar la categoría. Intenta de nuevo.");
     }
   }
 
@@ -170,6 +197,13 @@ export function CategoriasScreen() {
       etiqueta: "Acciones",
       render: (c) => (
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => abrirEdicion(c)}
+            className="rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-senal hover:text-senal"
+          >
+            Editar
+          </button>
           {c.activa ? (
             <>
               <button
@@ -243,10 +277,7 @@ export function CategoriasScreen() {
         <h1 className="text-micro tracking-[0.18em] text-tenue uppercase">Categorías</h1>
         <button
           type="button"
-          onClick={() => {
-            setFormularioAbierto(true);
-            setErrorFormulario(null);
-          }}
+          onClick={abrirCreacion}
           className="rounded-placa bg-senal px-3 py-2 text-micro font-semibold text-fondo hover:bg-senal/85"
         >
           Nueva categoría
@@ -262,11 +293,14 @@ export function CategoriasScreen() {
         </p>
       )}
 
-      {formularioAbierto && (
+      {formulario && (
         <FormularioCategoria
+          modo={formulario.modo}
+          categoria={formulario.modo === "editar" ? formulario.categoria : undefined}
           error={errorFormulario}
-          onCancelar={() => setFormularioAbierto(false)}
+          onCancelar={cerrarFormulario}
           onCrear={crear}
+          onEditar={editar}
         />
       )}
 
@@ -283,23 +317,35 @@ export function CategoriasScreen() {
 }
 
 interface FormularioCategoriaProps {
+  readonly modo: "crear" | "editar";
+  readonly categoria?: CategoriaValor;
   readonly error: string | null;
   readonly onCancelar: () => void;
   readonly onCrear: (payload: CrearCategoriaPayload) => void | Promise<void>;
+  readonly onEditar: (payload: ActualizarCategoriaPayload) => void | Promise<void>;
 }
 
-function FormularioCategoria({ error, onCancelar, onCrear }: FormularioCategoriaProps) {
+function FormularioCategoria({
+  modo,
+  categoria,
+  error,
+  onCancelar,
+  onCrear,
+  onEditar,
+}: FormularioCategoriaProps) {
   const sucursales = useSucursales();
   // Solo áreas activas: sembrarLineas únicamente resuelve áreas con
   // activa=true, así que ofrecer una inactiva aquí crearía una categoría
   // que se ve "con área" en esta pantalla pero cae a "Sin área" al abrir
   // la próxima sesión.
   const areas = useAreas().areas.filter((a) => a.activa);
-  const [etiqueta, setEtiqueta] = useState("");
-  const [valor, setValor] = useState("");
-  const [orden, setOrden] = useState("");
-  const [areaId, setAreaId] = useState("");
-  const [sucursalesAsignadas, setSucursalesAsignadas] = useState<string[]>([]);
+  const [etiqueta, setEtiqueta] = useState(categoria?.etiqueta ?? "");
+  const [valor, setValor] = useState(categoria ? String(categoria.valor) : "");
+  const [orden, setOrden] = useState(categoria ? String(categoria.orden) : "");
+  const [areaId, setAreaId] = useState(categoria?.areaId ?? "");
+  const [sucursalesAsignadas, setSucursalesAsignadas] = useState<string[]>(
+    categoria?.sucursalesAsignadas ? [...categoria.sucursalesAsignadas] : [],
+  );
   const [enviando, setEnviando] = useState(false);
 
   const idEtiqueta = useId();
@@ -321,13 +367,18 @@ function FormularioCategoria({ error, onCancelar, onCrear }: FormularioCategoria
     evento.preventDefault();
     setEnviando(true);
     try {
-      await onCrear({
+      const campos = {
         etiqueta,
         valor: Number(valor),
         orden: Number(orden),
         ...(areaId && { areaId }),
         ...(sucursalesAsignadas.length > 0 && { sucursalesAsignadas }),
-      });
+      };
+      if (modo === "crear") {
+        await onCrear(campos);
+      } else if (categoria) {
+        await onEditar({ categoriaId: categoria.categoriaId, ...campos });
+      }
     } finally {
       setEnviando(false);
     }
@@ -443,7 +494,7 @@ function FormularioCategoria({ error, onCancelar, onCrear }: FormularioCategoria
           }
         >
           {enviando && <Spinner className="size-3.5 shrink-0" />}
-          Crear categoría
+          {modo === "crear" ? "Crear categoría" : "Guardar cambios"}
         </button>
         <button
           type="button"

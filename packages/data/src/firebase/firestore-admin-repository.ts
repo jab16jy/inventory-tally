@@ -40,6 +40,7 @@ import type {
   AbrirSesionPayload,
   ActualizarAreaPayload,
   ActualizarCajeroPayload,
+  ActualizarCategoriaPayload,
   ActualizarSucursalPayload,
   AdminRepository,
   CerrarSesionPayload,
@@ -304,6 +305,12 @@ export class FirestoreAdminRepository implements AdminRepository {
     payload: CrearCategoriaPayload,
   ): Promise<{ categoriaId: string; creada: true }> {
     return this.llamar("crearCategoria", payload);
+  }
+
+  async actualizarCategoria(
+    payload: ActualizarCategoriaPayload,
+  ): Promise<{ categoriaId: string; actualizada: true }> {
+    return this.llamar("actualizarCategoria", payload);
   }
 
   async desactivarCategoria(

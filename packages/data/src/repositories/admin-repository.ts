@@ -115,6 +115,18 @@ export interface CrearCategoriaPayload {
   readonly areaId?: string;
 }
 
+// Espejo de contracts/schemas/actualizar-categoria.schema.ts. Mismos campos
+// editables que CrearCategoriaPayload más `categoriaId`: sin `activa`, ese
+// campo pertenece a desactivarCategoria/reactivarCategoria (I-7).
+export interface ActualizarCategoriaPayload {
+  readonly categoriaId: string;
+  readonly etiqueta: string;
+  readonly valor: number;
+  readonly orden: number;
+  readonly sucursalesAsignadas?: readonly string[];
+  readonly areaId?: string;
+}
+
 // Espejo de contracts/schemas/crear-area.schema.ts.
 export interface CrearAreaPayload {
   readonly nombre: string;
@@ -183,6 +195,9 @@ export interface AdminRepository {
     payload: ActualizarSucursalPayload,
   ): Promise<{ sucursalId: string; actualizada: true }>;
   crearCategoria(payload: CrearCategoriaPayload): Promise<{ categoriaId: string; creada: true }>;
+  actualizarCategoria(
+    payload: ActualizarCategoriaPayload,
+  ): Promise<{ categoriaId: string; actualizada: true }>;
   desactivarCategoria(categoriaId: string): Promise<{ categoriaId: string; desactivada: true }>;
   crearArea(payload: CrearAreaPayload): Promise<{ areaId: string; creada: true }>;
   actualizarArea(payload: ActualizarAreaPayload): Promise<{ areaId: string; actualizada: true }>;

@@ -14,6 +14,7 @@ import type {
   AbrirSesionPayload,
   ActualizarAreaPayload,
   ActualizarCajeroPayload,
+  ActualizarCategoriaPayload,
   ActualizarSucursalPayload,
   AdminRepository,
   CerrarSesionPayload,
@@ -266,6 +267,13 @@ export class FakeAdminRepository implements AdminRepository {
   ): Promise<{ categoriaId: string; creada: true }> {
     this.registrar("crearCategoria", payload);
     return { categoriaId: "cat_fake", creada: true };
+  }
+
+  async actualizarCategoria(
+    payload: ActualizarCategoriaPayload,
+  ): Promise<{ categoriaId: string; actualizada: true }> {
+    this.registrar("actualizarCategoria", payload);
+    return { categoriaId: payload.categoriaId, actualizada: true };
   }
 
   async desactivarCategoria(

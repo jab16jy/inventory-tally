@@ -16,6 +16,7 @@ export type {
   AbrirSesionPayload,
   ActualizarAreaPayload,
   ActualizarCajeroPayload,
+  ActualizarCategoriaPayload,
   ActualizarSucursalPayload,
   AdminRepository,
   CerrarSesionPayload,
