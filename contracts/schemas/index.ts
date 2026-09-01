@@ -27,6 +27,9 @@ export type { ActualizarSucursalInput } from "./actualizar-sucursal.schema.js";
 export { crearCategoriaSchema } from "./crear-categoria.schema.js";
 export type { CrearCategoriaInput } from "./crear-categoria.schema.js";
 
+export { actualizarCategoriaSchema } from "./actualizar-categoria.schema.js";
+export type { ActualizarCategoriaInput } from "./actualizar-categoria.schema.js";
+
 export { desactivarCategoriaSchema } from "./desactivar-categoria.schema.js";
 export type { DesactivarCategoriaInput } from "./desactivar-categoria.schema.js";
 

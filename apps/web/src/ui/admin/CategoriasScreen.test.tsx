@@ -160,6 +160,43 @@ describe("CategoriasScreen (F3)", () => {
     });
   });
 
+  it("edita una categoría existente con el formulario precargado", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarArea(areaBase());
+    repo.sembrarCategoria(
+      categoriaBase({ areaId: "area_aseo", sucursalesAsignadas: ["suc_norte"] }),
+    );
+    repo.sembrarSucursal(sucursalBase({ sucursalId: "suc_norte", nombre: "Norte" }));
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /editar/i }));
+    expect(screen.getByLabelText(/etiqueta/i)).toHaveValue("$5.000");
+    expect(screen.getByLabelText(/^valor$/i)).toHaveValue(5000);
+    expect(screen.getByLabelText(/orden/i)).toHaveValue(1);
+    expect(screen.getByLabelText(/área/i)).toHaveValue("area_aseo");
+    expect(screen.getByLabelText("Norte")).toBeChecked();
+
+    fireEvent.change(screen.getByLabelText(/etiqueta/i), { target: { value: "$6.000" } });
+    fireEvent.click(screen.getByRole("button", { name: /guardar cambios/i }));
+
+    await vi.waitFor(() => {
+      expect(repo.llamadas).toEqual([
+        {
+          metodo: "actualizarCategoria",
+          payload: {
+            categoriaId: "cat_5000",
+            etiqueta: "$6.000",
+            valor: 5000,
+            orden: 1,
+            areaId: "area_aseo",
+            sucursalesAsignadas: ["suc_norte"],
+          },
+        },
+      ]);
+    });
+  });
+
   it("no ofrece áreas inactivas en el selector del formulario (evitaría degradar a 'Sin área' al abrir sesión)", () => {
     const repo = new FakeAdminRepository();
     repo.sembrarArea(areaBase({ areaId: "area_aseo", nombre: "Aseo", activa: true }));

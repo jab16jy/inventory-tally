@@ -18,6 +18,7 @@ export { eliminarCajero } from "./callables/eliminar-cajero.js";
 export { crearSucursal } from "./callables/crear-sucursal.js";
 export { actualizarSucursal } from "./callables/actualizar-sucursal.js";
 export { crearCategoria } from "./callables/crear-categoria.js";
+export { actualizarCategoria } from "./callables/actualizar-categoria.js";
 export { desactivarCategoria } from "./callables/desactivar-categoria.js";
 export { eliminarCategoria } from "./callables/eliminar-categoria.js";
 export { reactivarCategoria } from "./callables/reactivar-categoria.js";
