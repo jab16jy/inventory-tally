@@ -17,6 +17,12 @@ import { registrarAuditoria } from "../lib/auditoria.js";
  * los omite, se borra el campo con `FieldValue.delete()` en vez de dejar un
  * `undefined` (que `tx.update` rechaza) — así una edición puede quitar un
  * área o volver una categoría "nombrada" a global.
+ *
+ * I-7 (issue #67): esta callable NUNCA toca `sesiones/*\/lineas`. Cambiar
+ * `valor` aquí no afecta ninguna sesión ya abierta porque `resumen.ts` lee
+ * `valorUnitario` desde la línea (copiada y congelada al abrir, ver
+ * `abrir-sesion.ts`), nunca desde `categoriasValor` en vivo — por eso no
+ * hace falta bloquear la edición ni re-sembrar líneas con sesión abierta.
  */
 export async function actualizarCategoriaImpl(
   db: Firestore,

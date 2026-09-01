@@ -38,6 +38,27 @@ async function sembrarCategoria(overrides: Record<string, unknown> = {}) {
   return categoriaId;
 }
 
+const sesionesCreadas: string[] = [];
+
+afterEach(async () => {
+  const idsPendientes = sesionesCreadas.splice(0);
+  await Promise.all(idsPendientes.map((id) => db.doc(`sesiones/${id}`).delete()));
+});
+
+async function sembrarLineaDeSesion(
+  sesionId: string,
+  categoriaId: string,
+  valorUnitario: number,
+): Promise<void> {
+  await db.doc(`sesiones/${sesionId}`).set({ estado: "abierta" });
+  sesionesCreadas.push(sesionId);
+  await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).set({
+    categoriaId,
+    valorUnitario,
+    cantidadTotal: 0,
+  });
+}
+
 describe("actualizarCategoriaImpl", () => {
   it("actualiza los campos editables y emite CATEGORIA_ACTUALIZADA en la misma transacción", async () => {
     const categoriaId = await sembrarCategoria();
@@ -112,5 +133,23 @@ describe("actualizarCategoriaImpl", () => {
     const categoria = await db.doc(`categoriasValor/${categoriaId}`).get();
     expect(categoria.data()).not.toHaveProperty("areaId");
     expect(categoria.data()).not.toHaveProperty("sucursalesAsignadas");
+  });
+
+  it("I-7 (issue #67) · cambiar el valor no afecta la línea congelada de una sesión abierta", async () => {
+    const categoriaId = await sembrarCategoria({ valor: 1000 });
+    const sesionId = `ses_${randomUUID()}`;
+    await sembrarLineaDeSesion(sesionId, categoriaId, 1000);
+
+    await actualizarCategoriaImpl(db, "uid_admin", {
+      categoriaId,
+      etiqueta: "Precio subió a mitad de conteo",
+      valor: 5000,
+      orden: 1,
+    });
+
+    const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
+    expect(linea.get("valorUnitario")).toBe(1000); // sin cambios, congelado al abrir
+    const categoria = await db.doc(`categoriasValor/${categoriaId}`).get();
+    expect(categoria.get("valor")).toBe(5000); // el catálogo sí cambió
   });
 });

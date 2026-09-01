@@ -17,6 +17,11 @@ import { registrarAuditoria } from "../lib/auditoria.js";
  * así que se pide `limit(2)` y se descarta en código el propio documento:
  * la invariante de crearAreaImpl (a lo sumo un área activa por nombre)
  * garantiza que sólo puede quedar, como mucho, un OTRO documento.
+ *
+ * I-7 (issue #67): esta callable NUNCA toca `sesiones/*\/lineas`. Renombrar
+ * un área no afecta ninguna sesión ya abierta porque el nombre se copia y
+ * congela en `linea.area` al abrir (ver `abrir-sesion.ts`) — la línea nunca
+ * relee `areas` en vivo.
  */
 export async function actualizarAreaImpl(
   db: Firestore,

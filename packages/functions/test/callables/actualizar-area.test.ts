@@ -34,6 +34,23 @@ async function sembrarArea(nombre: string) {
   return areaId;
 }
 
+const sesionesCreadas: string[] = [];
+
+afterEach(async () => {
+  const idsPendientes = sesionesCreadas.splice(0);
+  await Promise.all(idsPendientes.map((id) => db.doc(`sesiones/${id}`).delete()));
+});
+
+async function sembrarLineaDeSesion(
+  sesionId: string,
+  categoriaId: string,
+  area: string,
+): Promise<void> {
+  await db.doc(`sesiones/${sesionId}`).set({ estado: "abierta" });
+  sesionesCreadas.push(sesionId);
+  await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).set({ categoriaId, area });
+}
+
 describe("actualizarAreaImpl", () => {
   it("actualiza el nombre y emite AREA_ACTUALIZADA en la misma transacción", async () => {
     const nombreOriginal = `Aseo ${randomUUID()}`;
@@ -90,5 +107,20 @@ describe("actualizarAreaImpl", () => {
     });
 
     expect(resultado.actualizada).toBe(true);
+  });
+
+  it("I-7 (issue #67) · renombrar no afecta la línea congelada de una sesión abierta", async () => {
+    const nombreOriginal = `Aseo ${randomUUID()}`;
+    const areaId = await sembrarArea(nombreOriginal);
+    const sesionId = `ses_${randomUUID()}`;
+    const categoriaId = `cat_${randomUUID()}`;
+    await sembrarLineaDeSesion(sesionId, categoriaId, nombreOriginal);
+
+    await actualizarAreaImpl(db, "uid_admin", { areaId, nombre: "Aseo renombrada" });
+
+    const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
+    expect(linea.get("area")).toBe(nombreOriginal); // sin cambios, congelado al abrir
+    const area = await db.doc(`areas/${areaId}`).get();
+    expect(area.get("nombre")).toBe("Aseo renombrada"); // el catálogo sí cambió
   });
 });
