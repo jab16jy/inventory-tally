@@ -38,6 +38,7 @@ import type { Usuario } from "@conteo/shared/models/usuario.js";
 import { participanteSincronizado } from "@conteo/shared/services/sincronizacion.js";
 import type {
   AbrirSesionPayload,
+  ActualizarAreaPayload,
   ActualizarCajeroPayload,
   ActualizarSucursalPayload,
   AdminRepository,
@@ -313,6 +314,12 @@ export class FirestoreAdminRepository implements AdminRepository {
 
   async crearArea(payload: CrearAreaPayload): Promise<{ areaId: string; creada: true }> {
     return this.llamar("crearArea", payload);
+  }
+
+  async actualizarArea(
+    payload: ActualizarAreaPayload,
+  ): Promise<{ areaId: string; actualizada: true }> {
+    return this.llamar("actualizarArea", payload);
   }
 
   async desactivarArea(areaId: string): Promise<{ areaId: string; desactivada: true }> {

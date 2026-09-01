@@ -22,6 +22,7 @@ export { desactivarCategoria } from "./callables/desactivar-categoria.js";
 export { eliminarCategoria } from "./callables/eliminar-categoria.js";
 export { reactivarCategoria } from "./callables/reactivar-categoria.js";
 export { crearArea } from "./callables/crear-area.js";
+export { actualizarArea } from "./callables/actualizar-area.js";
 export { desactivarArea } from "./callables/desactivar-area.js";
 export { eliminarArea } from "./callables/eliminar-area.js";
 export { reactivarArea } from "./callables/reactivar-area.js";

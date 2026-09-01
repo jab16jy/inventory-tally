@@ -37,6 +37,7 @@ const ETIQUETAS_TIPO_EVENTO: Record<TipoEventoAuditoria, string> = {
   CATEGORIA_ELIMINADA: "Categoría eliminada",
   CATEGORIA_REACTIVADA: "Categoría reactivada",
   AREA_CREADA: "Área creada",
+  AREA_ACTUALIZADA: "Área actualizada",
   AREA_DESACTIVADA: "Área desactivada",
   AREA_ELIMINADA: "Área eliminada",
   AREA_REACTIVADA: "Área reactivada",

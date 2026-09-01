@@ -38,6 +38,9 @@ export type { DesactivarCategoriaInput as ReactivarCategoriaInput } from "./desa
 export { crearAreaSchema } from "./crear-area.schema.js";
 export type { CrearAreaInput } from "./crear-area.schema.js";
 
+export { actualizarAreaSchema } from "./actualizar-area.schema.js";
+export type { ActualizarAreaInput } from "./actualizar-area.schema.js";
+
 export { desactivarAreaSchema } from "./desactivar-area.schema.js";
 export type { DesactivarAreaInput } from "./desactivar-area.schema.js";
 
