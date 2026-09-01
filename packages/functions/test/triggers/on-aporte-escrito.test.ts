@@ -108,6 +108,38 @@ describe("procesarAporteEscrito", () => {
     expect(linea.get("versiones")).toEqual({ uid_ana: 1, uid_luis: 1 });
   });
 
+  it("D2/RNF-03 · dos entregas concurrentes del MISMO evento (mismo uid+version) no duplican el delta", async () => {
+    const sesionId = `ses_${randomUUID()}`;
+    const categoriaId = "cat_5000";
+    await crearSesionAbierta(sesionId);
+    const params = { sesionId, categoriaId, uid: "uid_ana" };
+
+    // Estado previo: version 1 ya aplicada (cantidad 10).
+    await procesarAporteEscrito(db, params, undefined, {
+      uid: "uid_ana",
+      nombre: "Ana",
+      cantidad: 10,
+      version: 1,
+    });
+
+    // Firestore es at-least-once: el mismo evento (version 2) puede llegar
+    // dos veces en paralelo. Ambas transacciones leen `versiones.uid_ana: 1`
+    // antes de que la primera confirme, así que la guardia (60 <= 1) no basta
+    // por sí sola; lo que evita duplicar es que `runTransaction` detecta el
+    // conflicto de escritura sobre la misma línea y reintenta la perdedora,
+    // que en el reintento sí ve version 2 aplicada y se descarta.
+    const despues = { uid: "uid_ana", nombre: "Ana", cantidad: 25, version: 2 };
+    await Promise.all([
+      procesarAporteEscrito(db, params, undefined, despues),
+      procesarAporteEscrito(db, params, undefined, despues),
+    ]);
+
+    const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
+    expect(linea.get("cantidadTotal")).toBe(25); // 10 + delta(15) aplicado UNA vez, no 40
+    expect(linea.get("numAportantes")).toBe(1);
+    expect(linea.get("versiones")).toEqual({ uid_ana: 2 });
+  });
+
   it("corrige un aporte propio por delta sin tocar el de otro cajero (doc 05 §2)", async () => {
     const sesionId = `ses_${randomUUID()}`;
     const categoriaId = "cat_5000";
