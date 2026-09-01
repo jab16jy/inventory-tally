@@ -66,6 +66,32 @@ describe("abrirSesionImpl", () => {
     expect(sucursal.get("sesionAbiertaId")).toBe("ses_ya_abierta"); // sin cambios
   });
 
+  it("I-1 · dos aperturas concurrentes en la misma sucursal: sólo una gana (interleaving real)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    await crearSucursal(sucursalId);
+    await crearCategoria(`cat_${randomUUID()}`, 5000);
+
+    // Ambas transacciones leen `sesionAbiertaId: null` antes de que la
+    // primera confirme; Firestore serializa por concurrencia optimista:
+    // la perdedora reintenta, ve el `sesionAbiertaId` ya escrito por la
+    // ganadora y falla por la misma guardia I-1 (línea 85), sin mocks.
+    const resultados = await Promise.allSettled([
+      abrirSesionImpl(db, "uid_admin", { sucursalId }),
+      abrirSesionImpl(db, "uid_admin", { sucursalId }),
+    ]);
+
+    const ganadoras = resultados.filter((r) => r.status === "fulfilled");
+    const rechazadas = resultados.filter((r) => r.status === "rejected");
+    expect(ganadoras).toHaveLength(1);
+    expect(rechazadas).toHaveLength(1);
+    expect((rechazadas[0] as PromiseRejectedResult).reason).toBeInstanceOf(HttpsError);
+
+    const sucursal = await db.doc(`sucursales/${sucursalId}`).get();
+    const sesionGanadora = (ganadoras[0] as PromiseFulfilledResult<{ sesionId: string }>).value
+      .sesionId;
+    expect(sucursal.get("sesionAbiertaId")).toBe(sesionGanadora);
+  });
+
   it("rechaza una sucursal inexistente", async () => {
     await expect(
       abrirSesionImpl(db, "uid_admin", { sucursalId: `suc_inexistente_${randomUUID()}` }),
