@@ -12,9 +12,13 @@ const MESES_EN_CALIENTE = 12; // doc 02 §7
  * año) y el sistema nunca se estabiliza en el ~4 % de cuota que doc 02 §5
  * promete.
  *
- * NO exporta. El archivo histórico ya existe y es la exportación diaria a
- * Cloud Storage de doc 12 §5 (RPO 24 h); un volcado propio dentro del cron
- * duplicaría un export gestionado que ya corre.
+ * NO exporta. El archivo histórico es la exportación diaria a Cloud Storage
+ * de doc 12 §5 (RPO 24 h); un volcado propio dentro del cron duplicaría un
+ * export gestionado. DEPENDENCIA SIN RESOLVER (issue #66): esa exportación
+ * todavía no existe (issue #18, bloqueado por #13) — hasta que exista, lo
+ * que este cron borra a los 12 meses no tiene copia en ningún lado. Sin
+ * urgencia hoy (prod aún no se publica), pero #18 debe embarcar antes de que
+ * la colección real cumpla 12 meses en producción.
  *
  * ponytail: sin try/catch por lote, a diferencia de sus dos hermanos. Ahí el
  * aislamiento protege elementos heterogéneos entre sí (una sesión corrupta no

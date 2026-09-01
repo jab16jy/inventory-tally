@@ -78,7 +78,7 @@ flowchart TD
 | RF-08 | Los cambios se reflejan en los demás dispositivos de la misma sesión                                       |
 | RF-09 | **Ningún conteo se pierde** cuando dos cajeros registran la misma categoría                                |
 | RF-10 | La app funciona **sin conexión** y sincroniza al recuperar señal                                           |
-| RF-11 | Toda modificación queda en un historial de auditoría **inmutable**                                         |
+| RF-11 | Toda modificación queda en un historial de auditoría **inmutable durante 12 meses en caliente**¹           |
 | RF-12 | El administrador cierra la sesión, congelando el resultado                                                 |
 | RF-13 | Dashboard analítico para el administrador, con comparativo entre sucursales                                |
 | RF-14 | Dashboard operativo para el cajero, sin información monetaria                                              |
@@ -87,6 +87,13 @@ flowchart TD
 
 > **RF-16 es nuevo en la v2** y no es un detalle: es la salvaguarda que compensa la
 > menor durabilidad del almacenamiento local en la PWA. Ver [06](06-plataforma-web.md).
+
+> ¹ **"Inmutable" significa que ningún actor humano puede editarlo ni borrarlo mientras
+> existe** (`infra/firestore.rules`, `allow write: if false` sin excepción por rol),
+> no que se conserve para siempre. Un cron mensual purga eventos de más de 12 meses
+> (decisión de costo, ver [02 §7](02-estimaciones-y-restricciones.md)) — piso de
+> negocio: mínimo 6 meses de historial garantizado una vez en producción, con margen
+> de 2×. Ver [66](https://github.com/jab16jy/inventory-tally/issues/66).
 
 ### 3.2 Deseables (fuera del alcance actual)
 
@@ -110,7 +117,7 @@ flowchart TD
 | RNF-01 | Latencia de sincronización    | Cambio visible en otro dispositivo en < 3 s con red estable           |
 | RNF-02 | Disponibilidad offline        | 100 % de las operaciones de conteo funcionan sin red                  |
 | RNF-03 | Integridad del conteo         | 0 % de pérdida de aportes bajo escritura concurrente                  |
-| RNF-04 | Trazabilidad                  | 100 % de las modificaciones generan evento de auditoría no editable   |
+| RNF-04 | Trazabilidad                  | 100 % de las modificaciones generan evento no editable, retenido 12 meses¹ |
 | RNF-05 | Rendimiento de UI             | ≥ 55 fps con hasta 200 categorías                                     |
 | RNF-06 | Costo operativo               | Dentro del plan gratuito de Firebase para el volumen estimado         |
 | RNF-07 | Arranque                      | < 5 s en 4G tras la primera carga · < 3 s con service worker caliente |
