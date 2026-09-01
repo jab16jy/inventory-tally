@@ -16,6 +16,7 @@
 // pantalla recibe su frontera de I/O desde afuera para que el test la monte
 // sin Firebase real).
 import clsx from "clsx";
+import { useRef } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useDisenoAdaptativo } from "../../state/useDisenoAdaptativo.js";
 import { Icono, type IconoProps } from "../primitivos/Icono.js";
@@ -52,6 +53,11 @@ export function AdminLayout({ onSalir }: AdminLayoutProps) {
   const diseno = useDisenoAdaptativo();
   const barraInferior = diseno === "movil";
   const soloIconos = diseno === "tablet";
+  // Mismo patrón de confirmación que BotonSalir.tsx (issue #72/ADR-19):
+  // un toque accidental aquí saca al admin del panel de golpe. Un solo
+  // <dialog> para los dos triggers posibles (sidebar / nav inferior) porque
+  // nunca se renderizan a la vez.
+  const dialogoRef = useRef<HTMLDialogElement>(null);
 
   return (
     <div className={clsx("flex min-h-dvh", barraInferior && "flex-col")}>
@@ -116,7 +122,7 @@ export function AdminLayout({ onSalir }: AdminLayoutProps) {
                 convención es del repo entero, no sólo de esa pantalla. */}
             <button
               type="button"
-              onClick={() => void onSalir()}
+              onClick={() => dialogoRef.current?.showModal()}
               title={soloIconos ? "Salir" : undefined}
               className={clsx(
                 "flex items-center gap-2.5 rounded-placa px-2.5 py-2.5 text-base text-tenue transition-colors duration-150 ease-out hover:bg-placa-alta/60 hover:text-tinta",
@@ -161,7 +167,7 @@ export function AdminLayout({ onSalir }: AdminLayoutProps) {
           ))}
           <button
             type="button"
-            onClick={() => void onSalir()}
+            onClick={() => dialogoRef.current?.showModal()}
             className="flex min-w-[4.5rem] flex-1 flex-col items-center gap-1 px-2 py-2 text-micro text-tenue"
           >
             <Icono nombre="cerrar" className="size-4 shrink-0" />
@@ -169,6 +175,33 @@ export function AdminLayout({ onSalir }: AdminLayoutProps) {
           </button>
         </nav>
       )}
+
+      <dialog
+        ref={dialogoRef}
+        aria-label="Confirmar salida"
+        className="w-[calc(100%-1.5rem)] max-w-sm rounded-placa border border-borde bg-placa-alta p-4 backdrop:bg-fondo/70"
+      >
+        <p className="text-base text-tinta">¿Seguro que quieres salir?</p>
+        <div className="mt-4 flex gap-2">
+          <button
+            type="button"
+            onClick={() => dialogoRef.current?.close()}
+            className="min-h-[var(--size-toque)] flex-1 rounded-placa border border-borde text-tinta transition-colors duration-150 ease-out active:bg-placa/85"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              dialogoRef.current?.close();
+              void onSalir();
+            }}
+            className="min-h-[var(--size-toque)] flex-1 rounded-placa bg-senal font-semibold text-fondo transition-colors duration-150 ease-out active:bg-senal/85"
+          >
+            Salir
+          </button>
+        </div>
+      </dialog>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 // apps/web/src/ui/admin/AdminLayout.test.tsx
 // (docs/plan-panel-administrador.md §5, fase F1; issue #20 item 1 para los 3
 // breakpoints de doc 11 §298-304)
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdminLayout } from "./AdminLayout.js";
@@ -16,11 +16,11 @@ afterEach(() => {
   fijarAncho(ANCHO_ORIGINAL);
 });
 
-function renderLayout(rutaInicial: string) {
+function renderLayout(rutaInicial: string, onSalir = vi.fn()) {
   return render(
     <MemoryRouter initialEntries={[rutaInicial]}>
       <Routes>
-        <Route path="/admin" element={<AdminLayout onSalir={vi.fn()} />}>
+        <Route path="/admin" element={<AdminLayout onSalir={onSalir} />}>
           <Route index element={<p>Panel — contenido</p>} />
           <Route path="cajeros" element={<p>Cajeros — contenido</p>} />
           <Route path="sucursales" element={<p>Sucursales — contenido</p>} />
@@ -68,6 +68,37 @@ describe("AdminLayout (F1)", () => {
     const boton = screen.getByRole("button", { name: /salir/i });
     expect(boton).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /cerrar sesión/i })).not.toBeInTheDocument();
+  });
+
+  it("al tocar Salir, todavía NO llama a onSalir sin confirmar (mismo criterio que BotonSalir, issue #72)", () => {
+    const onSalir = vi.fn();
+    renderLayout("/admin", onSalir);
+
+    fireEvent.click(screen.getByRole("button", { name: /^salir$/i }));
+
+    expect(onSalir).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeVisible();
+  });
+
+  it("confirmar dentro del diálogo llama a onSalir", () => {
+    const onSalir = vi.fn();
+    renderLayout("/admin", onSalir);
+
+    fireEvent.click(screen.getByRole("button", { name: /^salir$/i }));
+    const dialogo = screen.getByRole("dialog");
+    fireEvent.click(within(dialogo).getByRole("button", { name: /^salir$/i }));
+
+    expect(onSalir).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancelar en el diálogo cierra sin llamar a onSalir", () => {
+    const onSalir = vi.fn();
+    renderLayout("/admin", onSalir);
+
+    fireEvent.click(screen.getByRole("button", { name: /^salir$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /cancelar/i }));
+
+    expect(onSalir).not.toHaveBeenCalled();
   });
 });
 
