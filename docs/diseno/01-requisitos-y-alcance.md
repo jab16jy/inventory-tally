@@ -51,7 +51,7 @@ flowchart TD
 | Comparativo entre sucursales                                  |   ❌   |      ✅       |
 | Abrir / cerrar sesión de conteo                               |   ❌   |      ✅       |
 | Gestionar cajeros, sucursales, categorías                     |   ❌   |      ✅       |
-| Ver auditoría                                                 |   ❌   |      ✅       |
+| Ver auditoría (acotada a sus sucursales asignadas, #45)       |   ✅   |  ✅ (todas)   |
 | Editar o borrar auditoría                                     |   ❌   |  ❌ (nadie)   |
 
 > **Por qué el cajero no ve dinero.** En muchos negocios el valor total del inventario
