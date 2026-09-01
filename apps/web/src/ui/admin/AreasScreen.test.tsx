@@ -48,6 +48,28 @@ describe("AreasScreen", () => {
     });
   });
 
+  it("edita un área existente con el formulario precargado", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarArea(areaBase());
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /editar/i }));
+    expect(screen.getByLabelText(/nombre/i)).toHaveValue("Aseo");
+
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Aseo y limpieza" } });
+    fireEvent.click(screen.getByRole("button", { name: /guardar cambios/i }));
+
+    await vi.waitFor(() => {
+      expect(repo.llamadas).toEqual([
+        {
+          metodo: "actualizarArea",
+          payload: { areaId: "area_aseo", nombre: "Aseo y limpieza" },
+        },
+      ]);
+    });
+  });
+
   it("ofrece desactivar y eliminar sólo a las áreas activas, reactivar sólo a las inactivas", () => {
     const repo = new FakeAdminRepository();
     repo.sembrarArea(areaBase({ areaId: "area_activa", nombre: "Activa" }));

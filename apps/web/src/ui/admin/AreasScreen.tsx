@@ -4,7 +4,7 @@
 // CategoriasScreen.tsx.
 import { useEffect, useId, useState, type FormEvent } from "react";
 import type { Area } from "@conteo/shared/models/area.js";
-import type { CrearAreaPayload } from "@conteo/data";
+import type { ActualizarAreaPayload, CrearAreaPayload } from "@conteo/data";
 import { useAdminRepository } from "../../state/admin-contexto.js";
 import { Icono } from "../primitivos/Icono.js";
 import { Spinner } from "../primitivos/Spinner.js";
@@ -31,11 +31,13 @@ function useAreas(): { areas: Area[]; cargando: boolean } {
   return { areas, cargando };
 }
 
+type EstadoFormulario = { readonly modo: "crear" } | { readonly modo: "editar"; readonly area: Area };
+
 export function AreasScreen() {
   const repo = useAdminRepository();
   const { areas, cargando } = useAreas();
 
-  const [formularioAbierto, setFormularioAbierto] = useState(false);
+  const [formulario, setFormulario] = useState<EstadoFormulario | null>(null);
   const [errorFormulario, setErrorFormulario] = useState<string | null>(null);
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
   // areaId + tipo de acción en vuelo — deshabilita el botón de esa fila y
@@ -51,13 +53,36 @@ export function AreasScreen() {
   // CajerosScreen.tsx para eliminarCajero.
   const [confirmandoEliminarId, setConfirmandoEliminarId] = useState<string | null>(null);
 
+  function abrirCreacion(): void {
+    setFormulario({ modo: "crear" });
+    setErrorFormulario(null);
+  }
+
+  function abrirEdicion(area: Area): void {
+    setFormulario({ modo: "editar", area });
+    setErrorFormulario(null);
+  }
+
+  function cerrarFormulario(): void {
+    setFormulario(null);
+    setErrorFormulario(null);
+  }
+
   async function crear(payload: CrearAreaPayload): Promise<void> {
     try {
       await repo.crearArea(payload);
-      setFormularioAbierto(false);
-      setErrorFormulario(null);
+      cerrarFormulario();
     } catch {
       setErrorFormulario("No se pudo crear el área. Intenta de nuevo.");
+    }
+  }
+
+  async function editar(payload: ActualizarAreaPayload): Promise<void> {
+    try {
+      await repo.actualizarArea(payload);
+      cerrarFormulario();
+    } catch {
+      setErrorFormulario("No se pudo guardar el área. Intenta de nuevo.");
     }
   }
 
@@ -123,6 +148,13 @@ export function AreasScreen() {
       etiqueta: "Acciones",
       render: (a) => (
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => abrirEdicion(a)}
+            className="rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-senal hover:text-senal"
+          >
+            Editar
+          </button>
           {a.activa ? (
             <>
               <button
@@ -196,10 +228,7 @@ export function AreasScreen() {
         <h1 className="text-micro tracking-[0.18em] text-tenue uppercase">Áreas</h1>
         <button
           type="button"
-          onClick={() => {
-            setFormularioAbierto(true);
-            setErrorFormulario(null);
-          }}
+          onClick={abrirCreacion}
           className="rounded-placa bg-senal px-3 py-2 text-micro font-semibold text-fondo hover:bg-senal/85"
         >
           Nueva área
@@ -215,11 +244,14 @@ export function AreasScreen() {
         </p>
       )}
 
-      {formularioAbierto && (
+      {formulario && (
         <FormularioArea
+          modo={formulario.modo}
+          area={formulario.modo === "editar" ? formulario.area : undefined}
           error={errorFormulario}
-          onCancelar={() => setFormularioAbierto(false)}
+          onCancelar={cerrarFormulario}
           onCrear={crear}
+          onEditar={editar}
         />
       )}
 
@@ -236,13 +268,16 @@ export function AreasScreen() {
 }
 
 interface FormularioAreaProps {
+  readonly modo: "crear" | "editar";
+  readonly area?: Area;
   readonly error: string | null;
   readonly onCancelar: () => void;
   readonly onCrear: (payload: CrearAreaPayload) => void | Promise<void>;
+  readonly onEditar: (payload: ActualizarAreaPayload) => void | Promise<void>;
 }
 
-function FormularioArea({ error, onCancelar, onCrear }: FormularioAreaProps) {
-  const [nombre, setNombre] = useState("");
+function FormularioArea({ modo, area, error, onCancelar, onCrear, onEditar }: FormularioAreaProps) {
+  const [nombre, setNombre] = useState(area?.nombre ?? "");
   const [enviando, setEnviando] = useState(false);
 
   const idNombre = useId();
@@ -251,7 +286,11 @@ function FormularioArea({ error, onCancelar, onCrear }: FormularioAreaProps) {
     evento.preventDefault();
     setEnviando(true);
     try {
-      await onCrear({ nombre });
+      if (modo === "crear") {
+        await onCrear({ nombre });
+      } else if (area) {
+        await onEditar({ areaId: area.areaId, nombre });
+      }
     } finally {
       setEnviando(false);
     }
@@ -294,7 +333,7 @@ function FormularioArea({ error, onCancelar, onCrear }: FormularioAreaProps) {
           }
         >
           {enviando && <Spinner className="size-3.5 shrink-0" />}
-          Crear área
+          {modo === "crear" ? "Crear área" : "Guardar cambios"}
         </button>
         <button
           type="button"

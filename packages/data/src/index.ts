@@ -14,6 +14,7 @@ export { obtenerIdDispositivo } from "./firebase/dispositivo.js";
 
 export type {
   AbrirSesionPayload,
+  ActualizarAreaPayload,
   ActualizarCajeroPayload,
   ActualizarSucursalPayload,
   AdminRepository,

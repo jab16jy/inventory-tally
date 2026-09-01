@@ -12,6 +12,7 @@ import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import type { Usuario } from "@conteo/shared/models/usuario.js";
 import type {
   AbrirSesionPayload,
+  ActualizarAreaPayload,
   ActualizarCajeroPayload,
   ActualizarSucursalPayload,
   AdminRepository,
@@ -277,6 +278,13 @@ export class FakeAdminRepository implements AdminRepository {
   async crearArea(payload: CrearAreaPayload): Promise<{ areaId: string; creada: true }> {
     this.registrar("crearArea", payload);
     return { areaId: "area_fake", creada: true };
+  }
+
+  async actualizarArea(
+    payload: ActualizarAreaPayload,
+  ): Promise<{ areaId: string; actualizada: true }> {
+    this.registrar("actualizarArea", payload);
+    return { areaId: payload.areaId, actualizada: true };
   }
 
   async desactivarArea(areaId: string): Promise<{ areaId: string; desactivada: true }> {

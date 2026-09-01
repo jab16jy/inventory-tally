@@ -120,6 +120,13 @@ export interface CrearAreaPayload {
   readonly nombre: string;
 }
 
+// Espejo de contracts/schemas/actualizar-area.schema.ts. Sólo `nombre`: sin
+// `activa`, ese campo pertenece a desactivarArea/reactivarArea (I-7).
+export interface ActualizarAreaPayload {
+  readonly areaId: string;
+  readonly nombre: string;
+}
+
 export interface AdminRepository {
   // ── lecturas en vivo ──
   observarSesionesAbiertas(onChange: (sesiones: SesionConteo[]) => void): Unsubscribe;
@@ -178,6 +185,7 @@ export interface AdminRepository {
   crearCategoria(payload: CrearCategoriaPayload): Promise<{ categoriaId: string; creada: true }>;
   desactivarCategoria(categoriaId: string): Promise<{ categoriaId: string; desactivada: true }>;
   crearArea(payload: CrearAreaPayload): Promise<{ areaId: string; creada: true }>;
+  actualizarArea(payload: ActualizarAreaPayload): Promise<{ areaId: string; actualizada: true }>;
   desactivarArea(areaId: string): Promise<{ areaId: string; desactivada: true }>;
   eliminarCategoria(categoriaId: string): Promise<{ categoriaId: string; eliminada: true }>;
   eliminarArea(areaId: string): Promise<{ areaId: string; eliminada: true }>;
