@@ -5,6 +5,7 @@ import { abrirSesionSchema, type AbrirSesionInput } from "@conteo/contracts";
 import { exigirAdmin } from "../lib/exigir-admin.js";
 import { validar } from "../lib/validar.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
+import { lineaSembrada } from "../lib/linea-sembrada.js";
 
 const LOTE_MAXIMO = 400; // límite de 500 operaciones por batch (doc 08 §3)
 
@@ -38,7 +39,8 @@ async function sembrarLineas(
   // colección es chica (decenas de docs), igual que el resto de catálogos
   // admin de este repo.
   const docs = categorias.docs.filter((categoria) => {
-    const sucursalesAsignadas = categoria.get("sucursalesAsignadas") as readonly string[] | undefined;
+    const sucursalesAsignadas = categoria.get("sucursalesAsignadas") as
+      readonly string[] | undefined;
     return sucursalesAsignadas === undefined || sucursalesAsignadas.includes(sucursalId);
   });
 
@@ -48,17 +50,16 @@ async function sembrarLineas(
   for (let i = 0; i < docs.length; i += LOTE_MAXIMO) {
     const lote = db.batch();
     for (const categoria of docs.slice(i, i + LOTE_MAXIMO)) {
-      lote.set(db.doc(`sesiones/${sesionId}/lineas/${categoria.id}`), {
-        categoriaId: categoria.id,
-        valorUnitario: categoria.get("valor"), // I-7: copiado y congelado
-        etiqueta: categoria.get("etiqueta"),
-        area: nombresPorArea.get(categoria.get("areaId")) ?? "Sin área", // I-7: copiado y congelado
-        cantidadTotal: 0,
-        numAportantes: 0,
-        versiones: {},
-        actualizadaEn: FieldValue.serverTimestamp(),
-        actualizadaPor: ejecutadoPor,
-      });
+      lote.set(
+        db.doc(`sesiones/${sesionId}/lineas/${categoria.id}`),
+        lineaSembrada({
+          categoriaId: categoria.id,
+          valorUnitario: categoria.get("valor"),
+          etiqueta: categoria.get("etiqueta"),
+          area: nombresPorArea.get(categoria.get("areaId")),
+          actualizadaPor: ejecutadoPor,
+        }),
+      );
     }
     await lote.commit();
   }
