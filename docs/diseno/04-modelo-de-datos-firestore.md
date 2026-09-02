@@ -185,14 +185,17 @@ duplicar.
 > que el cajero, que necesita leer las líneas, no reciba importes consolidados.
 > `versiones` da idempotencia al trigger ([05](05-concurrencia-offline-tiempo-real.md)).
 > `area` sigue el patrón de `valorUnitario` (invariante I-7, [03](03-modelo-de-dominio.md))
-> **con una excepción**: se copia desde `categoriasValor.areaId` al sembrar la línea, pero
-> `"Sin área"` es el **hueco**, no un valor congelado — es el fallback cuando la categoría
-> no tenía área asignada. Una línea que vale `"Sin área"` puede re-etiquetarse; una con
-> área real, nunca ([ADR-21](13-decisiones-adr.md#adr-21)).
+> **con dos excepciones**: se copia desde `categoriasValor.areaId` al sembrar la línea,
+> junto con `areaFijaPorAdmin` (si esa categoría ya tenía `areaId` en el catálogo al abrir
+> la sesión). `"Sin área"` es el **hueco**, no un valor congelado — es el fallback cuando la
+> categoría no tenía área asignada. Una línea cuya categoría **no** tiene `areaId` de
+> catálogo (`areaFijaPorAdmin: false`) puede reetiquetarse tantas veces como el cajero
+> quiera, incluyendo volver a `"Sin área"`; una línea con `areaFijaPorAdmin: true`, nunca
+> ([ADR-21](13-decisiones-adr.md#adr-21), [ADR-22](13-decisiones-adr.md#adr-22)).
 >
-> El campo tiene **dos escritores**: `abrirSesion`, que lo siembra, y `vincularArea`, que
-> sólo rellena el hueco. `valorUnitario`, en cambio, sigue teniendo uno solo y sigue
-> congelado sin excepción.
+> El campo tiene **dos escritores**: `abrirSesion`, que lo siembra, y
+> `reetiquetarLineaEnSesion`, que sólo escribe sobre líneas con `areaFijaPorAdmin: false`.
+> `valorUnitario`, en cambio, sigue teniendo uno solo y sigue congelado sin excepción.
 
 ### `sesiones/{sesionId}/lineas/{categoriaId}/aportes/{uid}`
 

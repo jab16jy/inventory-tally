@@ -642,7 +642,7 @@ Cuatro límites que forman parte de la decisión, no de su implementación:
 | Alternativa                                        | Por qué se descartó                                                                                                     |
 | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | Dejar el hueco hasta la próxima sesión             | Los datos del conteo en curso son precisamente los que no se pueden rehacer; el vínculo llegaría cuando ya no sirve      |
-| Permitir editar un área ya asignada                | Convierte al contador en editor del catálogo y reabre la puerta que I-7 cerró: un análisis atribuido cambiaría a mitad de sesión |
+| Permitir editar un área ya asignada                | **Superseded por [ADR-22](#adr-22)** para el caso de categoría sin `areaId` de catálogo: el riesgo señalado ("análisis atribuido cambia a mitad de sesión") se mitiga con auditoría explícita en vez de prohibirse por completo |
 | Propagar a todas las sesiones abiertas             | Escritura fuera del alcance del claim (A-3/I-6); necesitaría una tarea de servidor sin `request.auth`, no un ensanche del permiso del cajero |
 | Dejar que el contador fije también el precio        | Cruza la separación monetaria por rol de [ADR-07](#adr-07) e I-9, que es estructural y no cosmética                      |
 
@@ -662,6 +662,60 @@ que hay que sostener (A-12, [09 §1](09-seguridad-y-auditoria.md)).
 cerrados**, esto no basta. Habría que tocar `Historico`, que es inmutable una vez escrito
 ([ADR-02](#adr-02)), así que el cambio no podría aplicarse retroactivamente al histórico
 acumulado — sólo a los cierres posteriores.
+
+---
+
+## ADR-22 {#adr-22}
+
+### Reetiquetado de línea por sesión — supersede parcial de ADR-21
+
+**Contexto.** [ADR-21](#adr-21) resolvió el hueco de `"Sin área"`, pero sólo en un
+sentido: de `SIN_AREA` a un área real, una sola vez. En la práctica, el cajero de pie
+frente al estante cuenta primero y clasifica después — y a veces se equivoca. Caso real:
+cuenta 20 líneas de una categoría de precio (naturalmente sin área en el catálogo) y las
+vincula a "talleres"; luego nota que 2 de esas 20 son en realidad de "aseo". Con la regla
+de ADR-21 ("una línea con área real nunca se re-etiqueta"), esa corrección ya no cabe
+dentro de la misma sesión — el análisis por área queda mal atribuido hasta el próximo
+conteo, exactamente el mismo problema de "dato recuperable convertido en dato perdido"
+que ADR-21 ya había identificado, sólo que un paso más tarde en el flujo.
+
+ADR-21 evaluó y rechazó explícitamente "permitir editar un área ya asignada", por temor a
+que "un análisis atribuido cambie a mitad de sesión". Ese riesgo es real pero no es
+absoluto: ya existe `registrarAuditoria` como mecanismo de trazabilidad para toda escritura
+sensible ([09](09-seguridad-y-auditoria.md)), y una corrección deliberada y auditada no es
+lo mismo que un cambio silencioso.
+
+**Decisión.** El cajero puede reetiquetar, dentro de su sesión abierta, el área de
+cualquier línea **cuya categoría siga sin `areaId` en el catálogo**, tantas veces como
+quiera, incluyendo volver a `SIN_AREA`. El cambio es local a
+`sesiones/{sesionId}/lineas/{categoriaId}.area`; **nunca** escribe
+`categoriasValor/{categoriaId}.areaId`. Una categoría con `areaId` ya fijado por admin en
+el catálogo permanece con su línea congelada sin excepción — la condición dura de ADR-21
+para ese caso no cambia. Cada reetiquetado se audita (`tipo: "LINEA_REETIQUETADA"`) como
+mitigación explícita al riesgo que ADR-21 señaló: el cambio es deliberado y trazable, no
+silencioso.
+
+Esto supersede parcialmente a ADR-21 en la fila "Permitir editar un área ya asignada" de
+su tabla de alternativas descartadas, sólo para el subconjunto de categorías sin `areaId`
+de catálogo. Para categorías con `areaId` fijado por admin, ADR-21 sigue vigente sin
+cambios: esa línea sigue sin re-etiquetarse jamás.
+
+| Alternativa                                        | Por qué se descartó                                                                                                     |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Mantener la regla original de ADR-21 (una sola vez) | Deja sin corrección el caso real observado: el cajero se da cuenta del error en la misma sesión y no tiene forma de arreglarlo |
+| Permitir reetiquetar también líneas con `areaId` de catálogo | Rompe la condición dura que el usuario fijó explícitamente: un área fijada por admin es intocable por el cajero, sin excepción |
+| Reetiquetar sin auditoría                          | Reabre exactamente el riesgo que ADR-21 señaló, sin la mitigación de trazabilidad que lo vuelve aceptable                |
+
+**Consecuencias.** ✅ El cajero puede corregir una clasificación errónea dentro de la
+misma sesión, sin esperar al próximo conteo · ✅ La condición dura se mantiene intacta: una
+categoría con `areaId` de admin sigue siendo intocable · ✅ Cada corrección queda en
+auditoría, así que un análisis que cambió de área es rastreable, no misterioso · ⚠️ I-7
+gana una segunda excepción explícita, además del sentinel `SIN_AREA` de ADR-21: hay que
+leer ambas antes de tocar `area` · ⚠️ Un análisis por área ya visto durante la sesión puede
+cambiar si el cajero reetiqueta después — mitigado por auditoría, no eliminado.
+
+**Detonante de reevaluación:** si el negocio pide reetiquetar líneas de sesiones **ya
+cerradas**, esto no basta — mismo límite de inmutabilidad de `Historico` que señala ADR-21.
 
 ---
 
