@@ -4,6 +4,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./estilos/tema.css";
 import { auth, db, monitorPersistencia } from "./lib/firebase.js";
+import { functions } from "./lib/funciones.js";
 import { AppRouter } from "./lib/router.js";
 import { ConteoRepositoryProvider } from "./state/repositorio-contexto.js";
 import { BannerInstalarPwa } from "./ui/BannerInstalarPwa.js";
@@ -19,7 +20,7 @@ const usuarioActual: ProveedorUsuarioActual = {
   obtenerNombre: () => auth.currentUser?.displayName ?? null,
 };
 
-const repo = new FirestoreConteoRepository(db, usuarioActual);
+const repo = new FirestoreConteoRepository(db, usuarioActual, functions);
 
 const raiz = document.getElementById("root");
 if (!raiz) throw new Error("No se encontró #root en index.html");
