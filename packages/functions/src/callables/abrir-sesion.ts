@@ -50,13 +50,17 @@ async function sembrarLineas(
   for (let i = 0; i < docs.length; i += LOTE_MAXIMO) {
     const lote = db.batch();
     for (const categoria of docs.slice(i, i + LOTE_MAXIMO)) {
+      const areaId = categoria.get("areaId") as string | undefined;
       lote.set(
         db.doc(`sesiones/${sesionId}/lineas/${categoria.id}`),
         lineaSembrada({
           categoriaId: categoria.id,
           valorUnitario: categoria.get("valor"),
           etiqueta: categoria.get("etiqueta"),
-          area: nombresPorArea.get(categoria.get("areaId")),
+          area: areaId === undefined ? undefined : nombresPorArea.get(areaId),
+          // ADR-22: fijado por admin en el catálogo al abrir la sesión,
+          // independiente de si el área referenciada sigue activa.
+          areaFijaPorAdmin: areaId !== undefined,
           actualizadaPor: ejecutadoPor,
         }),
       );

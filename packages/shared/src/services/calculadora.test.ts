@@ -15,6 +15,7 @@ function crearLinea(overrides: Partial<LineaConteo> = {}): LineaConteo {
     valorUnitario: 5000,
     etiqueta: "$5.000",
     area: "Aseo",
+    areaFijaPorAdmin: false,
     cantidadTotal: 55,
     numAportantes: 2,
     versiones: { uid_ana: 3, uid_luis: 1 },

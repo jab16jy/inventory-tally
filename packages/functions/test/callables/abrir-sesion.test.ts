@@ -188,6 +188,8 @@ describe("abrirSesionImpl", () => {
 
     const linea = await db.doc(`sesiones/${sesionId}/lineas/${catId}`).get();
     expect(linea.get("area")).toBe("Aseo");
+    // ADR-22: areaId ya venía fijado en el catálogo, la línea queda congelada.
+    expect(linea.get("areaFijaPorAdmin")).toBe(true);
   });
 
   it("I-7 · siembra la línea con 'Sin área' cuando la categoría no tiene areaId", async () => {
@@ -200,6 +202,8 @@ describe("abrirSesionImpl", () => {
 
     const linea = await db.doc(`sesiones/${sesionId}/lineas/${catId}`).get();
     expect(linea.get("area")).toBe("Sin área");
+    // ADR-22: sin areaId de catálogo, la línea queda abierta a reetiquetado.
+    expect(linea.get("areaFijaPorAdmin")).toBe(false);
   });
 
   it("registra un evento de auditoría SESION_ABIERTA", async () => {

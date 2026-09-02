@@ -8,6 +8,7 @@ function linea(categoriaId: string, versiones: Record<string, number>): LineaCon
     valorUnitario: 5000,
     etiqueta: `$${categoriaId}`,
     area: "Aseo",
+    areaFijaPorAdmin: false,
     cantidadTotal: 0,
     numAportantes: 0,
     versiones,

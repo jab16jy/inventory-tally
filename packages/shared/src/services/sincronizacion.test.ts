@@ -9,6 +9,7 @@ function linea(versiones: Record<string, number>): LineaConteo {
     valorUnitario: 5000,
     etiqueta: "$5.000",
     area: "Aseo",
+    areaFijaPorAdmin: false,
     cantidadTotal: 0,
     numAportantes: 0,
     versiones,

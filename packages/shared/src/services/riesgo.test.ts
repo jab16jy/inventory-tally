@@ -8,6 +8,7 @@ function linea(cantidadTotal: number, numAportantes: number): LineaConteo {
     valorUnitario: 5000,
     etiqueta: "$5.000",
     area: "Aseo",
+    areaFijaPorAdmin: false,
     cantidadTotal,
     numAportantes,
     versiones: {},

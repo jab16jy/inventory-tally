@@ -23,6 +23,12 @@ export interface LineaConteo {
   readonly valorUnitario: number;
   readonly etiqueta: string;
   readonly area: string;
+  /** true si `categoriasValor/{categoriaId}.areaId` ya estaba fijado por el
+   *  admin al abrir la sesión — condición dura de ADR-22: esa línea queda
+   *  congelada sin excepción y `reetiquetarLineaEnSesion` la rechaza. Con
+   *  `false`, el cajero puede reetiquetar `area` tantas veces como quiera
+   *  dentro de la misma sesión (ADR-21/ADR-22). */
+  readonly areaFijaPorAdmin: boolean;
   readonly cantidadTotal: number;
   readonly numAportantes: number;
   readonly versiones: Readonly<Record<string, number>>;

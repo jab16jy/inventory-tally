@@ -9,6 +9,7 @@ describe("lineaSembrada (I-7)", () => {
       valorUnitario: 5000,
       etiqueta: "$5.000",
       area: "Aseo",
+      areaFijaPorAdmin: false,
       actualizadaPor: "uid_admin",
     });
     expect(linea.valorUnitario).toBe(5000);
@@ -21,6 +22,7 @@ describe("lineaSembrada (I-7)", () => {
       valorUnitario: 5000,
       etiqueta: "$5.000",
       area: undefined,
+      areaFijaPorAdmin: false,
       actualizadaPor: "uid_admin",
     });
     expect(linea.area).toBe(SIN_AREA);
@@ -32,6 +34,7 @@ describe("lineaSembrada (I-7)", () => {
       valorUnitario: 5000,
       etiqueta: "$5.000",
       area: "Aseo",
+      areaFijaPorAdmin: false,
       actualizadaPor: "uid_admin",
     });
     expect(linea.area).toBe("Aseo");
@@ -43,8 +46,31 @@ describe("lineaSembrada (I-7)", () => {
       valorUnitario: 5000,
       etiqueta: "$5.000",
       area: undefined,
+      areaFijaPorAdmin: false,
       actualizadaPor: "uid_admin",
     });
     expect(linea.cantidadTotal).toBe(0);
+  });
+
+  it("areaFijaPorAdmin (ADR-22) se escribe tal cual se pasa", () => {
+    const fija = lineaSembrada({
+      categoriaId: "cat_1",
+      valorUnitario: 5000,
+      etiqueta: "$5.000",
+      area: "Aseo",
+      areaFijaPorAdmin: true,
+      actualizadaPor: "uid_admin",
+    });
+    expect(fija.areaFijaPorAdmin).toBe(true);
+
+    const libre = lineaSembrada({
+      categoriaId: "cat_2",
+      valorUnitario: 5000,
+      etiqueta: "$5.000",
+      area: undefined,
+      areaFijaPorAdmin: false,
+      actualizadaPor: "uid_admin",
+    });
+    expect(libre.areaFijaPorAdmin).toBe(false);
   });
 });

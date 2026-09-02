@@ -13,13 +13,15 @@ export function lineaSembrada(input: {
   valorUnitario: number;
   etiqueta: string;
   area: string | undefined;
+  areaFijaPorAdmin: boolean;
   actualizadaPor: string;
 }): DocumentData {
   return {
     categoriaId: input.categoriaId,
     valorUnitario: input.valorUnitario, // I-7: copiado y congelado
     etiqueta: input.etiqueta,
-    area: input.area ?? SIN_AREA, // I-7: copiado y congelado
+    area: input.area ?? SIN_AREA, // I-7: copiado y congelado salvo ADR-21/ADR-22
+    areaFijaPorAdmin: input.areaFijaPorAdmin, // ADR-22: condición dura de reetiquetado
     cantidadTotal: 0,
     numAportantes: 0,
     versiones: {},

@@ -75,6 +75,10 @@ export async function crearCategoriaEnSesionImpl(
         valorUnitario: 0,
         etiqueta,
         area: nombreArea,
+        // ADR-22: si el cajero fija un área al crear el producto, esta misma
+        // transacción la guarda en `categoriaRef.areaId` (línea de arriba) —
+        // queda fija de inmediato, igual que si la hubiera fijado el admin.
+        areaFijaPorAdmin: Boolean(areaId),
         actualizadaPor: auth.uid,
       }),
     );
