@@ -42,6 +42,11 @@ const ETIQUETAS_TIPO_EVENTO: Record<TipoEventoAuditoria, string> = {
   AREA_DESACTIVADA: "Área desactivada",
   AREA_ELIMINADA: "Área eliminada",
   AREA_REACTIVADA: "Área reactivada",
+  // La única acción de catálogo que puede originar un CAJERO, no el admin
+  // (ADR-21): vincular un área existente a una categoría sin área, desde su
+  // conteo. Lleva `sucursalId`, así que su propio cajero la ve en esta misma
+  // pantalla acotada a sus sucursales (ticket #45).
+  AREA_VINCULADA: "Área vinculada",
   SUCURSAL_CREADA: "Sucursal creada",
   SUCURSAL_ACTUALIZADA: "Sucursal actualizada",
   SUCURSAL_ELIMINADA: "Sucursal eliminada",
