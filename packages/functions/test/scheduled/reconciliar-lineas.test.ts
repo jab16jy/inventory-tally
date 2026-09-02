@@ -5,7 +5,7 @@
 import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { reconciliarLineasImpl } from "../../src/scheduled/reconciliar-lineas.js";
 
 if (getApps().length === 0) {
@@ -13,7 +13,32 @@ if (getApps().length === 0) {
 }
 const db = getFirestore();
 
+// `reconciliarLineasImpl` recorre TODAS las sesiones `abierta` del emulador y,
+// por cada una, toda su subcolección `lineas` — un N+1 sobre el estado global.
+// Sin esta limpieza, las sesiones de un test seguían vivas para el siguiente y
+// el archivo se hacía más lento con cada caso, hasta que el único test que
+// llama a reconciliar DOS veces (el no-op) excedía el timeout de 5 s. El resto
+// de los archivos de `packages/functions/test` ya limpiaban así; éste era el
+// que faltaba, y era latente: cualquier archivo nuevo que creara sesiones
+// abiertas en paralelo lo empujaba por encima del borde.
+const sesionesCreadas: string[] = [];
+
+afterEach(async () => {
+  for (const sesionId of sesionesCreadas.splice(0)) {
+    const lineas = await db.collection(`sesiones/${sesionId}/lineas`).get();
+    for (const linea of lineas.docs) {
+      const aportes = await linea.ref.collection("aportes").get();
+      await Promise.all(aportes.docs.map((aporte) => aporte.ref.delete()));
+      await linea.ref.delete();
+    }
+    const resumen = await db.collection(`sesiones/${sesionId}/resumen`).get();
+    await Promise.all(resumen.docs.map((doc) => doc.ref.delete()));
+    await db.doc(`sesiones/${sesionId}`).delete();
+  }
+});
+
 async function crearSesion(sesionId: string, estado: "abierta" | "cerrada"): Promise<void> {
+  sesionesCreadas.push(sesionId);
   await db.doc(`sesiones/${sesionId}`).set({
     sucursalId: "suc_norte",
     estado,
