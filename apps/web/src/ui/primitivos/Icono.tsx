@@ -45,6 +45,14 @@ const PATHS = {
    *  texto "Cerrar sesión": ver AdminLayout.tsx). */
   cerrar: "M14 3H5v18h9M20 12H9M16 8l4 4-4 4",
 
+  // ── LayoutCajero (docs/plan-diseno-visual-pwa.md, nav inferior cajero) ──
+  /** Una sola figura de hombros rectos (líneas diagonales, nunca un arco) —
+   *  nav "Cuenta" del cajero. Distinta de `usuarios`, que son DOS figuras
+   *  hechas de rectángulos apilados sin hombro: aquí hay una sola persona y
+   *  el cuerpo se angosta hacia la cabeza con dos tramos rectos, no con un
+   *  bloque cuadrado repetido. */
+  cuenta: "M9 3h6v6H9z M5 21v-2l4-6h6l4 6v2z",
+
   // ── borrado real con guardas (categorías, áreas, cajeros) ──
   /** Papelera cuadrada: tapa recta, sin curva de tacho — botón "Eliminar" en
    *  las pantallas de admin. */
