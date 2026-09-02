@@ -612,4 +612,27 @@ describe("FirestoreConteoRepository.reetiquetarLineaEnSesion/crearCategoriaEnSes
     });
     expect(resultado).toEqual({ categoriaId: "cat_nueva" });
   });
+
+  it("fix(data) · crearCategoriaEnSesion con areaId omitido invoca la callable SIN la clave areaId (nunca null)", async () => {
+    // Causa raíz del bug de producción (HTTP 400 al crear producto dejando
+    // "Sin área"): httpsCallable convierte `undefined` a `null` antes de
+    // enviar, y el schema del servidor rechaza `null` en un campo
+    // `.optional()`. `llamar` sanea el payload con un round-trip JSON antes
+    // de invocar la callable — este test verifica el efecto en el ARGUMENTO
+    // recibido por la callable, no sólo que `toEqual` lo tolere (`toEqual`
+    // ignora claves `undefined` por defecto y dejaría pasar el bug).
+    const llamada = vi.fn().mockResolvedValue({ data: { categoriaId: "cat_nueva" } });
+    httpsCallable.mockReturnValue(llamada);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
+
+    await repo.crearCategoriaEnSesion({
+      sesionId: "ses_1",
+      etiqueta: "$7.000",
+      areaId: undefined,
+    });
+
+    const payloadRecibido = llamada.mock.calls[0]?.[0];
+    expect(Object.keys(payloadRecibido)).not.toContain("areaId");
+    expect(payloadRecibido).not.toHaveProperty("areaId");
+  });
 });

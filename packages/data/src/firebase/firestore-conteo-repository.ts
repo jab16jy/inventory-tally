@@ -397,9 +397,23 @@ export class FirestoreConteoRepository implements ConteoRepository {
   // ponytail: copia de FirestoreAdminRepository.llamar (~5 líneas) en vez de
   // un helper compartido — ambos repositorios no comparten nada más, un
   // import cruzado sólo por esto sería más acoplamiento que la duplicación.
+  //
+  // JSON.parse(JSON.stringify(...)) sanea el payload ANTES de invocar la
+  // callable: `httpsCallable` (node_modules/@firebase/functions/dist/
+  // index.cjs.js, encode()) convierte cualquier propiedad `undefined` a
+  // `null` antes de enviarla por la red. Un schema zod con `.optional()`
+  // (p.ej. `crearCategoriaEnSesionSchema.areaId`) acepta `undefined` pero
+  // rechaza `null` → `invalid-argument` (HTTP 400) — el bug real que impedía
+  // crear un producto dejando "Sin área" (el valor por defecto, el camino
+  // normal). El round-trip por JSON elimina las claves `undefined` en vez de
+  // dejar que Firebase las convierta: es el único punto por el que pasan
+  // TODAS las llamadas de este repositorio, así que arregla la causa raíz
+  // una sola vez, no por schema. `null` explícito (p.ej. "Quitar área" de
+  // reetiquetarLineaEnSesion) sí sobrevive el round-trip intacto.
   private async llamar<Entrada, Salida>(nombre: string, payload: Entrada): Promise<Salida> {
     const llamada = httpsCallable<Entrada, Salida>(this.functions, nombre);
-    const resultado = await llamada(payload);
+    const payloadSaneado = JSON.parse(JSON.stringify(payload)) as Entrada;
+    const resultado = await llamada(payloadSaneado);
     return resultado.data;
   }
 }
