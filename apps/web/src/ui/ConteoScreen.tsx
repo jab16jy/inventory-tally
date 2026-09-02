@@ -5,6 +5,7 @@
 // el filtro "sólo pendientes" (doc 10 §2, "la función más útil del
 // dashboard"), el Deck de totales y la Hoja con teclado numérico.
 import type { Auth } from "firebase/auth";
+import { FirebaseError } from "firebase/app";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -44,6 +45,30 @@ function useAreasActivas(repo: ConteoRepository): Area[] {
   const [areas, setAreas] = useState<Area[]>([]);
   useEffect(() => repo.observarAreasActivas(setAreas), [repo]);
   return areas;
+}
+
+/**
+ * mensajeDeErrorReetiquetado — mismo criterio que mensajeDeError en
+ * HojaNuevoProducto.tsx: diferencia los códigos que
+ * reetiquetarLineaEnSesionImpl puede rechazar de forma legítima
+ * (packages/functions/src/callables/reetiquetar-linea-en-sesion.ts,
+ * verificado por packages/functions/test/callables/reetiquetar-linea-en-sesion.test.ts)
+ * — el resto (red, etc.) cae al mensaje genérico, que sigue siendo honesto
+ * para una causa no reconocida.
+ */
+function mensajeDeErrorReetiquetado(error: unknown): string {
+  if (error instanceof FirebaseError) {
+    if (error.code === "functions/failed-precondition") {
+      return "Esa categoría ya no se puede reetiquetar, o la sesión ya no está abierta.";
+    }
+    if (error.code === "functions/permission-denied") {
+      return "No tienes acceso a esta sesión.";
+    }
+    if (error.code === "functions/not-found") {
+      return "Esa línea o el área elegida ya no existen.";
+    }
+  }
+  return "No se pudo reetiquetar el área. Intenta de nuevo.";
 }
 
 export interface ConteoScreenProps {
@@ -126,6 +151,7 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
   const [areaFiltro, setAreaFiltro] = useState("");
   const [categoriaEnEdicion, setCategoriaEnEdicion] = useState<string | null>(null);
   const [hojaAreasAbierta, setHojaAreasAbierta] = useState(false);
+  const [errorReetiquetado, setErrorReetiquetado] = useState<string | null>(null);
   const [nuevoProductoAbierta, setNuevoProductoAbierta] = useState(false);
   const areasActivas = useAreasActivas(repo);
 
@@ -177,8 +203,20 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
   // cuya categoría sigue sin `areaId` de catálogo, tantas veces como el
   // cajero quiera — nunca crea áreas, sólo las que el admin ya dio de alta.
   // `areaId` ausente vuelve la línea a SIN_AREA ("Quitar área").
-  function reetiquetarArea(categoriaId: string, areaId?: string): void {
-    void repo.reetiquetarLineaEnSesion({ sesionId, categoriaId, areaId });
+  //
+  // La callable puede rechazar legítimamente (categoría fijada por admin,
+  // sesión cerrada, área inactiva/inexistente, sucursal equivocada — ver
+  // reetiquetar-linea-en-sesion.test.ts). Antes ese rechazo se perdía en un
+  // `void`: mismo criterio que confirmarCreacion en HojaNuevoProducto.tsx,
+  // ahora con console.error + mensaje visible al cajero.
+  async function reetiquetarArea(categoriaId: string, areaId?: string): Promise<void> {
+    setErrorReetiquetado(null);
+    try {
+      await repo.reetiquetarLineaEnSesion({ sesionId, categoriaId, areaId });
+    } catch (error) {
+      console.error("reetiquetarLineaEnSesion falló", error);
+      setErrorReetiquetado(mensajeDeErrorReetiquetado(error));
+    }
   }
 
   // Cierra la Hoja sólo tras confirmar la escritura (no en un `finally`):
@@ -411,8 +449,12 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
         abierta={hojaAreasAbierta}
         lineasReetiquetables={lineasReetiquetables}
         areas={areasActivas}
+        error={errorReetiquetado}
         onReetiquetar={reetiquetarArea}
-        onVolver={() => setHojaAreasAbierta(false)}
+        onVolver={() => {
+          setHojaAreasAbierta(false);
+          setErrorReetiquetado(null);
+        }}
       />
 
       <HojaNuevoProducto

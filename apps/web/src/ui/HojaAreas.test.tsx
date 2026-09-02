@@ -40,6 +40,7 @@ describe("HojaAreas (ADR-22)", () => {
         abierta={false}
         lineasReetiquetables={[crearLinea()]}
         areas={[crearArea()]}
+        error={null}
         onReetiquetar={() => {}}
         onVolver={() => {}}
       />,
@@ -54,6 +55,7 @@ describe("HojaAreas (ADR-22)", () => {
         abierta={true}
         lineasReetiquetables={[crearLinea()]}
         areas={[crearArea(), crearArea({ areaId: "area_cocina", nombre: "Cocina" })]}
+        error={null}
         onReetiquetar={onReetiquetar}
         onVolver={() => {}}
       />,
@@ -75,6 +77,7 @@ describe("HojaAreas (ADR-22)", () => {
         abierta={true}
         lineasReetiquetables={[crearLinea({ area: "Talleres" })]}
         areas={[crearArea()]}
+        error={null}
         onReetiquetar={() => {}}
         onVolver={() => {}}
       />,
@@ -90,6 +93,7 @@ describe("HojaAreas (ADR-22)", () => {
         abierta={true}
         lineasReetiquetables={[crearLinea({ area: "Talleres" })]}
         areas={[crearArea()]}
+        error={null}
         onReetiquetar={onReetiquetar}
         onVolver={() => {}}
       />,
@@ -108,12 +112,35 @@ describe("HojaAreas (ADR-22)", () => {
         abierta={true}
         lineasReetiquetables={[]}
         areas={[crearArea()]}
+        error={null}
         onReetiquetar={() => {}}
         onVolver={() => {}}
       />,
     );
 
     expect(screen.getByText(/no hay productos para reetiquetar/i)).toBeInTheDocument();
+  });
+
+  // Antes: reetiquetarLineaEnSesion podía rechazar (categoría fijada por
+  // admin, sesión cerrada, área inactiva/inexistente, sucursal equivocada —
+  // reetiquetar-linea-en-sesion.test.ts) y el cajero no veía nada. Quien
+  // monta HojaAreas (ConteoScreen) hace el try/catch y nos pasa el mensaje
+  // ya traducido vía `error`.
+  it("muestra el mensaje de error cuando la prop error trae un rechazo", () => {
+    render(
+      <HojaAreas
+        abierta={true}
+        lineasReetiquetables={[crearLinea()]}
+        areas={[crearArea()]}
+        error="No se pudo reetiquetar el área. Intenta de nuevo."
+        onReetiquetar={() => {}}
+        onVolver={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "No se pudo reetiquetar el área. Intenta de nuevo.",
+    );
   });
 
   it('el botón de salida se llama "Volver", nunca "Cerrar" (restricción dura de ConteoScreen.test.tsx)', () => {
@@ -123,6 +150,7 @@ describe("HojaAreas (ADR-22)", () => {
         abierta={true}
         lineasReetiquetables={[crearLinea()]}
         areas={[crearArea()]}
+        error={null}
         onReetiquetar={() => {}}
         onVolver={onVolver}
       />,

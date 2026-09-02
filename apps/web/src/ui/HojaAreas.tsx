@@ -17,6 +17,9 @@ export interface HojaAreasProps {
   readonly abierta: boolean;
   readonly lineasReetiquetables: readonly LineaConteo[];
   readonly areas: readonly Area[];
+  // Mensaje del último rechazo de reetiquetarLineaEnSesion (quien nos monta
+  // hace el try/catch — ver ConteoScreen.tsx), o null sin error pendiente.
+  readonly error: string | null;
   readonly onReetiquetar: (categoriaId: string, areaId?: string) => void;
   readonly onVolver: () => void;
 }
@@ -25,6 +28,7 @@ export function HojaAreas({
   abierta,
   lineasReetiquetables,
   areas,
+  error,
   onReetiquetar,
   onVolver,
 }: HojaAreasProps) {
@@ -59,6 +63,14 @@ export function HojaAreas({
           Volver
         </button>
       </div>
+
+      {/* role="status" (nunca "alert"): mismo criterio que HojaNuevoProducto
+          — BannerPendientes ya es el único role="alert" de la pantalla. */}
+      {error && (
+        <p role="status" aria-live="polite" className="text-micro text-riesgo">
+          {error}
+        </p>
+      )}
 
       {lineasReetiquetables.length === 0 ? (
         <p className="text-micro text-tenue">No hay productos para reetiquetar.</p>

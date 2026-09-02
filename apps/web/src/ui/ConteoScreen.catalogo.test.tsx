@@ -7,6 +7,7 @@
 // de ~82 px, doc 11 §4).
 import { FakeConteoRepository } from "@conteo/data";
 import type { Area, LineaConteo, SesionConteo } from "@conteo/shared";
+import { FirebaseError } from "firebase/app";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -151,6 +152,29 @@ describe("ConteoScreen · catálogo en conteo (ADR-21/ADR-22, doc 11 §4/§10)",
     // NO se autoextingue — la línea sigue sin `areaId` de catálogo, así que
     // sigue siendo reetiquetable.
     expect(screen.getByRole("button", { name: /reetiquetar área \(1\)/i })).toBeInTheDocument();
+  });
+
+  // Antes: un rechazo de reetiquetarLineaEnSesion (failed-precondition,
+  // permission-denied, not-found — reetiquetar-linea-en-sesion.test.ts) se
+  // perdía en un `void` sin try/catch ni estado de error. El cajero no
+  // recibía ninguna señal de que el reetiquetado no se aplicó.
+  it("si reetiquetarLineaEnSesion rechaza, el cajero ve un mensaje de error visible", async () => {
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarArea(crearArea({ areaId: "area_cocina", nombre: "Cocina" }));
+    repo.sembrarLinea("ses_1", crearLinea({ area: "Sin área" }));
+    repo.reetiquetarLineaEnSesion = vi
+      .fn()
+      .mockRejectedValue(new FirebaseError("functions/failed-precondition", "sesión cerrada"));
+    renderConteoScreen(repo);
+
+    fireEvent.click(await screen.findByRole("button", { name: /reetiquetar área \(1\)/i }));
+    const dialogoReetiquetar = screen.getByRole("dialog", { name: /reetiquetar área/i });
+    fireEvent.click(within(dialogoReetiquetar).getByRole("button", { name: /\$5\.000/ }));
+    fireEvent.click(within(dialogoReetiquetar).getByRole("button", { name: "Cocina" }));
+
+    expect(
+      await within(dialogoReetiquetar).findByRole("status"),
+    ).toHaveTextContent(/no se puede reetiquetar|sesión ya no está abierta/i);
   });
 
   it("con sesión cerrada no existe ninguno de los dos botones", async () => {
