@@ -157,6 +157,28 @@ beforeEach(async () => {
     await db
       .doc("auditoria/e_suc")
       .set({ tipo: "APORTE_CREADO", sesionId: "ses1", sucursalId: "suc_norte" });
+
+    // ADR-21: las dos acciones de catálogo que un contador ejecuta desde su
+    // conteo. Ambas denormalizan `sucursalId`, y ése es el único motivo por el
+    // que su propio cajero puede leerlas — la regla de auditoría no cambia.
+    // "e_cat_sin_suc" es el control: mismo tipo, sin el campo, sigue ilegible.
+    await db.doc("auditoria/e_area").set({
+      tipo: "AREA_VINCULADA",
+      sesionId: "ses1",
+      categoriaId: "cat_1000",
+      areaId: "area_efectivo",
+      sucursalId: "suc_norte",
+    });
+    await db.doc("auditoria/e_cat_conteo").set({
+      tipo: "CATEGORIA_CREADA",
+      sesionId: "ses1",
+      categoriaId: "cat_nueva",
+      origen: "conteo",
+      sucursalId: "suc_norte",
+    });
+    await db
+      .doc("auditoria/e_cat_sin_suc")
+      .set({ tipo: "CATEGORIA_CREADA", categoriaId: "cat_admin" });
   });
 });
 
@@ -193,9 +215,7 @@ describe("A-1 · líneas de sólo lectura para el cliente", () => {
   });
 
   it("un cajero SÍ puede leer el catálogo de áreas", async () => {
-    await assertSucceeds(
-      cajero("uid_ana", ["suc_norte"]).firestore().doc("areas/area_1").get(),
-    );
+    await assertSucceeds(cajero("uid_ana", ["suc_norte"]).firestore().doc("areas/area_1").get());
   });
 });
 
@@ -448,6 +468,43 @@ describe("A-2 · auditoría inmutable", () => {
     // directo (no una query de colección) prueba la regla contra ESTE
     // documento en concreto, no sólo lo que un `where` deja pasar.
     await assertFails(cajero("uid_ana", ["suc_norte"]).firestore().doc("auditoria/e1").get());
+  });
+
+  // ── ADR-21 · el contador lee la auditoría de sus propias acciones ──
+  // `infra/firestore.rules` NO cambia en este cambio. Lo que cambia es el
+  // ALCANCE de una regla que ya existía: `esCajero() && tieneSucursal(
+  // resource.data.sucursalId)` cubre cualquier evento que denormalice
+  // `sucursalId`, y los dos eventos nuevos lo denormalizan. Doc 09 §4 exige
+  // un test que afirme y otro que niegue por regla; el alcance nuevo necesita
+  // su propio par, aunque el texto de la regla siga idéntico.
+
+  it("ADR-21 · un cajero SÍ lee un AREA_VINCULADA de su propia sucursal", async () => {
+    await assertSucceeds(
+      cajero("uid_ana", ["suc_norte"]).firestore().doc("auditoria/e_area").get(),
+    );
+  });
+
+  it("ADR-21 · un cajero NO lee un AREA_VINCULADA de una sucursal que no tiene asignada", async () => {
+    // Par negativo del anterior: sin él, el afirmativo pasaría igual con la
+    // regla degradada a `esCajero()` a secas.
+    await assertFails(cajero("uid_luis", ["suc_sur"]).firestore().doc("auditoria/e_area").get());
+  });
+
+  it("ADR-21 · un cajero SÍ lee el CATEGORIA_CREADA que originó su propio conteo", async () => {
+    await assertSucceeds(
+      cajero("uid_ana", ["suc_norte"]).firestore().doc("auditoria/e_cat_conteo").get(),
+    );
+  });
+
+  it("ADR-21 · un CATEGORIA_CREADA SIN sucursalId sigue ilegible para el cajero", async () => {
+    // El control que demuestra de dónde viene el permiso: mismo tipo de
+    // evento, misma sucursal en el claim, pero sin el campo denormalizado. Si
+    // esto pasara, la lectura no vendría de `sucursalId` sino de que la regla
+    // se aflojó — que es justo lo que este cambio NO hace. Es también el
+    // estado de los CATEGORIA_CREADA que origina el admin desde el panel.
+    await assertFails(
+      cajero("uid_ana", ["suc_norte"]).firestore().doc("auditoria/e_cat_sin_suc").get(),
+    );
   });
 });
 
