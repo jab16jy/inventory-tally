@@ -177,9 +177,51 @@ export const abrirSesion = onCall(async (req) => {
 
 La siembra crea una línea por categoría activa con `cantidadTotal: 0` y el
 `valorUnitario` **copiado y congelado** (invariante I-7): cambiar el catálogo después no
-altera conteos en curso ni históricos. Mismo tratamiento para `area`: se resuelve una
-vez el nombre del área activa referenciada por `categoriasValor.areaId` (`"Sin área"`
-si no tiene una asignada) y se copia congelado en la línea.
+altera conteos en curso ni históricos. Para `area` se resuelve una vez el nombre del área
+activa referenciada por `categoriasValor.areaId` (`"Sin área"` si no tiene una asignada) y
+se copia en la línea — pero **`"Sin área"` es el hueco, no un valor congelado**: una línea
+con ese sentinel puede re-etiquetarse desde `vincularArea`; una con área real, nunca
+([ADR-21](13-decisiones-adr.md#adr-21)).
+
+La forma del documento de línea recién sembrada vive en un solo sitio,
+`packages/functions/src/lib/linea-sembrada.ts`, porque tiene dos escritores (`abrirSesion` y
+`crearCategoriaEnSesion`) y si divergen se rompe I-7 en silencio.
+
+### `vincularArea` y `crearCategoriaEnSesion`
+
+Las **únicas dos** callables de catálogo que no empiezan con `exigirAdmin`. Autorizan por
+**pertenencia a la sesión** (`exigirAdminOCajeroDeSesion`): admin siempre, y cajero sólo si
+la sesión es de una sucursal de su claim y está `abierta`. La sesión se lee **dentro de la
+misma transacción que escribe** — ver [09 §3](09-seguridad-y-auditoria.md) para por qué eso
+no es un detalle de estilo (A-12).
+
+```jsonc
+// vincularArea
+// entrada
+{ "sesionId": "ses_20260901_norte_01", "categoriaId": "cat_1000", "areaId": "area_efectivo" }
+// salida
+{ "categoriaId": "cat_1000", "areaId": "area_efectivo", "lineaActualizada": true }
+```
+
+Escribe `categoriasValor.areaId` y actualiza `linea.area` **sólo si vale `"Sin área"`**
+(`lineaActualizada` dice si lo hizo). Si la categoría ya tiene OTRA área →
+`failed-precondition`: el contador vincula, no edita. Con la MISMA área es idempotente, lo
+que permite que el cajero de otra sucursal etiquete su propia línea después.
+
+```jsonc
+// crearCategoriaEnSesion
+// entrada
+{ "sesionId": "ses_20260901_norte_01", "etiqueta": "Bolsas de basura", "areaId": "area_aseo" }
+// salida
+{ "categoriaId": "cat_a1b2c3", "creada": true }
+```
+
+**Sin `valor` y sin `orden` en la entrada**: el contrato no los acepta y el servidor escribe
+`valor: 0`. Un cajero fijando un importe cruzaría la separación monetaria por rol (I-9,
+[ADR-07](13-decisiones-adr.md#adr-07)); el admin precia después desde el panel. Crea la
+categoría con `sucursalesAsignadas: [sucursalId]` y siembra su `LineaConteo` en la sesión
+abierta, porque `sembrarLineas` sólo corre al abrir y sin esa línea el producto recién
+creado no aparecería en el conteo en curso.
 
 ### `cerrarSesion` — reforzada en la v2
 
