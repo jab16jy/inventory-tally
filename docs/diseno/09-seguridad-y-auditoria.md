@@ -28,6 +28,7 @@ autorización.
 | A-9  | Escritura masiva para inflar la factura                 | Abuso económico              | App Check, alertas, cuotas                       |
 | A-10 | **Cajero consulta el valor total del inventario**       | Fuga de información sensible | Datos monetarios en documentos que no puede leer |
 | A-11 | **Cajero marca su sincronización sin haberla hecho**    | Cierre con conteos perdidos  | Regla acotada + revalidación en servidor         |
+| A-12 | **Contador crea o vincula catálogo en sucursal ajena o sesión cerrada** | Catálogo contaminado; alteración de evidencia | `exigirAdminOCajeroDeSesion`: claim + `estado` leídos en la MISMA transacción que escribe |
 
 ---
 
@@ -241,6 +242,16 @@ service cloud.firestore {
   acepta: hay 1–2 por escritura de aporte, y la alternativa es confiar en el cliente.
 - **La denegación por defecto al final** protege colecciones que alguien agregue en el
   futuro sin escribir su regla.
+- **El catálogo en el conteo (ADR-21) NO cambia una sola línea de estas reglas.**
+  `vincularArea` y `crearCategoriaEnSesion` escriben con el Admin SDK, que las omite;
+  `categoriasValor` y `sesiones/*/lineas` siguen en `write: if false` para todo cliente, y
+  `areas` sigue en `read: if autenticado()`, que es lo que deja al contador leer el
+  catálogo de áreas sin pasar por el `AdminRepository`. Lo que sí cambia es el **alcance**
+  de la regla de `auditoria`: al denormalizar `sucursalId` en los eventos nuevos, la
+  condición `esCajero() && tieneSucursal(resource.data.sucursalId)` —que ya existía por el
+  ticket #45— empieza a cubrirlos. Un alcance nuevo necesita su propio par afirmativo/
+  negativo aunque el texto de la regla sea idéntico (§4); está en `infra/test/reglas.test.ts`,
+  bloque A-2.
 
 ---
 
@@ -338,6 +349,24 @@ niega. Sin eso, no se despliega ([12](12-despliegue-y-entornos.md)).
 | `CIERRE_BLOQUEADO`                   | El admin intentó cerrar con cajeros sin confirmar | Documenta que la salvaguarda actuó                      |
 | `SESION_CERRADA` con `forzado: true` | El admin anuló la verificación                    | Deja constancia de quién asumió el riesgo y sobre quién |
 | `RECONCILIACION`                     | La función semanal corrigió un total              | Trazabilidad de correcciones automáticas                |
+| `AREA_VINCULADA`                     | Un contador vinculó un área a una categoría sin área, durante su conteo | Es una mutación del catálogo GLOBAL hecha por un cajero: más sensible, no menos (ADR-21) |
+| `CATEGORIA_CREADA` con `origen: "conteo"` | Un contador creó un producto desde su conteo | Distingue lo que nace en bodega de lo que nace en el panel; el admin lo precia después |
+
+### Autorización por pertenencia a la sesión (ADR-21)
+
+`vincularArea` y `crearCategoriaEnSesion` son las **únicas dos** callables de catálogo que
+no empiezan con `exigirAdmin`. Autorizan por **pertenencia a la sesión**, no por rol:
+admin siempre, y cajero sólo si la sesión es de una sucursal de su claim (A-3 / I-6) y está
+`abierta` (A-4). El claim sigue siendo la fuente de verdad — nunca `usuarios/{uid}` (§2).
+
+La sesión se lee **dentro de la misma transacción que escribe**, y el helper de
+autorización recibe ese snapshot en vez de leerlo por su cuenta. No es un detalle de
+estilo: si el helper hiciera su propio `get()`, el admin podría cerrar la sesión entre esa
+lectura y el commit, y la escritura entraría igual sobre un conteo cerrado (A-4, A-12).
+
+Ambos eventos **denormalizan `sucursalId`**, así que el propio contador puede leer en
+auditoría lo que él mismo hizo. Los demás `CATEGORIA_*` —los que origina el admin desde el
+panel— siguen sin el campo y por tanto siguen ilegibles para cualquier cajero.
 
 ### Detección de inconsistencias
 
