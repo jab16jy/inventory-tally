@@ -38,11 +38,18 @@ flowchart TD
     SPLASH --> HOME{"rol"}
     LOGIN --> HOME
 
-    HOME -->|cajero| SUC["/sucursales"]
+    HOME -->|cajero| SUC
     HOME -->|admin| PANEL["/admin"]
 
+    subgraph PESTANAS["barra inferior del cajero — 3 pestañas"]
+        SUC["/sucursales<br/>Conteos · sucursales activas"]
+        MIS["/mis-conteos<br/>Mis conteos · historial"]
+        CTA["/cuenta<br/>Cuenta · datos y sucursales asignadas"]
+    end
+
+    MIS --> ANAC["/mis-conteos/:sesionId<br/>análisis de la sesión, EN UNIDADES"]
+
     SUC --> PREP["/conteo/:sesionId/preparar<br/>precarga + recordatorio"]
-    SUC --> MIS["/mis-conteos<br/>historial del cajero"]
     PREP --> CONTEO["/conteo/:sesionId"]
     CONTEO --> DETALLE["bottom sheet<br/>registrar cantidad"]
     CONTEO --> FIN["/conteo/:sesionId/finalizar<br/>confirmar sincronización"]
@@ -59,6 +66,24 @@ flowchart TD
 
 Dos rutas nuevas en la v2: `preparar` (antes de contar) y `finalizar` (después). Enmarcan
 la sesión y son donde viven la precarga y la confirmación de sincronización.
+
+### La barra de pestañas del cajero
+
+Las tres pestañas son **hermanas alcanzables entre sí**, no un árbol: desde cualquiera se
+llega a las otras dos. Antes `/mis-conteos` colgaba de un enlace al pie de `/sucursales` y
+era un salto **sin vuelta** — el cajero quedaba varado en el historial.
+
+> **La barra no se esconde en `/conteo/*`: no se monta.** Las cuatro rutas de pestaña viven
+> dentro de un layout route (`LayoutCajero`) y las tres de conteo quedan fuera de él. Una
+> condicional sobre `pathname` sería reimplementar el routing a mano y se desincronizaría en
+> la primera ruta nueva. Bajo `/admin` manda `AdminLayout`, que tiene su propia navegación.
+
+El análisis de `/mis-conteos/:sesionId` es el **dashboard operativo del cajero** de RF-14:
+unidades del equipo, aporte propio y desglose por categoría / área / compañero. **Nunca
+importes** — I-9 y ADR-07 lo hacen estructural, no cosmético: `sesiones/*/resumen` es
+`read: if esAdmin()` en las reglas, así que el dato monetario ni siquiera llega al cliente
+del cajero. El desglose por persona muestra "Tú" y "Compañero N", nunca un uid ni un nombre
+de tercero: `usuarios` es `list: if esAdmin()`.
 
 ### Guardas de ruta
 

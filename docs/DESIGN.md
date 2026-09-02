@@ -131,6 +131,8 @@ Modo *Operate* (el visitante completa una tarea, no explora): escala tipográfic
 
 **Safe area.** `body` lleva `padding-top: env(safe-area-inset-top)` porque `viewport-fit=cover` en `index.html` mete la UI bajo el notch; sin el padding la cabecera queda debajo de la barra de estado en un iPhone real.
 
+**Barra de pestañas del cajero** (`LayoutCajero`): `fixed inset-x-0 bottom-0`, tres destinos a ancho igual (`flex-1`), separada del contenido por `border-t border-borde` sobre `bg-placa`. Cada pestaña mide ≥ `--size-toque` (56 px, por encima del mínimo de 48 px de `docs/diseno/11-ux-y-navegacion.md`) porque se toca con guantes y con poca luz. Activa en `--color-senal` con `font-semibold`, inactiva en `--color-tenue`; `aria-current="page"` lo pone `NavLink` solo. Lleva `pb-[env(safe-area-inset-bottom)]` por la barra de gestos de iOS, y el `<main>` compensa con `pb-16` para que la última fila no quede tapada. **Sin botón "Salir"**: ése vive en `CabeceraCajero` de cada pantalla y duplicarlo daría dos salidas en pantalla a la vez. Sin sombra y sin regla de tinta — la regla está reservada al estado de sincronización.
+
 ## Elevation & Depth
 
 Sistema plano, sin sombras en ningún componente. La profundidad se comunica por **capas de superficie + borde**, no por `box-shadow`: `--color-fondo` (base) → `--color-placa` (bloque-rótulo) → `--color-placa-alta` (estado activo de un botón). Cada bloque declara su elevación una sola vez, con un borde de 1 px (`--color-borde`) — deliberadamente sin sombra, porque una sombra suave debajo de un borde duro produce la "card fantasma" que el mundo de "Placa de bodega" rechaza explícitamente.
@@ -195,7 +197,8 @@ Los ocho primitivos del plan existen hoy en `apps/web/src/ui/primitivos/`: `Plac
 ### Icono (paths SVG inline)
 - **Uso:** los ~12 glifos que la app necesita (búsqueda, filtro, conectividad, navegación del admin) — cero dependencia de icon pack.
 - **Gramática fija:** `strokeLinecap: "square"`, `strokeLinejoin: "miter"`, `viewBox 0 0 24 24` — trazo duro sin curva de esquina, nunca emoji (evita el reemplazo por el set de Apple en iOS).
-- **Prop distintiva:** `nombre` selecciona el path del catálogo (`buscar`, `filtro`, `wifi`, `datos`, `visto`, más los ocho de navegación del panel admin); el resto de props son las de un `<svg>` nativo (`aria-hidden` por defecto).
+- **Prop distintiva:** `nombre` selecciona el path del catálogo (`buscar`, `filtro`, `wifi`, `datos`, `visto`, más los ocho de navegación del panel admin y `cuenta` para la barra del cajero); el resto de props son las de un `<svg>` nativo (`aria-hidden` por defecto).
+- **`cuenta` vs. `usuarios`:** una figura sola con hombros, no dos apiladas. `usuarios` es la sección "Cajeros" del admin (gestionar a OTROS); `cuenta` es la pestaña del cajero (sus propios datos). Dos glifos porque son dos conceptos, no por decoración.
 
 ### Botón primario (patrón, aún sin extraer a primitivo)
 Usado hoy inline en `LoginScreen.tsx` ("Entrar") y previsto para "Finalizar conteo": ancho completo, alto mínimo 56 px, radio 2 px, fondo `--color-senal` / texto `--color-fondo`. Estado de envío: fondo al 40 % de opacidad, texto ámbar apagado — nunca un spinner reemplazando el texto. El primitivo `Spinner` antepuesto al texto (sin ocultarlo) sí es válido: es el patrón para una acción en vuelo que llama a una Cloud Function.

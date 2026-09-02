@@ -14,8 +14,11 @@ import { auth, db } from "./firebase.js";
 import { functions } from "./funciones.js";
 import { useAuthState } from "../state/useAuthState.js";
 import { AdminRepositoryProvider } from "../state/admin-contexto.js";
+import { AnalisisConteoScreen } from "../ui/AnalisisConteoScreen.js";
 import { ConteoScreenPorSesion } from "../ui/ConteoScreen.js";
+import { CuentaScreen } from "../ui/CuentaScreen.js";
 import { FinalizarScreen } from "../ui/FinalizarScreen.js";
+import { LayoutCajero } from "../ui/LayoutCajero.js";
 import { LoginScreen } from "../ui/LoginScreen.js";
 import { MisConteosScreen } from "../ui/MisConteosScreen.js";
 import { PrepararScreen } from "../ui/PrepararScreen.js";
@@ -96,25 +99,40 @@ export function AppRouter(): ReactNode {
             </RequireAnonimo>
           }
         />
+        {/* Armazón del cajero: las cuatro pantallas que se navegan por
+            pestañas van DENTRO del layout; las tres de conteo quedan fuera a
+            propósito, así la barra inferior no se esconde — no se monta.
+            Condicionar la barra a `pathname.startsWith("/conteo")` sería
+            reimplementar el routing a mano y desincronizarse en la primera
+            ruta nueva. Ruta pathless: `RequireAuth` se declara una vez en vez
+            de repetirse en cada hija. `calcularRedireccion` (lib/guardas.ts)
+            no necesita cambios: sólo desvía /admin, y éstas son del cajero. */}
         <Route
-          path="/sucursales"
           element={
             <RequireAuth>
-              <SucursalesScreen auth={auth} onSalir={() => signOut(auth)} />
+              <LayoutCajero />
             </RequireAuth>
           }
-        />
-        {/* Historial del cajero, alcanzado desde el pie de /sucursales.
-            `calcularRedireccion` (lib/guardas.ts) no necesita cambios: sólo
-            desvía /admin, y esta ruta es del cajero. */}
-        <Route
-          path="/mis-conteos"
-          element={
-            <RequireAuth>
-              <MisConteosScreen auth={auth} onSalir={() => signOut(auth)} />
-            </RequireAuth>
-          }
-        />
+        >
+          <Route
+            path="/sucursales"
+            element={<SucursalesScreen auth={auth} onSalir={() => signOut(auth)} />}
+          />
+          <Route
+            path="/mis-conteos"
+            element={<MisConteosScreen auth={auth} onSalir={() => signOut(auth)} />}
+          />
+          {/* Análisis de UNA sesión, en unidades (RF-14, I-9): alcanzado
+              tocando una fila del historial. */}
+          <Route
+            path="/mis-conteos/:sesionId"
+            element={<AnalisisConteoScreen onSalir={() => signOut(auth)} />}
+          />
+          <Route
+            path="/cuenta"
+            element={<CuentaScreen auth={auth} onSalir={() => signOut(auth)} />}
+          />
+        </Route>
         <Route
           path="/conteo/:sesionId/preparar"
           element={

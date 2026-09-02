@@ -12,6 +12,7 @@
 // `lib/firebase.js`, así el test la monta sin inicializar Firebase.
 import type { Auth } from "firebase/auth";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import type { SesionConteo } from "@conteo/shared";
 import { fecha, numero } from "../lib/formato.js";
 import { useConteoRepository } from "../state/repositorio-contexto.js";
@@ -146,7 +147,20 @@ export function MisConteosScreen({ auth, onSalir }: MisConteosScreenProps) {
           {sesiones.map((sesion) => (
             <li key={sesion.sesionId} className="list-none">
               <Placa className="py-2.5">
-                <div className="flex min-h-[var(--size-toque)] w-full flex-col justify-center gap-1">
+                {/* Absoluto, no relativo: un `to={sesion.sesionId}` resuelve
+                    contra la jerarquía de RUTAS, que se declara en
+                    lib/router.tsx — si alguien anidara /mis-conteos bajo otro
+                    prefijo, el destino cambiaría en silencio desde otro
+                    archivo. Repetir el prefijo cuesta once caracteres y no
+                    tiene esa acción a distancia.
+                    El nombre accesible dice a dónde lleva: "Sucursal Norte" a
+                    secas no distingue una fila informativa de un enlace, y el
+                    cajero llega una vez al mes (doc 11 §1). */}
+                <Link
+                  to={`/mis-conteos/${sesion.sesionId}`}
+                  aria-label={`Análisis de ${sesion.sucursalNombre}, ${fecha(sesion.abiertaEn)}`}
+                  className="flex min-h-[var(--size-toque)] w-full flex-col justify-center gap-1"
+                >
                   <span className="flex items-baseline justify-between gap-3">
                     <span className="min-w-0 truncate text-medio leading-none font-semibold text-tinta">
                       {sesion.sucursalNombre}
@@ -164,7 +178,7 @@ export function MisConteosScreen({ auth, onSalir }: MisConteosScreenProps) {
                     {fecha(sesion.abiertaEn)} · {numero(sesion.totalUnidades)} u · total de la
                     sesión
                   </span>
-                </div>
+                </Link>
               </Placa>
             </li>
           ))}

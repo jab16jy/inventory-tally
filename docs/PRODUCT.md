@@ -29,6 +29,7 @@ La app no muestra "cuántas unidades hay", muestra **cuánto contaste tú** fren
 - **Cadencia de uso**: mensual o quincenal, nunca diario. Es la restricción de UX más subestimada según `docs/diseno/11-ux-y-navegacion.md#1-contexto-real-de-uso`: una app de uso mensual tiene que explicarse sola cada vez, no puede depender de memoria muscular.
 - **Conectividad**: existe al inicio de la sesión (el cajero llega, inicia sesión, carga el catálogo) pero puede perderse durante el recorrido; nunca se asume ausente desde el arranque (supuesto 7, `docs/diseno/01-requisitos-y-alcance.md#5-supuestos-de-diseño`). Algunas sucursales sólo tienen datos móviles.
 - **Flujo de la sesión**: `/sucursales` → `/conteo/:id/preparar` (precarga + recordatorio de los 4 pasos) → `/conteo/:id` (pantalla crítica) → bottom sheet para registrar cantidad → `/conteo/:id/finalizar` (confirma sincronización antes de salir).
+- **Navegación fuera del conteo**: tres pestañas en una barra inferior — Conteos (`/sucursales`), Mis conteos (`/mis-conteos`, con el análisis de cada sesión **en unidades**) y Cuenta (`/cuenta`). La barra desaparece al entrar a contar: durante el conteo el cajero ejecuta una tarea, no navega (`docs/diseno/11-ux-y-navegacion.md#2-mapa-de-navegación`).
 - **Instalación de la PWA**: parte del procedimiento de alta de todo cajero, no una sugerencia opcional — una PWA instalada tiene mejores garantías de almacenamiento que una pestaña de navegador (`docs/diseno/11-ux-y-navegacion.md#7-instalación-de-la-pwa`).
 
 ## Capabilities and Constraints

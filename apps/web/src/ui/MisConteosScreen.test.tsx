@@ -149,4 +149,17 @@ describe("MisConteosScreen", () => {
     // aparezca.
     expect(screen.queryByTestId("fila-esqueleto")).not.toBeInTheDocument();
   });
+
+  it("cada fila es un enlace al análisis de esa sesión, con nombre accesible descriptivo", async () => {
+    // El nombre accesible dice a DÓNDE lleva: "Sucursal Norte" a secas no
+    // distingue una fila informativa de un enlace, y el cajero que llega una
+    // vez al mes no puede deducirlo del contexto (doc 11 §1, uso mensual).
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarSesion(crearSesion({ sesionId: "ses_1", sucursalNombre: "Sucursal Norte" }));
+
+    renderPantalla(repo);
+
+    const enlace = await screen.findByRole("link", { name: /análisis de sucursal norte/i });
+    expect(enlace).toHaveAttribute("href", "/mis-conteos/ses_1");
+  });
 });
