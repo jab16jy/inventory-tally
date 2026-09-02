@@ -31,8 +31,14 @@ flowchart TD
     CAJ["🧑‍💼 Cajero"] --> W1["Ver sus sucursales asignadas"]
     CAJ --> W2["Registrar su aporte de conteo"]
     CAJ --> W3["Dashboard operativo: su avance"]
-    CAJ -.->|"❌"| X["Valor monetario del inventario · Auditoría · Gestión"]
+    CAJ --> W4["Crear producto y vincular área<br/>en SU conteo abierto"]
+    CAJ -.->|"❌"| X["Valor monetario · Editar o borrar catálogo · Crear áreas · Gestión"]
 ```
+
+> **El cajero toca el catálogo, pero sólo hacia adelante.** Puede crear una categoría y
+> vincularle un área existente mientras cuenta, porque es quien tiene el producto en la
+> mano; no puede editar, desactivar ni borrar nada, ni crear áreas, ni fijar precios
+> ([ADR-21](13-decisiones-adr.md#adr-21)).
 
 > **Nota de terminología.** En la v1 este rol se llamaba "trabajador". En la v2 se
 > unifica bajo **cajero**, que es quien realiza el conteo. No existe un tercer rol.
@@ -50,7 +56,12 @@ flowchart TD
 | **Dashboard analítico** (subtotales, participación, gráficas) |   ❌   |      ✅       |
 | Comparativo entre sucursales                                  |   ❌   |      ✅       |
 | Abrir / cerrar sesión de conteo                               |   ❌   |      ✅       |
-| Gestionar cajeros, sucursales, categorías                     |   ❌   |      ✅       |
+| Gestionar cajeros y sucursales                                |   ❌   |      ✅       |
+| **Crear una categoría/producto durante su conteo abierto**    |   ✅   |      ✅       |
+| **Vincular un área existente a una categoría _sin área_, durante su conteo** |   ✅   |      ✅       |
+| Editar, desactivar o borrar categorías                        |   ❌   |      ✅       |
+| Crear o gestionar áreas                                       |   ❌   |      ✅       |
+| Fijar el precio (`valor`) de una categoría                    |   ❌   |      ✅       |
 | Ver auditoría (acotada a sus sucursales asignadas, #45)       |   ✅   |  ✅ (todas)   |
 | Editar o borrar auditoría                                     |   ❌   |  ❌ (nadie)   |
 

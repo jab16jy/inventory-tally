@@ -152,6 +152,8 @@ La pantalla crítica del sistema.
 ├────────────────────────────────────────────┤
 │ 🔍 Buscar valor…                            │
 ├────────────────────────────────────────────┤
+│ [ Todas las áreas ▾ ] [ Sin área (12) ] [ + Producto ] │
+├────────────────────────────────────────────┤
 │  $1.000                          [ ─ 12 + ]│
 │  Tú: 12 · Equipo: 45                        │
 ├────────────────────────────────────────────┤
@@ -193,6 +195,17 @@ flowchart LR
 
 Botones `−`/`+` para ajustes de una unidad sin abrir el teclado, y búsqueda por valor para
 catálogos grandes.
+
+### Catálogo desde el conteo (ADR-21)
+
+`Sin área (N)` es **autoextinguible**: sólo aparece mientras quedan categorías con el
+sentinel `"Sin área"` (`N = número de líneas en ese estado`); en cuanto la última se
+vincula, el botón desaparece solo, sin que el cajero tenga que cerrar nada. Abre una hoja
+que lista esas categorías y, al tocar una, despliega las áreas ya existentes del catálogo —
+**el contador vincula, nunca crea, un área** (ADR-21). `+ Producto` siempre está disponible
+con la sesión abierta: da de alta una categoría nueva dentro de la sesión en curso, con
+`valorUnitario: 0` — el admin la precia después, la separación monetaria de I-9 no se cruza
+desde el conteo.
 
 > **Punto de atención de UX:** la entrada de texto en Safari móvil se valida con el
 > prototipo descrito en [06](06-plataforma-web.md); al usar campos HTML nativos el riesgo
@@ -360,6 +373,7 @@ auditoría con `forzadoPor` ([09](09-seguridad-y-auditoria.md)).
 | Cerrar la sesión con cajeros sin sincronizar     | Bloqueo en el panel + revalidación en servidor                          |
 | Confundir sucursales                             | Nombre siempre en la barra superior, con color distintivo               |
 | Cantidad absurda por dedo torpe                  | Confirmación suave si supera 10× el promedio de la categoría            |
+| Producto creado por error o duplicado            | Confirmación explícita «¿Crear el producto «X»?» antes de escribir; el nombre queda editable con «Corregir» |
 | Olvidar cómo funciona tras un mes                | Pantalla de preparación con los cuatro pasos                            |
 | Perder trabajo al cerrar la app                  | Cada aporte se persiste al instante (con la salvedad de PWA)            |
 
