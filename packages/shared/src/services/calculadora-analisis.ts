@@ -1,4 +1,5 @@
 import type { LineaConteo } from "../models/linea-conteo.js";
+import { SIN_AREA } from "../models/linea-conteo.js";
 import { subtotal } from "./calculadora.js";
 
 /**
@@ -177,12 +178,6 @@ export interface FilaDimension {
   readonly unidades: number;
   readonly valor: number;
 }
-
-/** Rótulo para línea sin área asignada — el mismo exacto que usa
- * `abrirSesion` en producción (`packages/functions/src/callables/abrir-sesion.ts`)
- * cuando la categoría no tiene `areaId`, para que una línea con área vacía
- * caiga en la misma fila que las que ya nacieron sin área. */
-const SIN_AREA = "Sin área";
 
 /** Clave de la fila que absorbe unidades sin atribuir a ningún cajero. */
 const SIN_ATRIBUIR = "__sin_atribuir";
