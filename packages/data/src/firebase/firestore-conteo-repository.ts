@@ -1,4 +1,6 @@
 // packages/data/src/firebase/firestore-conteo-repository.ts (doc 07 §6)
+import type { Functions } from "firebase/functions";
+import { httpsCallable } from "firebase/functions";
 import {
   collection,
   doc,
@@ -19,6 +21,7 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { CantidadInvalidaError } from "@conteo/shared/errors.js";
+import type { Area } from "@conteo/shared/models/area.js";
 import type { Aporte } from "@conteo/shared/models/aporte.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
@@ -26,11 +29,14 @@ import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import type { Pagina } from "../repositories/admin-repository.js";
 import type {
   ConteoRepository,
+  CrearCategoriaEnSesionPayload,
   RegistrarAporteInput,
   Unsubscribe,
+  VincularAreaPayload,
 } from "../repositories/conteo-repository.js";
 import {
   aporteDesdeDoc,
+  areaDesdeDoc,
   lineaConteoDesdeDoc,
   sesionConteoDesdeDoc,
   sucursalDesdeDoc,
@@ -66,6 +72,7 @@ export class FirestoreConteoRepository implements ConteoRepository {
   constructor(
     private readonly db: Firestore,
     private readonly usuario: ProveedorUsuarioActual,
+    private readonly functions: Functions,
   ) {}
 
   observarLineas(sesionId: string, onChange: (lineas: LineaConteo[]) => void): Unsubscribe {
@@ -289,6 +296,26 @@ export class FirestoreConteoRepository implements ConteoRepository {
     return this.usuario.obtenerUid();
   }
 
+  observarAreasActivas(onChange: (areas: Area[]) => void): Unsubscribe {
+    // Filtro `activa` EN MEMORIA, no where() — ver el comentario de la
+    // interfaz (conteo-repository.ts): decenas de documentos, sin índice
+    // compuesto nuevo.
+    const q = query(collection(this.db, "areas"), orderBy("nombre"));
+    return onSnapshot(q, (snap) => {
+      onChange(snap.docs.map((d) => areaDesdeDoc(d.id, d.data() as never)).filter((a) => a.activa));
+    });
+  }
+
+  async vincularArea(payload: VincularAreaPayload): Promise<void> {
+    await this.llamar("vincularArea", payload);
+  }
+
+  async crearCategoriaEnSesion(
+    payload: CrearCategoriaEnSesionPayload,
+  ): Promise<{ categoriaId: string }> {
+    return this.llamar("crearCategoriaEnSesion", payload);
+  }
+
   observarEscriturasPendientes(sesionId: string, onChange: (n: number) => void): Unsubscribe {
     let listeners = this.listenersPendientes.get(sesionId);
     if (!listeners) {
@@ -365,5 +392,14 @@ export class FirestoreConteoRepository implements ConteoRepository {
 
   private notificarPendientes(sesionId: string, n: number): void {
     this.listenersPendientes.get(sesionId)?.forEach((cb) => cb(n));
+  }
+
+  // ponytail: copia de FirestoreAdminRepository.llamar (~5 líneas) en vez de
+  // un helper compartido — ambos repositorios no comparten nada más, un
+  // import cruzado sólo por esto sería más acoplamiento que la duplicación.
+  private async llamar<Entrada, Salida>(nombre: string, payload: Entrada): Promise<Salida> {
+    const llamada = httpsCallable<Entrada, Salida>(this.functions, nombre);
+    const resultado = await llamada(payload);
+    return resultado.data;
   }
 }

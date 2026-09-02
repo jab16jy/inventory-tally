@@ -31,7 +31,15 @@ vi.mock("firebase/firestore", () => ({
   serverTimestamp: () => serverTimestamp(),
 }));
 
+const httpsCallable = vi.fn();
+
+vi.mock("firebase/functions", () => ({
+  httpsCallable: (...args: unknown[]) => httpsCallable(...args),
+}));
+
 const { FirestoreConteoRepository } = await import("./firestore-conteo-repository.js");
+
+const functions = {} as never;
 
 function deferido<T>() {
   let resolver!: (v: T) => void;
@@ -52,7 +60,7 @@ describe("FirestoreConteoRepository.registrarAporte (doc 07 §6)", () => {
 
   it("no espera la confirmación del servidor: resuelve aunque setDoc nunca resuelva (offline no cuelga la UI)", async () => {
     setDoc.mockReturnValue(new Promise(() => {})); // nunca resuelve
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
     await expect(
       repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 }),
@@ -61,7 +69,7 @@ describe("FirestoreConteoRepository.registrarAporte (doc 07 §6)", () => {
 
   it("escribe con merge:true (update semántico) y sólo las claves permitidas por la regla hasOnly", async () => {
     setDoc.mockResolvedValue(undefined);
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
     await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
 
@@ -75,7 +83,7 @@ describe("FirestoreConteoRepository.registrarAporte (doc 07 §6)", () => {
 
   it("escribe version con increment(1), nunca un número literal (I-obligatoria de la regla de monotonía)", async () => {
     setDoc.mockResolvedValue(undefined);
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
     await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
 
@@ -85,7 +93,7 @@ describe("FirestoreConteoRepository.registrarAporte (doc 07 §6)", () => {
   });
 
   it("rechaza cantidades negativas antes de tocar Firestore", async () => {
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
     await expect(
       repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: -1 }),
@@ -100,7 +108,7 @@ describe("FirestoreConteoRepository.confirmarSincronizacion (RF-16)", () => {
   it("SÍ espera la confirmación del servidor (a diferencia de registrarAporte)", async () => {
     const { promesa, resolver } = deferido<void>();
     updateDoc.mockReturnValue(promesa);
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
     let resuelto = false;
     const enCurso = repo.confirmarSincronizacion("ses_1").then(() => {
@@ -116,7 +124,7 @@ describe("FirestoreConteoRepository.confirmarSincronizacion (RF-16)", () => {
 
   it("actualiza sólo la entrada del propio uid, con updateDoc (nunca reemplaza el documento)", async () => {
     updateDoc.mockResolvedValue(undefined);
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
     await repo.confirmarSincronizacion("ses_1");
 
@@ -130,7 +138,7 @@ describe("FirestoreConteoRepository.confirmarSincronizacion (RF-16)", () => {
 
 describe("FirestoreConteoRepository.uidActual", () => {
   it("delega en el proveedor de usuario actual (nunca importa firebase/auth aquí)", () => {
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
     expect(repo.uidActual()).toBe("uid_ana");
   });
 });
@@ -148,7 +156,7 @@ describe("FirestoreConteoRepository.observarSesion (F4-A1, doc 11 §5)", () => {
       callback = cb;
       return vi.fn();
     });
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
     const recibidas: Array<{ sesionId: string; estado: string } | null> = [];
 
     repo.observarSesion("ses_1", (s) => recibidas.push(s as never));
@@ -180,7 +188,7 @@ describe("FirestoreConteoRepository.observarSesion (F4-A1, doc 11 §5)", () => {
       callback = cb;
       return vi.fn();
     });
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
     const recibidas: Array<unknown | null> = [];
 
     repo.observarSesion("ses_inexistente", (s) => recibidas.push(s));
@@ -201,7 +209,7 @@ describe("FirestoreConteoRepository.observarSucursales (doc 04 §3 — decisión
   }
 
   it("con sucursalIds vacío emite [] una sola vez, sin abrir ningún listener, y el unsubscribe es no-op", () => {
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
     const recibidas: unknown[][] = [];
 
     const unsub = repo.observarSucursales([], (s) => recibidas.push(s));
@@ -217,7 +225,7 @@ describe("FirestoreConteoRepository.observarSucursales (doc 04 §3 — decisión
       callbacks.push(cb);
       return vi.fn();
     });
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
     const recibidas: Array<{ sucursalId: string; nombre: string }[]> = [];
 
     repo.observarSucursales(["suc_b", "suc_a"], (s) => recibidas.push(s));
@@ -258,7 +266,7 @@ describe("FirestoreConteoRepository.observarSucursales (doc 04 §3 — decisión
       callbacks.push(cb);
       return vi.fn();
     });
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
     const recibidas: Array<{ sucursalId: string }[]> = [];
 
     repo.observarSucursales(["suc_borrada"], (s) => recibidas.push(s));
@@ -271,7 +279,7 @@ describe("FirestoreConteoRepository.observarSucursales (doc 04 §3 — decisión
     const unsubsIndividuales = [vi.fn(), vi.fn(), vi.fn()];
     let i = 0;
     onSnapshot.mockImplementation(() => unsubsIndividuales[i++]);
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
     const unsub = repo.observarSucursales(["suc_a", "suc_b", "suc_c"], () => {});
     unsub();
@@ -286,7 +294,7 @@ describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
   it("sube al registrar y baja cuando el setDoc en segundo plano se asienta", async () => {
     const { promesa, resolver } = deferido<void>();
     setDoc.mockReturnValue(promesa);
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
     const valores: number[] = [];
     repo.observarEscriturasPendientes("ses_1", (n) => valores.push(n));
@@ -307,7 +315,7 @@ describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
       const diferidos = [deferido<void>(), deferido<void>(), deferido<void>()];
       let llamada = 0;
       setDoc.mockImplementation(() => diferidos[llamada++]!.promesa);
-      const repo = new FirestoreConteoRepository({} as never, usuario);
+      const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
       const valores: number[] = [];
       repo.observarEscriturasPendientes("ses_1", (n) => valores.push(n));
@@ -346,7 +354,7 @@ describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
       const diferidos = [deferido<void>(), deferido<void>(), deferido<void>(), deferido<void>()];
       let llamada = 0;
       setDoc.mockImplementation(() => diferidos[llamada++]!.promesa);
-      const repo = new FirestoreConteoRepository({} as never, usuario);
+      const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
       const pendientes: number[] = [];
       const errores: number[] = [];
@@ -382,7 +390,7 @@ describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
       const { promesa: p0, rechazador } = deferido<void>();
       const { promesa: p1, resolver } = deferido<void>();
       setDoc.mockReturnValueOnce(p0).mockReturnValueOnce(p1);
-      const repo = new FirestoreConteoRepository({} as never, usuario);
+      const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
       const pendientes: number[] = [];
       const errores: number[] = [];
@@ -416,7 +424,7 @@ describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
       const { promesa: pManual, resolver } = deferido<void>();
       let llamada = 0;
       setDoc.mockImplementation(() => (llamada < 4 ? diferidos[llamada++]!.promesa : pManual));
-      const repo = new FirestoreConteoRepository({} as never, usuario);
+      const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
       const pendientes: number[] = [];
       const errores: number[] = [];
@@ -471,7 +479,7 @@ describe("FirestoreConteoRepository.listarMisSesiones (historial del cajero)", (
   }
 
   it("con sucursalIds vacío devuelve página vacía sin tocar Firestore", async () => {
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
     const pagina = await repo.listarMisSesiones([]);
 
@@ -482,7 +490,7 @@ describe("FirestoreConteoRepository.listarMisSesiones (historial del cajero)", (
 
   it("acota por participantes Y por sucursalId: sin el 'in' la regla deniega la query entera", async () => {
     getDocs.mockResolvedValue({ docs: [] });
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
     await repo.listarMisSesiones(["suc_norte", "suc_sur"]);
 
@@ -494,7 +502,7 @@ describe("FirestoreConteoRepository.listarMisSesiones (historial del cajero)", (
 
   it("mapea los docs con sesionConteoDesdeDoc y da siguienteCursor null bajo el tamaño de página", async () => {
     getDocs.mockResolvedValue({ docs: [snapSesion("ses1")] });
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
     const pagina = await repo.listarMisSesiones(["suc_norte"]);
 
@@ -512,7 +520,7 @@ describe("FirestoreConteoRepository.listarMisSesiones (historial del cajero)", (
   it("con la página llena devuelve el último doc como cursor y con cursor encadena vía startAfter", async () => {
     const docs = Array.from({ length: 20 }, (_, i) => snapSesion(`ses${i}`));
     getDocs.mockResolvedValue({ docs });
-    const repo = new FirestoreConteoRepository({} as never, usuario);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
     const primera = await repo.listarMisSesiones(["suc_norte"]);
     expect(primera.siguienteCursor).toBe(docs.at(-1));
@@ -521,5 +529,83 @@ describe("FirestoreConteoRepository.listarMisSesiones (historial del cajero)", (
     await repo.listarMisSesiones(["suc_norte"], primera.siguienteCursor);
 
     expect(startAfter).toHaveBeenCalledWith(primera.siguienteCursor);
+  });
+});
+
+describe("FirestoreConteoRepository.observarAreasActivas (catálogo-en-conteo)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function snapArea(id: string, datos: Record<string, unknown>) {
+    return { id, data: () => datos };
+  }
+
+  it("suscribe a la colección areas y filtra las inactivas EN MEMORIA", () => {
+    let callback: ((snap: unknown) => void) | undefined;
+    onSnapshot.mockImplementation((_ref: unknown, cb: (snap: unknown) => void) => {
+      callback = cb;
+      return vi.fn();
+    });
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
+    const recibidas: Array<{ areaId: string }[]> = [];
+
+    repo.observarAreasActivas((areas) => recibidas.push(areas));
+    expect(collection).toHaveBeenCalledWith({}, "areas");
+    expect(where).not.toHaveBeenCalled(); // ← filtro en memoria, no where()
+
+    callback?.({
+      docs: [
+        snapArea("area_1", {
+          nombre: "Aseo",
+          activa: true,
+          creadaEn: { toDate: () => new Date("2026-01-01T00:00:00Z") },
+        }),
+        snapArea("area_2", {
+          nombre: "Cocina",
+          activa: false,
+          creadaEn: { toDate: () => new Date("2026-01-01T00:00:00Z") },
+        }),
+      ],
+    });
+
+    expect(recibidas.at(-1)?.map((a) => a.areaId)).toEqual(["area_1"]);
+  });
+});
+
+describe("FirestoreConteoRepository.vincularArea/crearCategoriaEnSesion (routing vía httpsCallable)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("vincularArea llama a httpsCallable('vincularArea') con el payload exacto", async () => {
+    const llamada = vi.fn().mockResolvedValue({ data: undefined });
+    httpsCallable.mockReturnValue(llamada);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
+
+    await repo.vincularArea({ sesionId: "ses_1", categoriaId: "cat_5000", areaId: "area_1" });
+
+    expect(httpsCallable).toHaveBeenCalledWith(functions, "vincularArea");
+    expect(llamada).toHaveBeenCalledWith({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+    });
+  });
+
+  it("crearCategoriaEnSesion llama a httpsCallable('crearCategoriaEnSesion') con el payload exacto", async () => {
+    const llamada = vi.fn().mockResolvedValue({ data: { categoriaId: "cat_nueva" } });
+    httpsCallable.mockReturnValue(llamada);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
+
+    const resultado = await repo.crearCategoriaEnSesion({
+      sesionId: "ses_1",
+      etiqueta: "$7.000",
+      areaId: "area_1",
+    });
+
+    expect(httpsCallable).toHaveBeenCalledWith(functions, "crearCategoriaEnSesion");
+    expect(llamada).toHaveBeenCalledWith({
+      sesionId: "ses_1",
+      etiqueta: "$7.000",
+      areaId: "area_1",
+    });
+    expect(resultado).toEqual({ categoriaId: "cat_nueva" });
   });
 });

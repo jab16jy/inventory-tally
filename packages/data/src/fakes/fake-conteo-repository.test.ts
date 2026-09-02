@@ -1,5 +1,6 @@
 import { CantidadInvalidaError } from "@conteo/shared/errors.js";
-import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
+import type { Area } from "@conteo/shared/models/area.js";
+import { SIN_AREA, type LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import { describe, expect, it, vi } from "vitest";
@@ -16,6 +17,16 @@ function crearLinea(overrides: Partial<LineaConteo> = {}): LineaConteo {
     versiones: {},
     actualizadaEn: new Date("2026-08-02T08:00:00Z"),
     actualizadaPor: "",
+    ...overrides,
+  };
+}
+
+function crearArea(overrides: Partial<Area> = {}): Area {
+  return {
+    areaId: "area_aseo",
+    nombre: "Aseo",
+    activa: true,
+    creadaEn: new Date("2026-01-15T10:00:00Z"),
     ...overrides,
   };
 }
@@ -377,5 +388,73 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
         vi.useRealTimers();
       }
     });
+  });
+});
+
+describe("FakeConteoRepository — catálogo-en-conteo (vincular área / crear categoría)", () => {
+  it("observarAreasActivas emite sólo las áreas activas", () => {
+    const repo = new FakeConteoRepository();
+    repo.sembrarArea(crearArea({ areaId: "area_activa", nombre: "Aseo", activa: true }));
+    repo.sembrarArea(
+      crearArea({ areaId: "area_inactiva", nombre: "Descontinuada", activa: false }),
+    );
+
+    const recibidas: Area[][] = [];
+    repo.observarAreasActivas((areas) => recibidas.push(areas));
+
+    expect(recibidas.at(-1)?.map((a) => a.areaId)).toEqual(["area_activa"]);
+  });
+
+  it("vincularArea re-etiqueta una línea cuya área es SIN_AREA y notifica al listener", async () => {
+    const repo = new FakeConteoRepository();
+    repo.sembrarArea(crearArea({ areaId: "area_aseo", nombre: "Aseo" }));
+    repo.sembrarLinea("ses_1", crearLinea({ area: SIN_AREA }));
+
+    const recibidas: LineaConteo[][] = [];
+    repo.observarLineas("ses_1", (lineas) => recibidas.push(lineas));
+
+    await repo.vincularArea({ sesionId: "ses_1", categoriaId: "cat_5000", areaId: "area_aseo" });
+
+    expect(recibidas.at(-1)?.[0]?.area).toBe("Aseo");
+  });
+
+  // Par negativo del test anterior (AGENTS.md §2): sin esto, el test de
+  // arriba pasaría igual con la condición `area !== SIN_AREA` invertida o
+  // ausente.
+  it("vincularArea NO re-etiqueta una línea cuya área ya vale un área real", async () => {
+    const repo = new FakeConteoRepository();
+    repo.sembrarArea(crearArea({ areaId: "area_cocina", nombre: "Cocina" }));
+    repo.sembrarLinea("ses_1", crearLinea({ area: "Aseo" }));
+
+    const recibidas: LineaConteo[][] = [];
+    repo.observarLineas("ses_1", (lineas) => recibidas.push(lineas));
+
+    await repo.vincularArea({ sesionId: "ses_1", categoriaId: "cat_5000", areaId: "area_cocina" });
+
+    expect(recibidas.at(-1)?.[0]?.area).toBe("Aseo");
+  });
+
+  it("crearCategoriaEnSesion siembra una línea visible para observarLineas, con valorUnitario: 0", async () => {
+    const repo = new FakeConteoRepository();
+
+    const recibidas: LineaConteo[][] = [];
+    repo.observarLineas("ses_1", (lineas) => recibidas.push(lineas));
+    expect(recibidas.at(-1)).toEqual([]);
+
+    const { categoriaId } = await repo.crearCategoriaEnSesion({
+      sesionId: "ses_1",
+      etiqueta: "$7.000",
+    });
+
+    const ultima = recibidas.at(-1);
+    expect(ultima).toHaveLength(1);
+    expect(ultima?.[0]).toEqual(
+      expect.objectContaining({
+        categoriaId,
+        etiqueta: "$7.000",
+        valorUnitario: 0,
+        cantidadTotal: 0,
+      }),
+    );
   });
 });

@@ -3,6 +3,7 @@
 // re-exporta `Config` (config/entorno.ts), que exige el ambient
 // `ImportMeta.env` de Vite — innecesario aquí y fuera del alcance de esta
 // ola tocar `packages/shared` para exponerlo en este programa de TS.
+import type { Area } from "@conteo/shared/models/area.js";
 import type { Aporte } from "@conteo/shared/models/aporte.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
@@ -18,6 +19,24 @@ export interface RegistrarAporteInput {
   readonly sesionId: string;
   readonly categoriaId: string;
   readonly cantidad: number;
+}
+
+// ── payloads de catálogo-en-conteo ──
+// Declarados AQUÍ, no importados de `@conteo/contracts` — mismo criterio que
+// admin-repository.ts: `apps/web` no gana la dependencia de zod (fuera del
+// bundle del cliente, que ya revalida la callable) ni un alias nuevo en
+// vite.config.ts.
+
+export interface VincularAreaPayload {
+  readonly sesionId: string;
+  readonly categoriaId: string;
+  readonly areaId: string;
+}
+
+export interface CrearCategoriaEnSesionPayload {
+  readonly sesionId: string;
+  readonly etiqueta: string;
+  readonly areaId?: string;
 }
 
 export interface ConteoRepository {
@@ -107,4 +126,25 @@ export interface ConteoRepository {
    * `FakeConteoRepository.usuario.uid`), esto sólo lo expone.
    */
   uidActual(): string;
+
+  /**
+   * Áreas activas, para que el cajero elija a cuál vincular una categoría
+   * dentro de su conteo abierto. Dos hechos verificables:
+   *  (a) `areas` es `read: if autenticado()` en `infra/firestore.rules:52` —
+   *      el cajero las lee directo, no necesita `AdminRepository`.
+   *  (b) el filtro `activa` va EN MEMORIA, no con `where()`: son decenas de
+   *      documentos y `where("activa","==",true) + orderBy("nombre")`
+   *      pediría un índice compuesto nuevo.
+   * // ponytail: filtro en memoria, techo decenas de áreas — pasar a
+   * // `where()` + índice si la colección crece a cientos.
+   */
+  observarAreasActivas(onChange: (areas: Area[]) => void): Unsubscribe;
+
+  /** Vincula un área existente a una categoría, dentro de la sesión abierta
+   *  del cajero. Escribe vía callable — `categoriasValor` es `write: if false`. */
+  vincularArea(payload: VincularAreaPayload): Promise<void>;
+
+  /** Crea una categoría nueva desde el conteo del cajero y siembra su línea
+   *  en la sesión. Escribe vía callable — `sesiones/*\/lineas` es `write: if false`. */
+  crearCategoriaEnSesion(payload: CrearCategoriaEnSesionPayload): Promise<{ categoriaId: string }>;
 }

@@ -2,15 +2,19 @@
 // memoria de ConteoRepository (doc 07 §6), para los tests de UI en
 // `apps/web` sin tocar el SDK de Firebase ni el emulador.
 import { CantidadInvalidaError } from "@conteo/shared/errors.js";
+import type { Area } from "@conteo/shared/models/area.js";
 import type { Aporte } from "@conteo/shared/models/aporte.js";
-import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
+import { SIN_AREA, type LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
+import type { LlamadaEscritura } from "./fake-admin-repository.js";
 import type { Pagina } from "../repositories/admin-repository.js";
 import type {
   ConteoRepository,
+  CrearCategoriaEnSesionPayload,
   RegistrarAporteInput,
   Unsubscribe,
+  VincularAreaPayload,
 } from "../repositories/conteo-repository.js";
 
 const TAMANO_PAGINA = 20; // mismo valor que FirestoreConteoRepository (constante en producción)
@@ -45,6 +49,16 @@ export class FakeConteoRepository implements ConteoRepository {
   private readonly sesionesPorId = new Map<string, SesionConteo>();
   private readonly sucursales = new Map<string, Sucursal>();
   private readonly pendientesPorSesion = new Map<string, number>();
+  private readonly areas = new Map<string, Area>();
+  // ponytail: sólo el areaId por categoría, no un store completo de
+  // CategoriaValor — nada en ConteoRepository lee la categoría entera, esto
+  // sólo modela el efecto real de vincularArea.
+  private readonly categoriaAreaId = new Map<string, string>();
+  private contadorCategoriaId = 0;
+
+  /** Igual que FakeAdminRepository.llamadas: registro para que los tests de
+   *  UI asserten los argumentos exactos de vincularArea/crearCategoriaEnSesion. */
+  readonly llamadas: LlamadaEscritura[] = [];
 
   // Issue #41: seam de prueba para simular rechazos deterministas del
   // "servidor" — cuenta cuántos rechazos consecutivos quedan por consumir
@@ -89,6 +103,10 @@ export class FakeConteoRepository implements ConteoRepository {
 
   sembrarSucursal(sucursal: Sucursal): void {
     this.sucursales.set(sucursal.sucursalId, sucursal);
+  }
+
+  sembrarArea(area: Area): void {
+    this.areas.set(area.areaId, area);
   }
 
   /** Hace que las próximas `veces` "escrituras" de esa (sesionId, categoriaId)
@@ -245,6 +263,57 @@ export class FakeConteoRepository implements ConteoRepository {
 
   uidActual(): string {
     return this.usuario.uid;
+  }
+
+  observarAreasActivas(onChange: (areas: Area[]) => void): Unsubscribe {
+    onChange([...this.areas.values()].filter((a) => a.activa));
+    return () => {};
+  }
+
+  async vincularArea({ sesionId, categoriaId, areaId }: VincularAreaPayload): Promise<void> {
+    this.llamadas.push({ metodo: "vincularArea", payload: { sesionId, categoriaId, areaId } });
+    this.categoriaAreaId.set(categoriaId, areaId);
+
+    const lineas = this.lineasDeSesion(sesionId);
+    const linea = lineas.get(categoriaId);
+    // Semántica real (I-7/ADR-21): sólo re-etiqueta si la línea seguía en
+    // SIN_AREA — una línea con área real (ya vinculada antes) queda intacta.
+    if (!linea || linea.area !== SIN_AREA) return;
+
+    const area = this.areas.get(areaId);
+    const actualizada: LineaConteo = { ...linea, area: area?.nombre ?? SIN_AREA };
+    lineas.set(categoriaId, actualizada);
+    this.notificar(this.listenersLineas, sesionId, [...lineas.values()]);
+  }
+
+  async crearCategoriaEnSesion({
+    sesionId,
+    etiqueta,
+    areaId,
+  }: CrearCategoriaEnSesionPayload): Promise<{ categoriaId: string }> {
+    const categoriaId = `cat_fake_${++this.contadorCategoriaId}`;
+    this.llamadas.push({
+      metodo: "crearCategoriaEnSesion",
+      payload: { sesionId, etiqueta, areaId },
+    });
+    if (areaId) this.categoriaAreaId.set(categoriaId, areaId);
+
+    const linea: LineaConteo = {
+      categoriaId,
+      valorUnitario: 0,
+      etiqueta,
+      area: (areaId && this.areas.get(areaId)?.nombre) || SIN_AREA,
+      cantidadTotal: 0,
+      numAportantes: 0,
+      versiones: {},
+      actualizadaEn: new Date(),
+      actualizadaPor: this.usuario.uid,
+    };
+    const lineas = this.lineasDeSesion(sesionId);
+    lineas.set(categoriaId, linea);
+    this.notificar(this.listenersLineas, sesionId, [...lineas.values()]);
+
+    return { categoriaId };
   }
 
   // ─────────── helpers privados ───────────
