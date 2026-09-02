@@ -30,9 +30,9 @@ import type { Pagina } from "../repositories/admin-repository.js";
 import type {
   ConteoRepository,
   CrearCategoriaEnSesionPayload,
+  ReetiquetarLineaEnSesionPayload,
   RegistrarAporteInput,
   Unsubscribe,
-  VincularAreaPayload,
 } from "../repositories/conteo-repository.js";
 import {
   aporteDesdeDoc,
@@ -306,8 +306,8 @@ export class FirestoreConteoRepository implements ConteoRepository {
     });
   }
 
-  async vincularArea(payload: VincularAreaPayload): Promise<void> {
-    await this.llamar("vincularArea", payload);
+  async reetiquetarLineaEnSesion(payload: ReetiquetarLineaEnSesionPayload): Promise<void> {
+    await this.llamar("reetiquetarLineaEnSesion", payload);
   }
 
   async crearCategoriaEnSesion(

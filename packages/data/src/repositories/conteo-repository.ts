@@ -27,10 +27,12 @@ export interface RegistrarAporteInput {
 // bundle del cliente, que ya revalida la callable) ni un alias nuevo en
 // vite.config.ts.
 
-export interface VincularAreaPayload {
+export interface ReetiquetarLineaEnSesionPayload {
   readonly sesionId: string;
   readonly categoriaId: string;
-  readonly areaId: string;
+  // ADR-22: `undefined` (omitido) y `null` (limpiado a propósito) significan
+  // lo mismo — volver a SIN_AREA. Ninguno de los dos es un olvido del cliente.
+  readonly areaId?: string | null;
 }
 
 export interface CrearCategoriaEnSesionPayload {
@@ -140,9 +142,12 @@ export interface ConteoRepository {
    */
   observarAreasActivas(onChange: (areas: Area[]) => void): Unsubscribe;
 
-  /** Vincula un área existente a una categoría, dentro de la sesión abierta
-   *  del cajero. Escribe vía callable — `categoriasValor` es `write: if false`. */
-  vincularArea(payload: VincularAreaPayload): Promise<void>;
+  /** Reetiqueta el área de una línea dentro de la sesión abierta del cajero
+   *  (ADR-22) — sin límite de veces, mientras su categoría siga sin `areaId`
+   *  fijado en el catálogo (el servidor lo re-valida siempre). Nunca escribe
+   *  `categoriasValor`: sólo la línea de ESTA sesión. Escribe vía callable —
+   *  `sesiones/*\/lineas` es `write: if false`. */
+  reetiquetarLineaEnSesion(payload: ReetiquetarLineaEnSesionPayload): Promise<void>;
 
   /** Crea una categoría nueva desde el conteo del cajero y siembra su línea
    *  en la sesión. Escribe vía callable — `sesiones/*\/lineas` es `write: if false`. */

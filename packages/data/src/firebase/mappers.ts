@@ -36,6 +36,7 @@ interface LineaConteoDoc {
   readonly valorUnitario: number;
   readonly etiqueta: string;
   readonly area: string;
+  readonly areaFijaPorAdmin: boolean;
   readonly cantidadTotal: number;
   readonly numAportantes: number;
   readonly versiones: Record<string, number>;
@@ -50,6 +51,7 @@ export function lineaConteoDesdeDoc(categoriaId: string, data: LineaConteoDoc): 
     valorUnitario: data.valorUnitario,
     etiqueta: data.etiqueta,
     area: data.area,
+    areaFijaPorAdmin: data.areaFijaPorAdmin,
     cantidadTotal: data.cantidadTotal,
     numAportantes: data.numAportantes,
     versiones: data.versiones,
