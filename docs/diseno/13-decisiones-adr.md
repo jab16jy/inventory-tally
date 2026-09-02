@@ -601,6 +601,70 @@ acumulado hasta hoy.
 
 ---
 
+## ADR-21 {#adr-21}
+
+### `"Sin área"` es un hueco, no un valor congelado
+
+**Contexto.** La invariante I-7 ([03 §6](03-modelo-de-dominio.md)) congela `valorUnitario`
+en la línea al sembrarla, por una razón contable concreta: si el negocio sube un precio de
+$5.000 a $5.500, el conteo histórico tiene que conservar el valor vigente al momento de
+contar. El campo `area` heredó la misma regla por analogía.
+
+Pero no es el mismo dato. `"Sin área"` **no es un área que alguien eligió**: es el fallback
+literal de `nombresPorArea.get(categoria.get("areaId")) ?? "Sin área"` en
+`abrir-sesion.ts`. Congelar un fallback no protege evidencia — perpetúa un vacío durante
+toda la sesión. Y el contador de pie frente al estante es exactamente quien sabe a qué área
+pertenece ese producto: obligarlo a llamar al admin y esperar al siguiente conteo convierte
+un dato recuperable en un dato perdido, porque los conteos de esta sesión son justo los que
+no se pueden rehacer.
+
+**Decisión.** `area` sigue congelada **salvo cuando vale el sentinel `SIN_AREA`**. Un
+contador de la sesión puede vincular un **área existente** a una categoría **sin área**; la
+línea de esa sesión se actualiza sólo si su `area === SIN_AREA`. Una línea con área real
+**nunca** se re-etiqueta, así que ningún análisis ya atribuido cambia bajo los pies de
+nadie.
+
+Cuatro límites que forman parte de la decisión, no de su implementación:
+
+- **El contador no crea áreas**, sólo vincula las que ya existen — [03 §6](03-modelo-de-dominio.md)
+  lo decía y se mantiene. Tampoco edita ni borra categorías: eso sigue siendo del admin.
+- **`valorUnitario` no se toca jamás.** `crearCategoriaEnSesion` escribe `valor: 0` y el
+  admin precia después; el contrato ni siquiera acepta el campo (I-9, [ADR-07](#adr-07)).
+- **El alcance es UNA sesión**, la del llamador. No es pereza: el claim del cajero autoriza
+  una sucursal (A-3 / I-6), así que escribir en la sesión de otra sucursal sería la
+  escritura cross-tenant que las reglas existen para impedir. La vinculación sobre la
+  categoría es idempotente justamente por eso — el cajero de la otra sucursal etiqueta su
+  propia línea cuando le toque.
+- **`SIN_AREA` deja de ser un literal duplicado.** Estaba copiado en tres archivos, uno de
+  ellos admitiéndolo por escrito; al pasar de rótulo a **condición de una invariante** ya no
+  puede vivir en tres sitios, y sube a `packages/shared/src/models/linea-conteo.ts`.
+
+| Alternativa                                        | Por qué se descartó                                                                                                     |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Dejar el hueco hasta la próxima sesión             | Los datos del conteo en curso son precisamente los que no se pueden rehacer; el vínculo llegaría cuando ya no sirve      |
+| Permitir editar un área ya asignada                | Convierte al contador en editor del catálogo y reabre la puerta que I-7 cerró: un análisis atribuido cambiaría a mitad de sesión |
+| Propagar a todas las sesiones abiertas             | Escritura fuera del alcance del claim (A-3/I-6); necesitaría una tarea de servidor sin `request.auth`, no un ensanche del permiso del cajero |
+| Dejar que el contador fije también el precio        | Cruza la separación monetaria por rol de [ADR-07](#adr-07) e I-9, que es estructural y no cosmética                      |
+
+**Consecuencias.** ✅ La sesión en curso queda analizable por área, que es lo que el
+contador necesita mientras cuenta · ✅ Cero reglas nuevas, cero índices nuevos: las
+callables escriben con Admin SDK y `areas` ya era legible por cualquier autenticado · ✅ El
+contador ve en auditoría lo que él mismo hizo, porque los dos eventos denormalizan
+`sucursalId` y la regla del ticket #45 ya los cubría · ⚠️ I-7 deja de ser una sola frase:
+ahora distingue `valorUnitario` (congelado siempre) de `area` (congelada salvo el
+sentinel), y esa distinción hay que leerla antes de tocar cualquiera de los dos ·
+⚠️ Dos sucursales con sesión abierta pueden vincular la misma categoría; la segunda llamada
+es idempotente y sólo etiqueta su propia línea · ⚠️ Aparece una tercera forma de
+autorización en las callables —por pertenencia a la sesión, junto a "admin" y "autenticado"—
+que hay que sostener (A-12, [09 §1](09-seguridad-y-auditoria.md)).
+
+**Detonante de reevaluación:** si el negocio pide reasignar áreas de conteos **ya
+cerrados**, esto no basta. Habría que tocar `Historico`, que es inmutable una vez escrito
+([ADR-02](#adr-02)), así que el cambio no podría aplicarse retroactivamente al histórico
+acumulado — sólo a los cierres posteriores.
+
+---
+
 ## Evolución del diseño
 
 ```mermaid

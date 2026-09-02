@@ -184,9 +184,15 @@ duplicar.
 > **El `subtotal` ya no vive aquí** (cambio respecto a la v1). Se movió a `resumen` para
 > que el cajero, que necesita leer las líneas, no reciba importes consolidados.
 > `versiones` da idempotencia al trigger ([05](05-concurrencia-offline-tiempo-real.md)).
-> `area` sigue el mismo patrón que `valorUnitario` (invariante I-7, [03](03-modelo-de-dominio.md)):
-> copiado y congelado desde `categoriasValor.areaId` al sembrar la línea, `"Sin área"` si
-> la categoría no tenía una asignada.
+> `area` sigue el patrón de `valorUnitario` (invariante I-7, [03](03-modelo-de-dominio.md))
+> **con una excepción**: se copia desde `categoriasValor.areaId` al sembrar la línea, pero
+> `"Sin área"` es el **hueco**, no un valor congelado — es el fallback cuando la categoría
+> no tenía área asignada. Una línea que vale `"Sin área"` puede re-etiquetarse; una con
+> área real, nunca ([ADR-21](13-decisiones-adr.md#adr-21)).
+>
+> El campo tiene **dos escritores**: `abrirSesion`, que lo siembra, y `vincularArea`, que
+> sólo rellena el hueco. `valorUnitario`, en cambio, sigue teniendo uno solo y sigue
+> congelado sin excepción.
 
 ### `sesiones/{sesionId}/lineas/{categoriaId}/aportes/{uid}`
 
