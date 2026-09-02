@@ -1,5 +1,6 @@
 export type { Aporte } from "./models/aporte.js";
 export type { LineaConteo } from "./models/linea-conteo.js";
+export { SIN_AREA } from "./models/linea-conteo.js";
 export type { EstadoSesion, SesionConteo } from "./models/sesion-conteo.js";
 export type { RolUsuario, Usuario } from "./models/usuario.js";
 export type { CategoriaValor } from "./models/categoria-valor.js";

@@ -1,4 +1,17 @@
 /**
+ * SIN_AREA — sentinel, no un área: el hueco que deja `abrirSesion` en el
+ * campo `area` de una línea cuando su categoría no tenía `areaId` todavía.
+ *
+ * Deja de ser cosmético en cuanto existe `vincularArea` (capacidad de que un
+ * contador vincule un área a una categoría durante su conteo): es la
+ * condición de la invariante que permite re-etiquetar una línea viva sin
+ * romper I-7 (ADR-21) — "la línea se actualiza sólo si su `area` vale
+ * `SIN_AREA`". Los únicos escritores del campo `area` son `abrirSesion` (lo
+ * siembra) y `vincularArea` (lo reemplaza una vez).
+ */
+export const SIN_AREA = "Sin área";
+
+/**
  * LineaConteo — intersección (sesión × categoría), dato derivado (doc 03 §3).
  * Documento: `sesiones/{sesionId}/lineas/{categoriaId}` (doc 04 §3).
  *
