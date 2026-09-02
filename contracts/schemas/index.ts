@@ -69,3 +69,13 @@ export type { DesactivarAreaInput as EliminarAreaInput } from "./desactivar-area
 // el mismo objeto que ya cubre desactivar-cajero.schema.test.ts.
 export { desactivarCajeroSchema as eliminarCajeroSchema } from "./desactivar-cajero.schema.js";
 export type { DesactivarCajeroInput as EliminarCajeroInput } from "./desactivar-cajero.schema.js";
+
+// Las dos únicas callables de catálogo que NO exigen rol admin: autorizan por
+// PERTENENCIA a la sesión (doc 08 §3, ADR-21). El contador vincula un área
+// existente y crea una categoría, ambas dentro de su conteo abierto; editar y
+// borrar siguen siendo del admin.
+export { vincularAreaSchema } from "./vincular-area.schema.js";
+export type { VincularAreaInput } from "./vincular-area.schema.js";
+
+export { crearCategoriaEnSesionSchema } from "./crear-categoria-en-sesion.schema.js";
+export type { CrearCategoriaEnSesionInput } from "./crear-categoria-en-sesion.schema.js";
