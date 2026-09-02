@@ -5,14 +5,17 @@
 // el filtro "sólo pendientes" (doc 10 §2, "la función más útil del
 // dashboard"), el Deck de totales y la Hoja con teclado numérico.
 import type { Auth } from "firebase/auth";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
+  SIN_AREA,
   estaPendiente,
   promedioCategoria,
   siguientePendiente,
   totalUnidadesSesion,
+  type Area,
 } from "@conteo/shared";
+import type { ConteoRepository } from "@conteo/data";
 import { datos } from "../lib/formato.js";
 import { useAuthState } from "../state/useAuthState.js";
 import { useConteoRepository } from "../state/repositorio-contexto.js";
@@ -25,6 +28,8 @@ import { useSesion } from "../state/useSesion.js";
 import { BannerPendientes } from "./BannerPendientes.js";
 import { BotonSalir } from "./BotonSalir.js";
 import { FilaCategoria } from "./FilaCategoria.js";
+import { HojaAreas } from "./HojaAreas.js";
+import { HojaNuevoProducto } from "./HojaNuevoProducto.js";
 import { ModalSesionCerrada } from "./ModalSesionCerrada.js";
 import { BarraProgreso } from "./primitivos/BarraProgreso.js";
 import { ChipEstado } from "./primitivos/ChipEstado.js";
@@ -32,6 +37,15 @@ import { Deck } from "./primitivos/Deck.js";
 import { Hoja } from "./primitivos/Hoja.js";
 import { Icono } from "./primitivos/Icono.js";
 import { Placa } from "./primitivos/Placa.js";
+
+/** Áreas activas del catálogo, para vincular una categoría "Sin área"
+ *  (ADR-21) o preseleccionar una al crear un producto. Hook local, no un
+ *  archivo en `state/`: un solo consumidor (esta pantalla) y ~6 líneas. */
+function useAreasActivas(repo: ConteoRepository): Area[] {
+  const [areas, setAreas] = useState<Area[]>([]);
+  useEffect(() => repo.observarAreasActivas(setAreas), [repo]);
+  return areas;
+}
 
 export interface ConteoScreenProps {
   readonly auth: Auth;
@@ -112,6 +126,9 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
   const [soloPendientes, setSoloPendientes] = useState(false);
   const [areaFiltro, setAreaFiltro] = useState("");
   const [categoriaEnEdicion, setCategoriaEnEdicion] = useState<string | null>(null);
+  const [hojaAreasAbierta, setHojaAreasAbierta] = useState(false);
+  const [nuevoProductoAbierta, setNuevoProductoAbierta] = useState(false);
+  const areasActivas = useAreasActivas(repo);
 
   // "Tu aporte" del Deck: cada fila YA tiene abierto useMiAporte para sí
   // misma (FilaCategoria) y sólo REPORTA su número hacia acá (ver el
@@ -157,6 +174,20 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
     setCategoriaEnEdicion(siguientePendiente(lineas, uid, categoriaEnEdicion));
   }
 
+  // ADR-21: vincular un área existente a una categoría "Sin área" — el
+  // cajero nunca crea áreas, sólo las que el admin ya dio de alta.
+  function vincularArea(categoriaId: string, areaId: string): void {
+    void repo.vincularArea({ sesionId, categoriaId, areaId });
+  }
+
+  // Cierra la Hoja sólo tras confirmar la escritura (no en un `finally`):
+  // si `crearCategoriaEnSesion` rechaza, HojaNuevoProducto se queda abierta
+  // mostrando el error y el nombre tecleado sigue ahí para reintentar.
+  async function crearProducto(etiqueta: string, areaId?: string): Promise<void> {
+    await repo.crearCategoriaEnSesion({ sesionId, etiqueta, areaId });
+    setNuevoProductoAbierta(false);
+  }
+
   const total = lineas.length;
   const contadas = lineas.filter((l) => !estaPendiente(l, uid)).length;
   const equipoTotal = totalUnidadesSesion(lineas);
@@ -173,6 +204,10 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
   // `siguientePendiente` (línea ~150) siguen leyendo `lineas` completas,
   // nunca `lineasVisibles`; este filtro no los toca.
   const areas = [...new Set(lineas.map((l) => l.area))].sort();
+  // "Sin área (N)" es autoextinguible (doc 11 §4): se calcula de `lineas`
+  // completas, no de `lineasVisibles`, para no depender del filtro/búsqueda
+  // en curso.
+  const lineasSinArea = lineas.filter((l) => l.area === SIN_AREA);
 
   const consulta = busqueda.trim().toLowerCase();
   const soloDigitos = consulta.replace(/\D/g, "");
@@ -246,24 +281,51 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
 
         {/* Fila propia: no cabe apretada junto a búsqueda+Pendientes+Salir
             sin bajar del objetivo táctil mínimo (--size-toque). Con menos de
-            dos áreas no hay nada que elegir: el selector sería una fila de
-            ruido en la pantalla más apretada del sistema. */}
-        {areas.length > 1 && (
-          <label className="relative block">
-            <span className="sr-only">Filtrar por área</span>
-            <select
-              value={areaFiltro}
-              onChange={(e) => setAreaFiltro(e.target.value)}
-              className="min-h-[var(--size-toque)] w-full rounded-placa border border-borde bg-fondo px-3 text-tinta focus:border-senal focus:outline-none"
-            >
-              <option value="">Todas las áreas</option>
-              {areas.map((area) => (
-                <option key={area} value={area}>
-                  {area}
-                </option>
-              ))}
-            </select>
-          </label>
+            dos áreas el selector no filtraría nada, pero "Sin área (N)" y
+            "+ Producto" (ADR-21) no dependen del número de áreas, sólo de
+            que la sesión siga abierta. */}
+        {(areas.length > 1 || !sesionCerrada) && (
+          <div className="flex items-center gap-2">
+            {areas.length > 1 && (
+              <label className="relative min-w-0 flex-1">
+                <span className="sr-only">Filtrar por área</span>
+                <select
+                  value={areaFiltro}
+                  onChange={(e) => setAreaFiltro(e.target.value)}
+                  className="min-h-[var(--size-toque)] w-full rounded-placa border border-borde bg-fondo px-3 text-tinta focus:border-senal focus:outline-none"
+                >
+                  <option value="">Todas las áreas</option>
+                  {areas.map((area) => (
+                    <option key={area} value={area}>
+                      {area}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            {/* Autoextinguible: desaparece en cuanto el hueco se llena
+                (doc 11 §4) — no hay nada que vincular con 0 líneas sin área. */}
+            {!sesionCerrada && lineasSinArea.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setHojaAreasAbierta(true)}
+                className="min-h-[var(--size-toque)] shrink-0 rounded-placa border border-borde px-3 text-micro font-semibold text-tenue"
+              >
+                Sin área ({lineasSinArea.length})
+              </button>
+            )}
+
+            {!sesionCerrada && (
+              <button
+                type="button"
+                onClick={() => setNuevoProductoAbierta(true)}
+                className="min-h-[var(--size-toque)] shrink-0 rounded-placa border border-borde px-3 text-micro font-semibold text-tenue"
+              >
+                + Producto
+              </button>
+            )}
+          </div>
         )}
       </header>
 
@@ -333,6 +395,27 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
         promedioCategoria={promedioEnEdicion}
         onConfirmar={confirmarDesdeHoja}
         onVolver={() => setCategoriaEnEdicion(null)}
+      />
+
+      {/* ADR-21. Montadas siempre (como Hoja arriba), después de ella y
+          antes de ModalSesionCerrada a propósito: si el admin cierra la
+          sesión con cualquiera de estas dos abierta, el showModal() del
+          modal bloqueante se invoca más tarde y queda encima en el top
+          layer nativo (orden de invocación, no de DOM — mismo criterio que
+          ModalSesionCerrada más abajo). */}
+      <HojaAreas
+        abierta={hojaAreasAbierta}
+        lineasSinArea={lineasSinArea}
+        areas={areasActivas}
+        onVincular={vincularArea}
+        onVolver={() => setHojaAreasAbierta(false)}
+      />
+
+      <HojaNuevoProducto
+        abierta={nuevoProductoAbierta}
+        areas={areasActivas}
+        onCrear={crearProducto}
+        onVolver={() => setNuevoProductoAbierta(false)}
       />
 
       {/* Se monta SIEMPRE (como Hoja arriba) y decide su propia visibilidad
