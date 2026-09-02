@@ -194,7 +194,7 @@ contable; mutarla destruye el valor de la auditoría.
 | I-4  | No se escriben aportes en sesiones `cerradas`            | Security Rules                                     |
 | I-5  | La auditoría no puede editarse ni borrarse por nadie     | Security Rules (`write: if false`)                 |
 | I-6  | Un cajero sólo accede a sus sucursales asignadas         | Security Rules + custom claims                     |
-| I-7  | `valorUnitario` se congela al crearse la línea           | Trigger de siembra                                 |
+| I-7  | `valorUnitario` se congela al crearse la línea; `area` también, **salvo cuando vale `"Sin área"`** | Trigger de siembra + `vincularArea` ([ADR-21](13-decisiones-adr.md#adr-21)) |
 | I-8  | Un usuario desactivado no puede autenticarse ni escribir | Function + `revokeRefreshTokens`                   |
 | I-9  | **Un cajero nunca lee valores monetarios**               | Security Rules sobre `resumen` y campos derivados  |
 | I-10 | **Una sesión no se cierra con aportes sin sincronizar**  | Function `cerrarSesion` + confirmación del cliente |
@@ -203,10 +203,23 @@ contable; mutarla destruye el valor de la auditoría.
 > históricos deben conservar el valor vigente al momento del conteo. Por eso la línea
 > guarda una copia del valor, no una referencia viva al catálogo.
 >
-> Mismo patrón para `LineaConteo.area`: el nombre del área se copia y congela al
-> sembrar la línea (`"Sin área"` si la categoría no tiene una asignada). El cajero
-> nunca crea áreas al vuelo por esta misma razón — una entrada creada a mitad de
-> conteo sólo aplicaría a la próxima sesión.
+> `LineaConteo.area` sigue el mismo patrón **con una excepción deliberada**
+> ([ADR-21](13-decisiones-adr.md#adr-21)): el nombre del área se copia al sembrar la línea,
+> pero `"Sin área"` **no es un valor congelado — es el hueco**. No es un área que alguien
+> eligió: es el fallback `?? "Sin área"` que deja `abrirSesion` cuando la categoría no
+> tenía `areaId`. Congelar un fallback no protege evidencia contable; perpetúa un vacío
+> durante toda la sesión, y el contador frente al estante es justo quien sabe a qué área
+> pertenece el producto.
+>
+> Por eso un contador de la sesión **puede vincular un área existente a una categoría sin
+> área**, y la línea se actualiza **sólo si su `area` vale `"Sin área"`**. Una línea con
+> área real nunca se re-etiqueta: ningún análisis ya atribuido cambia bajo los pies de
+> nadie.
+>
+> **El cajero sigue sin crear áreas al vuelo** — una entrada creada a mitad de conteo sólo
+> aplicaría a la próxima sesión, y ésa es la parte del razonamiento original que se
+> mantiene intacta. Vincula una existente; no la inventa. Tampoco edita ni borra
+> categorías: eso sigue siendo del admin.
 
 ---
 
