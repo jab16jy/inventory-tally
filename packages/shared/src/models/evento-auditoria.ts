@@ -33,6 +33,7 @@ export type TipoEventoAuditoria =
   | "AREA_ELIMINADA"
   | "AREA_REACTIVADA"
   | "AREA_VINCULADA"
+  | "LINEA_REETIQUETADA"
   | "SUCURSAL_CREADA"
   | "SUCURSAL_ACTUALIZADA"
   | "SUCURSAL_ELIMINADA"
@@ -53,17 +54,18 @@ export interface EventoAuditoria {
    * Denormalizado (ticket #45) en los eventos ligados a una sucursal:
    * `SESION_ABIERTA`, `SUCURSAL_CREADA`, `SUCURSAL_ACTUALIZADA`,
    * `APORTE_CREADO`, `APORTE_MODIFICADO`, `SESION_CERRADA`,
-   * `CIERRE_BLOQUEADO`, `RECONCILIACION`, `AREA_VINCULADA` (9 de 14 tipos) —
-   * habilita `ConteoRepository.listarAuditoria` y la regla de lectura del
-   * cajero en `infra/firestore.rules` (`allow read: if esAdmin() ||
-   * (esCajero() && tieneSucursal(resource.data.sucursalId));`, líneas
-   * 133-143), sin cambiar esa regla.
+   * `CIERRE_BLOQUEADO`, `RECONCILIACION`, `AREA_VINCULADA`,
+   * `LINEA_REETIQUETADA` (ADR-22, reemplaza a `AREA_VINCULADA` como emisor
+   * activo del cajero) — habilita `ConteoRepository.listarAuditoria` y la
+   * regla de lectura del cajero en `infra/firestore.rules` (`allow read: if
+   * esAdmin() || (esCajero() && tieneSucursal(resource.data.sucursalId));`,
+   * líneas 133-143), sin cambiar esa regla.
    *
    * `CATEGORIA_CREADA` también la lleva cuando nace de un conteo (un cajero
-   * vincula un área a una categoría vía `vincularArea`): hereda la
-   * `sucursalId` de la sesión, así que ESE evento sí es legible por su
-   * propio cajero. `CATEGORIA_CREADA` originado en el panel de administrador
-   * no la lleva. Ausente siempre en el resto (`USUARIO_*`,
+   * crea un producto vía `crearCategoriaEnSesion`): hereda la `sucursalId`
+   * de la sesión, así que ESE evento sí es legible por su propio cajero.
+   * `CATEGORIA_CREADA` originado en el panel de administrador no la lleva.
+   * Ausente siempre en el resto (`USUARIO_*`,
    * `CATEGORIA_ACTUALIZADA`, `CATEGORIA_DESACTIVADA`, `CATEGORIA_ELIMINADA`,
    * `CATEGORIA_REACTIVADA`, `AUDITORIA_PURGADA`): esos NO son legibles por
    * un cajero.

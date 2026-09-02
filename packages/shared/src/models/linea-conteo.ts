@@ -2,12 +2,15 @@
  * SIN_AREA — sentinel, no un área: el hueco que deja `abrirSesion` en el
  * campo `area` de una línea cuando su categoría no tenía `areaId` todavía.
  *
- * Deja de ser cosmético en cuanto existe `vincularArea` (capacidad de que un
- * contador vincule un área a una categoría durante su conteo): es la
- * condición de la invariante que permite re-etiquetar una línea viva sin
- * romper I-7 (ADR-21) — "la línea se actualiza sólo si su `area` vale
- * `SIN_AREA`". Los únicos escritores del campo `area` son `abrirSesion` (lo
- * siembra) y `vincularArea` (lo reemplaza una vez).
+ * Deja de ser cosmético en cuanto existe `reetiquetarLineaEnSesion`
+ * (capacidad de que un contador reetiquete el área de una línea durante su
+ * conteo, ADR-22): es la condición de la invariante que permite re-etiquetar
+ * una línea viva sin romper I-7 — para categorías sin `areaId` de catálogo
+ * (`LineaConteo.areaFijaPorAdmin === false`), tantas veces como el cajero
+ * quiera, no sólo la primera vez que sale del sentinel `SIN_AREA` (ADR-21).
+ * Los únicos escritores del campo `area` son `abrirSesion` (lo siembra) y
+ * `reetiquetarLineaEnSesion` (lo reemplaza, sin límite de veces, mientras
+ * `areaFijaPorAdmin` sea `false`).
  */
 export const SIN_AREA = "Sin área";
 

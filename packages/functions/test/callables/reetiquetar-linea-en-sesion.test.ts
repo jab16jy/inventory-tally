@@ -1,22 +1,14 @@
-// Pruebas contra el emulador de Firestore (doc 08 §3, ADR-21).
-// `unauthenticated`/entrada inválida NO se reprueban aquí: `autorizacionDe`
-// y `vincularAreaSchema` ya tienen su propio test genérico (misma convención
-// que el resto de callables). `exigirAdminOCajeroDeSesion` también tiene su
-// propio test puro (exigir-cajero-de-sesion.test.ts); aquí sólo se prueba que
-// vincularAreaImpl lo invoca correctamente dentro de su transacción.
-//
-// RIESGO CRÍTICO (docs/plan-panel-administrador.md §6, riesgo 1):
+// Pruebas contra el emulador de Firestore (ADR-22). Mismo riesgo crítico que
+// vincular-area.test.ts (docs/plan-panel-administrador.md §6, riesgo 1):
 // `categoriasValor` es una colección GLOBAL y los archivos de test corren en
-// paralelo contra el mismo emulador (`abrirSesionImpl` siembra sobre TODA la
-// colección `activa == true`). Cada test borra en `afterEach` toda
-// categoría/área/sesión que creó, para no filtrar hacia otro archivo de test
-// en la SIGUIENTE corrida. `randomUUID()` en cada etiqueta/id creado.
+// paralelo contra el mismo emulador. Cada test borra en `afterEach` toda
+// categoría/área/sesión que creó. `randomUUID()` en cada etiqueta/id creado.
 import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 import { describe, expect, it, afterEach } from "vitest";
-import { vincularAreaImpl } from "../../src/callables/vincular-area.js";
+import { reetiquetarLineaEnSesionImpl } from "../../src/callables/reetiquetar-linea-en-sesion.js";
 import type { AutorizacionCajero } from "../../src/lib/exigir-cajero-de-sesion.js";
 import { SIN_AREA } from "@conteo/shared/models/linea-conteo.js";
 
@@ -84,6 +76,7 @@ async function crearLinea(sesionId: string, categoriaId: string, area: string) {
     valorUnitario: 1000,
     etiqueta: "Etiqueta",
     area,
+    areaFijaPorAdmin: false,
     cantidadTotal: 0,
     numAportantes: 0,
     versiones: {},
@@ -91,60 +84,84 @@ async function crearLinea(sesionId: string, categoriaId: string, area: string) {
   });
 }
 
-describe("vincularAreaImpl (I-6/A-3/A-4, ADR-21)", () => {
-  it("vincula: escribe categoriasValor.areaId y re-etiqueta la línea SIN_AREA", async () => {
+describe("reetiquetarLineaEnSesionImpl (I-6/A-3/A-4, ADR-22)", () => {
+  it("reetiqueta libremente una línea SIN_AREA de una categoría sin areaId de catálogo", async () => {
     const sucursalId = `suc_${randomUUID()}`;
     const sesionId = await crearSesion(sucursalId);
-    const areaId = await crearArea("Aseo");
-    const categoriaId = await crearCategoria();
+    const areaId = await crearArea("Talleres");
+    const categoriaId = await crearCategoria(); // sin areaId de catálogo
     await crearLinea(sesionId, categoriaId, SIN_AREA);
 
-    const resultado = await vincularAreaImpl(db, admin, { sesionId, categoriaId, areaId });
+    const resultado = await reetiquetarLineaEnSesionImpl(db, admin, {
+      sesionId,
+      categoriaId,
+      areaId,
+    });
 
-    expect(resultado).toEqual({ categoriaId, areaId, lineaActualizada: true });
+    expect(resultado).toEqual({ categoriaId, areaId });
+    const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
+    expect(linea.get("area")).toBe("Talleres");
+    // Nunca toca el catálogo (diferencia estructural con vincularArea).
     const categoria = await db.doc(`categoriasValor/${categoriaId}`).get();
-    expect(categoria.get("areaId")).toBe(areaId);
+    expect(categoria.get("areaId")).toBeUndefined();
+  });
+
+  it("ADR-22 · reetiqueta una línea que YA tenía un área real, más de una vez, en la misma sesión", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const sesionId = await crearSesion(sucursalId);
+    const talleres = await crearArea("Talleres");
+    const aseo = await crearArea("Aseo");
+    const categoriaId = await crearCategoria(); // sin areaId de catálogo
+    await crearLinea(sesionId, categoriaId, "Talleres"); // ya reetiquetada una vez
+
+    await reetiquetarLineaEnSesionImpl(db, admin, { sesionId, categoriaId, areaId: aseo });
+
     const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
     expect(linea.get("area")).toBe("Aseo");
+
+    // Y de nuevo, sin límite de veces.
+    await reetiquetarLineaEnSesionImpl(db, admin, { sesionId, categoriaId, areaId: talleres });
+    const lineaOtraVez = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
+    expect(lineaOtraVez.get("area")).toBe("Talleres");
   });
 
-  it("ADR-21 · una línea YA etiquetada con área real NO se re-etiqueta (par negativo)", async () => {
+  it("ADR-22 · permite volver a SIN_AREA (areaId omitido)", async () => {
     const sucursalId = `suc_${randomUUID()}`;
     const sesionId = await crearSesion(sucursalId);
-    const areaId = await crearArea("Cocina");
     const categoriaId = await crearCategoria();
-    await crearLinea(sesionId, categoriaId, "Aseo"); // ya tiene área real, distinta
+    await crearLinea(sesionId, categoriaId, "Aseo");
 
-    const resultado = await vincularAreaImpl(db, admin, { sesionId, categoriaId, areaId });
+    await reetiquetarLineaEnSesionImpl(db, admin, { sesionId, categoriaId, areaId: undefined });
 
-    expect(resultado.lineaActualizada).toBe(false);
     const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
-    expect(linea.get("area")).toBe("Aseo"); // sin cambios
+    expect(linea.get("area")).toBe(SIN_AREA);
   });
 
-  it("categoría con OTRA área ya asignada → failed-precondition", async () => {
+  it("ADR-22 · permite volver a SIN_AREA (areaId null, limpiado explícitamente)", async () => {
     const sucursalId = `suc_${randomUUID()}`;
     const sesionId = await crearSesion(sucursalId);
-    const otraArea = await crearArea("Otra");
-    const areaId = await crearArea("Nueva");
-    const categoriaId = await crearCategoria(otraArea);
+    const categoriaId = await crearCategoria();
+    await crearLinea(sesionId, categoriaId, "Aseo");
 
-    await expect(vincularAreaImpl(db, admin, { sesionId, categoriaId, areaId })).rejects.toThrow(
-      HttpsError,
-    );
-    const categoria = await db.doc(`categoriasValor/${categoriaId}`).get();
-    expect(categoria.get("areaId")).toBe(otraArea); // sin cambios
+    await reetiquetarLineaEnSesionImpl(db, admin, { sesionId, categoriaId, areaId: null });
+
+    const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
+    expect(linea.get("area")).toBe(SIN_AREA);
   });
 
-  it("categoría con la MISMA área ya asignada → idempotente, pasa (par afirmativo)", async () => {
+  it("condición dura ADR-22 · categoría con areaId YA fijado en el catálogo → failed-precondition", async () => {
     const sucursalId = `suc_${randomUUID()}`;
     const sesionId = await crearSesion(sucursalId);
-    const areaId = await crearArea("Aseo");
-    const categoriaId = await crearCategoria(areaId);
+    const fijaId = await crearArea("Fija");
+    const nuevaId = await crearArea("Nueva");
+    const categoriaId = await crearCategoria(fijaId); // admin ya la fijó
+    await crearLinea(sesionId, categoriaId, "Fija");
 
-    const resultado = await vincularAreaImpl(db, admin, { sesionId, categoriaId, areaId });
-
-    expect(resultado.areaId).toBe(areaId);
+    await expect(
+      reetiquetarLineaEnSesionImpl(db, admin, { sesionId, categoriaId, areaId: nuevaId }),
+    ).rejects.toThrow(HttpsError);
+    const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
+    expect(linea.get("area")).toBe("Fija"); // sin cambios
   });
 
   it("área inactiva → failed-precondition", async () => {
@@ -152,19 +169,38 @@ describe("vincularAreaImpl (I-6/A-3/A-4, ADR-21)", () => {
     const sesionId = await crearSesion(sucursalId);
     const areaId = await crearArea("Inactiva", false);
     const categoriaId = await crearCategoria();
+    await crearLinea(sesionId, categoriaId, SIN_AREA);
 
-    await expect(vincularAreaImpl(db, admin, { sesionId, categoriaId, areaId })).rejects.toThrow(
-      HttpsError,
-    );
+    await expect(
+      reetiquetarLineaEnSesionImpl(db, admin, { sesionId, categoriaId, areaId }),
+    ).rejects.toThrow(HttpsError);
   });
 
   it("área inexistente → not-found", async () => {
     const sucursalId = `suc_${randomUUID()}`;
     const sesionId = await crearSesion(sucursalId);
     const categoriaId = await crearCategoria();
+    await crearLinea(sesionId, categoriaId, SIN_AREA);
 
     await expect(
-      vincularAreaImpl(db, admin, { sesionId, categoriaId, areaId: `area_${randomUUID()}` }),
+      reetiquetarLineaEnSesionImpl(db, admin, {
+        sesionId,
+        categoriaId,
+        areaId: `area_${randomUUID()}`,
+      }),
+    ).rejects.toThrow(HttpsError);
+  });
+
+  it("categoría inexistente → not-found", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const sesionId = await crearSesion(sucursalId);
+
+    await expect(
+      reetiquetarLineaEnSesionImpl(db, admin, {
+        sesionId,
+        categoriaId: `cat_${randomUUID()}`,
+        areaId: undefined,
+      }),
     ).rejects.toThrow(HttpsError);
   });
 
@@ -173,9 +209,10 @@ describe("vincularAreaImpl (I-6/A-3/A-4, ADR-21)", () => {
     const sesionId = await crearSesion(sucursalId);
     const areaId = await crearArea("Aseo");
     const categoriaId = await crearCategoria();
+    await crearLinea(sesionId, categoriaId, SIN_AREA);
 
     await expect(
-      vincularAreaImpl(db, cajero([`suc_ajena_${randomUUID()}`]), {
+      reetiquetarLineaEnSesionImpl(db, cajero([`suc_ajena_${randomUUID()}`]), {
         sesionId,
         categoriaId,
         areaId,
@@ -188,25 +225,26 @@ describe("vincularAreaImpl (I-6/A-3/A-4, ADR-21)", () => {
     const sesionId = await crearSesion(sucursalId, "cerrada");
     const areaId = await crearArea("Aseo");
     const categoriaId = await crearCategoria();
+    await crearLinea(sesionId, categoriaId, SIN_AREA);
 
-    await expect(vincularAreaImpl(db, admin, { sesionId, categoriaId, areaId })).rejects.toThrow(
-      HttpsError,
-    );
+    await expect(
+      reetiquetarLineaEnSesionImpl(db, admin, { sesionId, categoriaId, areaId }),
+    ).rejects.toThrow(HttpsError);
   });
 
-  it("emite AREA_VINCULADA con sucursalId en la misma transacción", async () => {
+  it("emite LINEA_REETIQUETADA con sucursalId en la misma transacción", async () => {
     const sucursalId = `suc_${randomUUID()}`;
     const sesionId = await crearSesion(sucursalId);
     const areaId = await crearArea("Aseo");
     const categoriaId = await crearCategoria();
     await crearLinea(sesionId, categoriaId, SIN_AREA);
 
-    await vincularAreaImpl(db, admin, { sesionId, categoriaId, areaId });
+    await reetiquetarLineaEnSesionImpl(db, admin, { sesionId, categoriaId, areaId });
 
     const eventos = await db
       .collection("auditoria")
       .where("categoriaId", "==", categoriaId)
-      .where("tipo", "==", "AREA_VINCULADA")
+      .where("tipo", "==", "LINEA_REETIQUETADA")
       .get();
     expect(eventos.size).toBe(1);
     expect(eventos.docs[0]?.get("sucursalId")).toBe(sucursalId);
