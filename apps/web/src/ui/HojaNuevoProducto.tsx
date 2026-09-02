@@ -13,8 +13,30 @@
 // de conteo admite un solo role="alert" a la vez, reservado a
 // BannerPendientes.
 import { useEffect, useId, useRef, useState } from "react";
+import { FirebaseError } from "firebase/app";
 import type { Area } from "@conteo/shared";
 import { Spinner } from "./primitivos/Spinner.js";
+
+/**
+ * mensajeDeError — antes esta pantalla descartaba el error real en el
+ * `catch` y mostraba siempre el mismo texto genérico, sin importar la causa
+ * (ni un `console.error` para depurar). Diferencia los dos códigos que
+ * `crearCategoriaEnSesionImpl` puede rechazar sobre el área elegida
+ * (packages/functions/src/callables/crear-categoria-en-sesion.ts) — el resto
+ * (red, sesión cerrada, etc.) cae al mensaje genérico, que sigue siendo
+ * honesto para una causa no reconocida.
+ */
+function mensajeDeError(error: unknown): string {
+  if (error instanceof FirebaseError) {
+    if (error.code === "functions/not-found") {
+      return "El área elegida ya no existe. Elige otra o deja «Sin área».";
+    }
+    if (error.code === "functions/failed-precondition") {
+      return "El área elegida ya no está activa. Elige otra o deja «Sin área».";
+    }
+  }
+  return "No se pudo crear el producto. Intenta de nuevo.";
+}
 
 export interface HojaNuevoProductoProps {
   readonly abierta: boolean;
@@ -77,8 +99,11 @@ export function HojaNuevoProducto({ abierta, areas, onCrear, onVolver }: HojaNue
       await onCrear(etiqueta.trim(), areaId || undefined);
       // Sin cerrar aquí: quien nos monta decide (cambia `abierta` a false),
       // igual que Hoja.tsx delega el avance a quien la monta.
-    } catch {
-      setError("No se pudo crear el producto. Intenta de nuevo.");
+    } catch (error) {
+      // Antes se descartaba silenciosamente: sin esto, un 400/403 real del
+      // servidor no dejaba ningún rastro para depurar.
+      console.error("crearCategoriaEnSesion falló", error);
+      setError(mensajeDeError(error));
       setEnviando(false);
     }
   }

@@ -2,6 +2,7 @@
 // y doc 11 §10 ("Producto creado por error o duplicado"): la confirmación
 // explícita antes de escribir es el requisito central de esta hoja.
 import { fireEvent, render, screen } from "@testing-library/react";
+import { FirebaseError } from "firebase/app";
 import { describe, expect, it, vi } from "vitest";
 import type { Area } from "@conteo/shared";
 import { HojaNuevoProducto } from "./HojaNuevoProducto.js";
@@ -85,5 +86,44 @@ describe("HojaNuevoProducto (ADR-21, doc 11 §10)", () => {
 
     resolverCreacion();
     await Promise.resolve();
+  });
+
+  it("fix(web) · un rechazo genérico se loguea y muestra el mensaje genérico (camino antes sin cobertura)", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fallo = new Error("network error simulado");
+    const onCrear = vi.fn().mockRejectedValue(fallo);
+    render(<HojaNuevoProducto abierta={true} areas={[]} onCrear={onCrear} onVolver={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Bolsas" } });
+    fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
+    fireEvent.click(screen.getByRole("button", { name: /sí, crear/i }));
+
+    expect(await screen.findByText(/no se pudo crear el producto/i)).toBeInTheDocument();
+    expect(consoleError).toHaveBeenCalledWith(expect.any(String), fallo);
+    consoleError.mockRestore();
+  });
+
+  it("fix(web) · un área ya no disponible en el servidor muestra un mensaje DISTINTO del genérico", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fallo = new FirebaseError("functions/not-found", "Área inexistente");
+    const onCrear = vi.fn().mockRejectedValue(fallo);
+    render(
+      <HojaNuevoProducto
+        abierta={true}
+        areas={[crearArea()]}
+        onCrear={onCrear}
+        onVolver={() => {}}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Bolsas" } });
+    fireEvent.change(screen.getByLabelText(/área/i), { target: { value: "area_aseo" } });
+    fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
+    fireEvent.click(screen.getByRole("button", { name: /sí, crear/i }));
+
+    const mensaje = await screen.findByText(/el área elegida ya no existe/i);
+    expect(mensaje).toBeInTheDocument();
+    expect(screen.queryByText(/no se pudo crear el producto/i)).not.toBeInTheDocument();
+    consoleError.mockRestore();
   });
 });
