@@ -38,6 +38,7 @@ function crearLinea(overrides: Partial<LineaConteo> = {}): LineaConteo {
     // evite el carácter "$" en cualquier texto.
     etiqueta: "Categoría",
     area: "Bodega",
+    areaFijaPorAdmin: false,
     cantidadTotal: 0,
     numAportantes: 0,
     versiones: {},

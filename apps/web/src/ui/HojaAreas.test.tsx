@@ -1,6 +1,7 @@
-// apps/web/src/ui/HojaAreas.test.tsx — ADR-21 (docs/diseno/13-decisiones-adr.md#adr-21) y
-// doc 11 §4: el cajero vincula un área EXISTENTE a una categoría "Sin área",
-// nunca crea una.
+// apps/web/src/ui/HojaAreas.test.tsx — ADR-22 (supersede parcial de
+// docs/diseno/13-decisiones-adr.md#adr-21): el cajero REETIQUETA un área
+// EXISTENTE a una categoría cuyo catálogo sigue sin `areaId`, tantas veces
+// como quiera, nunca crea una.
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Area, LineaConteo } from "@conteo/shared";
@@ -12,6 +13,7 @@ function crearLinea(overrides: Partial<LineaConteo> = {}): LineaConteo {
     valorUnitario: 5000,
     etiqueta: "$5.000",
     area: "Sin área",
+    areaFijaPorAdmin: false,
     cantidadTotal: 0,
     numAportantes: 0,
     versiones: {},
@@ -31,28 +33,28 @@ function crearArea(overrides: Partial<Area> = {}): Area {
   };
 }
 
-describe("HojaAreas (ADR-21, doc 11 §4)", () => {
+describe("HojaAreas (ADR-22)", () => {
   it("no está en el DOM visible cuando abierta=false", () => {
     render(
       <HojaAreas
         abierta={false}
-        lineasSinArea={[crearLinea()]}
+        lineasReetiquetables={[crearLinea()]}
         areas={[crearArea()]}
-        onVincular={() => {}}
+        onReetiquetar={() => {}}
         onVolver={() => {}}
       />,
     );
     expect(screen.queryByText("$5.000")).not.toBeVisible();
   });
 
-  it("tocar una línea despliega los botones de área disponibles y vincular llama a onVincular con los args exactos", () => {
-    const onVincular = vi.fn();
+  it("tocar una línea despliega los botones de área disponibles y reetiquetar llama a onReetiquetar con los args exactos", () => {
+    const onReetiquetar = vi.fn();
     render(
       <HojaAreas
         abierta={true}
-        lineasSinArea={[crearLinea()]}
+        lineasReetiquetables={[crearLinea()]}
         areas={[crearArea(), crearArea({ areaId: "area_cocina", nombre: "Cocina" })]}
-        onVincular={onVincular}
+        onReetiquetar={onReetiquetar}
         onVolver={() => {}}
       />,
     );
@@ -60,25 +62,58 @@ describe("HojaAreas (ADR-21, doc 11 §4)", () => {
     // Antes de tocar la línea, los botones de área no existen.
     expect(screen.queryByRole("button", { name: "Aseo" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "$5.000" }));
+    fireEvent.click(screen.getByRole("button", { name: /\$5\.000/ }));
     fireEvent.click(screen.getByRole("button", { name: "Cocina" }));
 
-    expect(onVincular).toHaveBeenCalledTimes(1);
-    expect(onVincular).toHaveBeenCalledWith("cat_5000", "area_cocina");
+    expect(onReetiquetar).toHaveBeenCalledTimes(1);
+    expect(onReetiquetar).toHaveBeenCalledWith("cat_5000", "area_cocina");
   });
 
-  it("con cero líneas sin área muestra un estado vacío, no una lista rota", () => {
+  it("ADR-22 · muestra el área vigente de cada línea como contexto", () => {
     render(
       <HojaAreas
         abierta={true}
-        lineasSinArea={[]}
+        lineasReetiquetables={[crearLinea({ area: "Talleres" })]}
         areas={[crearArea()]}
-        onVincular={() => {}}
+        onReetiquetar={() => {}}
         onVolver={() => {}}
       />,
     );
 
-    expect(screen.getByText(/no quedan productos sin área/i)).toBeInTheDocument();
+    expect(screen.getByText("Talleres")).toBeInTheDocument();
+  });
+
+  it('ADR-22 · "Quitar área" llama a onReetiquetar sin areaId (vuelve a SIN_AREA)', () => {
+    const onReetiquetar = vi.fn();
+    render(
+      <HojaAreas
+        abierta={true}
+        lineasReetiquetables={[crearLinea({ area: "Talleres" })]}
+        areas={[crearArea()]}
+        onReetiquetar={onReetiquetar}
+        onVolver={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /\$5\.000/ }));
+    fireEvent.click(screen.getByRole("button", { name: /quitar área/i }));
+
+    expect(onReetiquetar).toHaveBeenCalledTimes(1);
+    expect(onReetiquetar).toHaveBeenCalledWith("cat_5000", undefined);
+  });
+
+  it("con cero líneas reetiquetables muestra un estado vacío, no una lista rota", () => {
+    render(
+      <HojaAreas
+        abierta={true}
+        lineasReetiquetables={[]}
+        areas={[crearArea()]}
+        onReetiquetar={() => {}}
+        onVolver={() => {}}
+      />,
+    );
+
+    expect(screen.getByText(/no hay productos para reetiquetar/i)).toBeInTheDocument();
   });
 
   it('el botón de salida se llama "Volver", nunca "Cerrar" (restricción dura de ConteoScreen.test.tsx)', () => {
@@ -86,9 +121,9 @@ describe("HojaAreas (ADR-21, doc 11 §4)", () => {
     render(
       <HojaAreas
         abierta={true}
-        lineasSinArea={[crearLinea()]}
+        lineasReetiquetables={[crearLinea()]}
         areas={[crearArea()]}
-        onVincular={() => {}}
+        onReetiquetar={() => {}}
         onVolver={onVolver}
       />,
     );

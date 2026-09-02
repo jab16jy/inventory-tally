@@ -28,6 +28,7 @@ function lineaBase(categoriaId: string, etiqueta: string, valorUnitario: number)
     valorUnitario,
     etiqueta,
     area: "Aseo",
+    areaFijaPorAdmin: false,
     cantidadTotal: 0,
     numAportantes: 0,
     versiones: {},

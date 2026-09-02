@@ -8,7 +8,6 @@ import type { Auth } from "firebase/auth";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  SIN_AREA,
   estaPendiente,
   promedioCategoria,
   siguientePendiente,
@@ -38,9 +37,9 @@ import { Hoja } from "./primitivos/Hoja.js";
 import { Icono } from "./primitivos/Icono.js";
 import { Placa } from "./primitivos/Placa.js";
 
-/** Áreas activas del catálogo, para vincular una categoría "Sin área"
- *  (ADR-21) o preseleccionar una al crear un producto. Hook local, no un
- *  archivo en `state/`: un solo consumidor (esta pantalla) y ~6 líneas. */
+/** Áreas activas del catálogo, para reetiquetar una línea reetiquetable
+ *  (ADR-21/ADR-22) o preseleccionar una al crear un producto. Hook local, no
+ *  un archivo en `state/`: un solo consumidor (esta pantalla) y ~6 líneas. */
 function useAreasActivas(repo: ConteoRepository): Area[] {
   const [areas, setAreas] = useState<Area[]>([]);
   useEffect(() => repo.observarAreasActivas(setAreas), [repo]);
@@ -174,10 +173,12 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
     setCategoriaEnEdicion(siguientePendiente(lineas, uid, categoriaEnEdicion));
   }
 
-  // ADR-21: vincular un área existente a una categoría "Sin área" — el
-  // cajero nunca crea áreas, sólo las que el admin ya dio de alta.
-  function vincularArea(categoriaId: string, areaId: string): void {
-    void repo.vincularArea({ sesionId, categoriaId, areaId });
+  // ADR-22 (supersede parcial de ADR-21): reetiqueta el área de una línea
+  // cuya categoría sigue sin `areaId` de catálogo, tantas veces como el
+  // cajero quiera — nunca crea áreas, sólo las que el admin ya dio de alta.
+  // `areaId` ausente vuelve la línea a SIN_AREA ("Quitar área").
+  function reetiquetarArea(categoriaId: string, areaId?: string): void {
+    void repo.reetiquetarLineaEnSesion({ sesionId, categoriaId, areaId });
   }
 
   // Cierra la Hoja sólo tras confirmar la escritura (no en un `finally`):
@@ -204,10 +205,12 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
   // `siguientePendiente` (línea ~150) siguen leyendo `lineas` completas,
   // nunca `lineasVisibles`; este filtro no los toca.
   const areas = [...new Set(lineas.map((l) => l.area))].sort();
-  // "Sin área (N)" es autoextinguible (doc 11 §4): se calcula de `lineas`
+  // ADR-22: reetiquetables son las líneas de categorías SIN `areaId` de
+  // catálogo (`areaFijaPorAdmin === false`), sin importar su área actual —
+  // ya no sólo las que siguen en SIN_AREA (ADR-21). Se calcula de `lineas`
   // completas, no de `lineasVisibles`, para no depender del filtro/búsqueda
   // en curso.
-  const lineasSinArea = lineas.filter((l) => l.area === SIN_AREA);
+  const lineasReetiquetables = lineas.filter((l) => !l.areaFijaPorAdmin);
 
   const consulta = busqueda.trim().toLowerCase();
   const soloDigitos = consulta.replace(/\D/g, "");
@@ -281,9 +284,9 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
 
         {/* Fila propia: no cabe apretada junto a búsqueda+Pendientes+Salir
             sin bajar del objetivo táctil mínimo (--size-toque). Con menos de
-            dos áreas el selector no filtraría nada, pero "Sin área (N)" y
-            "+ Producto" (ADR-21) no dependen del número de áreas, sólo de
-            que la sesión siga abierta. */}
+            dos áreas el selector no filtraría nada, pero "Reetiquetar área
+            (N)" y "+ Producto" (ADR-21/ADR-22) no dependen del número de
+            áreas, sólo de que la sesión siga abierta. */}
         {(areas.length > 1 || !sesionCerrada) && (
           <div className="flex items-center gap-2">
             {areas.length > 1 && (
@@ -304,15 +307,16 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
               </label>
             )}
 
-            {/* Autoextinguible: desaparece en cuanto el hueco se llena
-                (doc 11 §4) — no hay nada que vincular con 0 líneas sin área. */}
-            {!sesionCerrada && lineasSinArea.length > 0 && (
+            {/* Desaparece con 0 líneas reetiquetables — no hay nada que
+                reetiquetar cuando toda categoría de la sesión ya tiene
+                `areaId` fijo en catálogo (ADR-22). */}
+            {!sesionCerrada && lineasReetiquetables.length > 0 && (
               <button
                 type="button"
                 onClick={() => setHojaAreasAbierta(true)}
                 className="min-h-[var(--size-toque)] shrink-0 rounded-placa border border-borde px-3 text-micro font-semibold text-tenue"
               >
-                Sin área ({lineasSinArea.length})
+                Reetiquetar área ({lineasReetiquetables.length})
               </button>
             )}
 
@@ -397,17 +401,17 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
         onVolver={() => setCategoriaEnEdicion(null)}
       />
 
-      {/* ADR-21. Montadas siempre (como Hoja arriba), después de ella y
-          antes de ModalSesionCerrada a propósito: si el admin cierra la
+      {/* ADR-21/ADR-22. Montadas siempre (como Hoja arriba), después de ella
+          y antes de ModalSesionCerrada a propósito: si el admin cierra la
           sesión con cualquiera de estas dos abierta, el showModal() del
           modal bloqueante se invoca más tarde y queda encima en el top
           layer nativo (orden de invocación, no de DOM — mismo criterio que
           ModalSesionCerrada más abajo). */}
       <HojaAreas
         abierta={hojaAreasAbierta}
-        lineasSinArea={lineasSinArea}
+        lineasReetiquetables={lineasReetiquetables}
         areas={areasActivas}
-        onVincular={vincularArea}
+        onReetiquetar={reetiquetarArea}
         onVolver={() => setHojaAreasAbierta(false)}
       />
 

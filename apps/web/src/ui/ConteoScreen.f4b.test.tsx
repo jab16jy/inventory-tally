@@ -30,6 +30,7 @@ function lineaBase(categoriaId: string, etiqueta: string, valorUnitario: number,
     valorUnitario,
     etiqueta,
     area: "Aseo",
+    areaFijaPorAdmin: false,
     cantidadTotal: 0,
     numAportantes: 0,
     versiones: {},
@@ -89,7 +90,10 @@ describe("ConteoScreen · esqueleto de carga (F4-B)", () => {
     renderConteoScreen(repo);
 
     expect(screen.queryByTestId("fila-esqueleto")).not.toBeInTheDocument();
-    expect(screen.getByText("$5.000")).toBeInTheDocument();
+    // getByRole (no getByText): con ADR-22 la línea también aparece dentro de
+    // la HojaAreas (siempre montada, aunque cerrada) porque sigue siendo
+    // reetiquetable — "$5.000" a secas ya no identifica una sola fila.
+    expect(screen.getByRole("button", { name: /sumar \$5\.000/i })).toBeInTheDocument();
   });
 
   it("con la sesión BORRADA no promete contenido: no va a llegar nada", () => {

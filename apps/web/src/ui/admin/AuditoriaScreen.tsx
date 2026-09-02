@@ -42,11 +42,17 @@ const ETIQUETAS_TIPO_EVENTO: Record<TipoEventoAuditoria, string> = {
   AREA_DESACTIVADA: "Área desactivada",
   AREA_ELIMINADA: "Área eliminada",
   AREA_REACTIVADA: "Área reactivada",
-  // La única acción de catálogo que puede originar un CAJERO, no el admin
-  // (ADR-21): vincular un área existente a una categoría sin área, desde su
-  // conteo. Lleva `sucursalId`, así que su propio cajero la ve en esta misma
-  // pantalla acotada a sus sucursales (ticket #45).
+  // Emisor histórico, retirado (ADR-22 reemplaza vincularArea por
+  // reetiquetarLineaEnSesion): ya no lo emite ninguna callable, pero queda en
+  // el catálogo porque auditoría es inmutable (I-5) — eventos ya escritos
+  // siguen existiendo y deben poder etiquetarse al leerlos.
   AREA_VINCULADA: "Área vinculada",
+  // La acción de catálogo que puede originar un CAJERO, no el admin
+  // (ADR-22, supersede parcial de ADR-21): reetiquetar el área de una línea
+  // cuya categoría sigue sin área fija, desde su conteo. Lleva `sucursalId`,
+  // así que su propio cajero la ve en esta misma pantalla acotada a sus
+  // sucursales (ticket #45).
+  LINEA_REETIQUETADA: "Línea reetiquetada",
   SUCURSAL_CREADA: "Sucursal creada",
   SUCURSAL_ACTUALIZADA: "Sucursal actualizada",
   SUCURSAL_ELIMINADA: "Sucursal eliminada",

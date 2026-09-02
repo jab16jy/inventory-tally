@@ -33,6 +33,7 @@ function lineaBase(
     valorUnitario,
     etiqueta,
     area: "Aseo",
+    areaFijaPorAdmin: false,
     cantidadTotal: 0,
     numAportantes: 0,
     versiones: {},

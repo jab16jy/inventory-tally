@@ -46,6 +46,7 @@ function lineaBase(
     valorUnitario,
     etiqueta: `$${valorUnitario}`,
     area: "Aseo",
+    areaFijaPorAdmin: false,
     cantidadTotal,
     numAportantes: 1,
     versiones: {},

@@ -10,6 +10,7 @@ function lineaBase(categoriaId: string): LineaConteo {
     valorUnitario: 1000,
     etiqueta: `$${categoriaId}`,
     area: "Aseo",
+    areaFijaPorAdmin: false,
     cantidadTotal: 0,
     numAportantes: 0,
     versiones: {},

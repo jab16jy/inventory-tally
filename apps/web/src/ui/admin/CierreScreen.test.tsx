@@ -35,6 +35,7 @@ function lineaBase(overrides: Partial<LineaConteo> = {}): LineaConteo {
     valorUnitario: 5000,
     etiqueta: "$5.000",
     area: "Aseo",
+    areaFijaPorAdmin: false,
     cantidadTotal: 10,
     numAportantes: 1,
     versiones: {},
