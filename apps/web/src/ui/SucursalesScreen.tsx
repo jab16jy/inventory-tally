@@ -27,7 +27,7 @@
 //      una consulta adicional para leer este campo.
 import type { Auth } from "firebase/auth";
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import type { Sucursal } from "@conteo/shared";
 import { useConteoRepository } from "../state/repositorio-contexto.js";
 import { useAuthState } from "../state/useAuthState.js";
@@ -173,17 +173,6 @@ export function SucursalesScreen({ auth, onSalir }: SucursalesScreenProps) {
           })}
         </ul>
       )}
-
-      {/* Al PIE, no en la cabecera: doc 11 §1 pone las acciones en la mitad
-          inferior (uso a una mano), y `CabeceraCajero` sólo acepta
-          `titulo` + `onSalir` — meterlo arriba obligaría a cambiar un
-          componente que comparten tres pantallas por un solo enlace. */}
-      <Link
-        to="/mis-conteos"
-        className="mt-auto mb-4 flex min-h-[var(--size-toque)] items-center justify-center text-micro text-tenue"
-      >
-        Mis conteos →
-      </Link>
     </section>
   );
 }

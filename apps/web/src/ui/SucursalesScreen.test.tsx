@@ -198,4 +198,18 @@ describe("SucursalesScreen (F3-A)", () => {
     expect(await screen.findByText("Sucursal Norte")).toBeInTheDocument();
     expect(screen.queryByTestId("fila-esqueleto")).not.toBeInTheDocument();
   });
+
+  it("ya no lleva el enlace de pie a 'Mis conteos': lo reemplaza la barra de pestañas", async () => {
+    // El enlace del pie era un salto SIN VUELTA (MisConteosScreen no tenía
+    // cómo regresar). Ahora "Mis conteos" es una pestaña de `LayoutCajero`,
+    // que vive fuera de esta pantalla — duplicarlo aquí daría dos caminos al
+    // mismo destino, uno de ellos sin retorno.
+    const repo = new FakeConteoRepository();
+    repo.sembrarSucursal(crearSucursal({ sucursalId: "suc_norte", nombre: "Sucursal Norte" }));
+
+    renderPantalla(repo, ["suc_norte"]);
+
+    expect(await screen.findByText("Sucursal Norte")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /mis conteos/i })).not.toBeInTheDocument();
+  });
 });
