@@ -71,5 +71,19 @@ export interface EventoAuditoria {
    * un cajero.
    */
   readonly sucursalId?: string;
+  readonly ejecutadoPor?: string;
+  readonly usuarioId?: string;
+  readonly usuarioNombre?: string;
+  readonly sesionId?: string;
+  readonly categoriaId?: string;
+  readonly areaId?: string;
+  readonly cantidadAnterior?: number;
+  readonly cantidadNueva?: number;
+  readonly forzado?: boolean;
+  readonly sinConfirmar?: readonly (string | { readonly uid: string; readonly nombre?: string })[];
+  readonly campos?: readonly string[];
+  readonly origen?: "trigger" | "cron" | "conteo";
+  readonly eliminados?: number;
+  readonly corte?: Date;
   readonly [campo: string]: unknown;
 }

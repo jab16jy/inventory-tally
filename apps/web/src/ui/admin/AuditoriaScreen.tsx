@@ -6,15 +6,19 @@
 // sesionId) — `FiltroAuditoria` ya está tipado como unión de un solo campo
 // porque cada combinación exigiría su propio índice compuesto en Firestore.
 // Añadir índices y un filtro combinado si el negocio pide combinarlos.
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import type {
   EventoAuditoria,
   TipoEventoAuditoria,
 } from "@conteo/shared/models/evento-auditoria.js";
+import type { Sucursal } from "@conteo/shared/models/sucursal.js";
+import type { Usuario } from "@conteo/shared/models/usuario.js";
 import type { FiltroAuditoria } from "@conteo/data";
 import { fecha } from "../../lib/formato.js";
 import { useAdminRepository } from "../../state/admin-contexto.js";
 import { Tabla, type ColumnaTabla } from "./Tabla.js";
+import { describirContexto, obtenerAutor, obtenerNombreSucursal } from "./auditoria-helpers.js";
+import { ModalDetalleAuditoria } from "./ModalDetalleAuditoria.js";
 
 // `Record<TipoEventoAuditoria, string>` es exhaustivo POR CONSTRUCCIÓN: a
 // `tsc` le falta una rama si el catálogo crece y no se le agrega su etiqueta
@@ -82,6 +86,20 @@ function construirFiltro(campo: CampoFiltro, valor: string): FiltroAuditoria {
   return { campo, valor };
 }
 
+function useUsuarios(): Usuario[] {
+  const repo = useAdminRepository();
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  useEffect(() => repo.observarUsuarios(setUsuarios), [repo]);
+  return usuarios;
+}
+
+function useSucursales(): Sucursal[] {
+  const repo = useAdminRepository();
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  useEffect(() => repo.observarSucursales(setSucursales), [repo]);
+  return sucursales;
+}
+
 function useAuditoriaPaginada(campo: CampoFiltro, valor: string) {
   const repo = useAdminRepository();
   const [eventos, setEventos] = useState<EventoAuditoria[]>([]);
@@ -131,6 +149,17 @@ function useAuditoriaPaginada(campo: CampoFiltro, valor: string) {
 export function AuditoriaScreen() {
   const [campo, setCampo] = useState<CampoFiltro>("");
   const [valor, setValor] = useState("");
+  const [eventoSeleccionado, setEventoSeleccionado] = useState<EventoAuditoria | null>(null);
+
+  const usuarios = useUsuarios();
+  const sucursales = useSucursales();
+
+  const usuariosMap = useMemo(() => new Map(usuarios.map((u) => [u.uid, u])), [usuarios]);
+  const sucursalesMap = useMemo(
+    () => new Map(sucursales.map((s) => [s.sucursalId, s])),
+    [sucursales],
+  );
+
   const { eventos, siguienteCursor, cargando, error, cargarMas } = useAuditoriaPaginada(
     campo,
     valor,
@@ -140,13 +169,61 @@ export function AuditoriaScreen() {
   const idValor = useId();
 
   const columnas: ColumnaTabla<EventoAuditoria>[] = [
-    { clave: "eventoId", etiqueta: "ID", render: (e) => e.eventoId },
-    { clave: "tipo", etiqueta: "Evento", render: (e) => ETIQUETAS_TIPO_EVENTO[e.tipo] },
     {
       clave: "ocurrido",
       etiqueta: "Ocurrido",
       render: (e) => fecha(e.ocurridoEn),
       valorOrden: (e) => e.ocurridoEn.getTime(),
+    },
+    {
+      clave: "tipo",
+      etiqueta: "Evento",
+      render: (e) => ETIQUETAS_TIPO_EVENTO[e.tipo],
+      valorOrden: (e) => ETIQUETAS_TIPO_EVENTO[e.tipo],
+    },
+    {
+      clave: "autor",
+      etiqueta: "Autor",
+      render: (e) => {
+        const autor = obtenerAutor(e, usuariosMap);
+        return (
+          <div className="flex items-center gap-1.5">
+            <span className="font-medium text-tinta">{autor.nombre}</span>
+            {autor.rol && (
+              <span className="rounded-placa border border-borde bg-placa px-1.5 py-0.5 text-micro text-tenue">
+                {autor.rol}
+              </span>
+            )}
+          </div>
+        );
+      },
+      valorOrden: (e) => obtenerAutor(e, usuariosMap).nombre,
+    },
+    {
+      clave: "sucursal",
+      etiqueta: "Sucursal",
+      render: (e) => obtenerNombreSucursal(e, sucursalesMap),
+      valorOrden: (e) => obtenerNombreSucursal(e, sucursalesMap),
+    },
+    {
+      clave: "contexto",
+      etiqueta: "Contexto",
+      render: (e) => <span className="text-micro text-tenue">{describirContexto(e)}</span>,
+    },
+    {
+      clave: "acciones",
+      etiqueta: "Acciones",
+      render: (e) => (
+        <button
+          type="button"
+          onClick={() => setEventoSeleccionado(e)}
+          aria-label={`Detalle de evento ${e.eventoId}`}
+          className="rounded-placa border border-borde px-2.5 py-1 text-micro font-semibold text-tinta transition-colors duration-150 ease-out hover:border-senal hover:text-senal"
+        >
+          Detalle →
+        </button>
+      ),
+      alinearDerecha: true,
     },
   ];
 
@@ -208,14 +285,57 @@ export function AuditoriaScreen() {
           </div>
         )}
 
-        {(campo === "sucursalId" || campo === "usuarioId" || campo === "sesionId") && (
+        {campo === "sucursalId" && (
           <div>
             <label htmlFor={idValor} className="mb-1.5 block text-micro text-tenue">
-              ID
+              Sucursal
+            </label>
+            <select
+              id={idValor}
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              className="min-h-[var(--size-toque)] rounded-placa border border-borde bg-fondo px-3 text-tinta focus:border-senal focus:outline-none"
+            >
+              <option value="">Todas</option>
+              {sucursales.map((s) => (
+                <option key={s.sucursalId} value={s.sucursalId}>
+                  {s.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {campo === "usuarioId" && (
+          <div>
+            <label htmlFor={idValor} className="mb-1.5 block text-micro text-tenue">
+              Usuario
+            </label>
+            <select
+              id={idValor}
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              className="min-h-[var(--size-toque)] rounded-placa border border-borde bg-fondo px-3 text-tinta focus:border-senal focus:outline-none"
+            >
+              <option value="">Todos</option>
+              {usuarios.map((u) => (
+                <option key={u.uid} value={u.uid}>
+                  {u.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {campo === "sesionId" && (
+          <div>
+            <label htmlFor={idValor} className="mb-1.5 block text-micro text-tenue">
+              Sesión
             </label>
             <input
               id={idValor}
               value={valor}
+              placeholder="ID de sesión"
               onChange={(e) => setValor(e.target.value)}
               className="min-h-[var(--size-toque)] rounded-placa border border-borde bg-fondo px-3 text-tinta focus:border-senal focus:outline-none"
             />
@@ -241,6 +361,13 @@ export function AuditoriaScreen() {
           Cargar más
         </button>
       )}
+
+      <ModalDetalleAuditoria
+        evento={eventoSeleccionado}
+        onCerrar={() => setEventoSeleccionado(null)}
+        usuariosMap={usuariosMap}
+        sucursalesMap={sucursalesMap}
+      />
     </section>
   );
 }

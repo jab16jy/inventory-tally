@@ -122,6 +122,7 @@ describe("cerrarSesionImpl", () => {
       .where("tipo", "==", "SESION_CERRADA")
       .get();
     expect(eventos.docs[0]?.get("sucursalId")).toBe(sucursalId);
+    expect(eventos.docs[0]?.get("ejecutadoPor")).toBe("uid_admin");
   });
 
   it("bloqueada sin forzar · CIERRE_BLOQUEADO auditado, el inactivo no bloquea (negativo, multi-participante)", async () => {
@@ -179,6 +180,7 @@ describe("cerrarSesionImpl", () => {
       .where("tipo", "==", "CIERRE_BLOQUEADO")
       .get();
     expect(eventos.docs[0]?.get("sucursalId")).toBe(sucursalId);
+    expect(eventos.docs[0]?.get("ejecutadoPor")).toBe("uid_admin");
   });
 
   it("forzado · cierra pese a pendientes y audita forzado:true con la lista completa (afirmativo)", async () => {

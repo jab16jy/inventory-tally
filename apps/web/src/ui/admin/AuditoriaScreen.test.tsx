@@ -112,4 +112,98 @@ describe("AuditoriaScreen (F3, R6)", () => {
     // siempre y el esqueleto no se va nunca, aunque el alert sí aparezca.
     expect(screen.queryByTestId("fila-esqueleto")).not.toBeInTheDocument();
   });
+
+  it("muestra el autor resuelto y el contexto del evento en las columnas", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarUsuario({
+      uid: "uid_admin_carlos",
+      nombre: "Carlos Admin",
+      correo: "carlos@negocio.com",
+      rol: "admin",
+      sucursalesAsignadas: [],
+      activo: true,
+      creadoEn: new Date(),
+      creadoPor: "sistema",
+    });
+    repo.sembrarAuditoria(
+      eventoBase({
+        eventoId: "evt_cierre_1",
+        tipo: "SESION_CERRADA",
+        forzado: true,
+        sinConfirmar: ["uid_pend"],
+        ejecutadoPor: "uid_admin_carlos",
+      }),
+    );
+
+    renderPantalla(repo);
+
+    expect(await screen.findByText("Carlos Admin")).toBeInTheDocument();
+    expect(screen.getByText("Administrador")).toBeInTheDocument();
+    expect(
+      screen.getByText(/cierre forzado \(1 pendientes sin sincronizar\)/i),
+    ).toBeInTheDocument();
+  });
+
+  it("el filtro por sucursal muestra un selector con las sucursales disponibles", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSucursal({
+      sucursalId: "suc_norte",
+      nombre: "Sucursal Norte",
+      direccion: "Calle 1",
+      conectividad: "wifi",
+      activa: true,
+      sesionAbiertaId: null,
+      creadaEn: new Date(),
+    });
+
+    renderPantalla(repo);
+
+    fireEvent.change(screen.getByLabelText(/filtrar por/i), { target: { value: "sucursalId" } });
+
+    const selectSucursal = await screen.findByLabelText(/^sucursal$/i);
+    expect(within(selectSucursal).getByRole("option", { name: /sucursal norte/i })).toBeDefined();
+  });
+
+  it("el filtro por usuario muestra un selector con los usuarios disponibles", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarUsuario({
+      uid: "uid_maria",
+      nombre: "María Gómez",
+      correo: "maria@negocio.com",
+      rol: "cajero",
+      sucursalesAsignadas: [],
+      activo: true,
+      creadoEn: new Date(),
+      creadoPor: "admin",
+    });
+
+    renderPantalla(repo);
+
+    fireEvent.change(screen.getByLabelText(/filtrar por/i), { target: { value: "usuarioId" } });
+
+    const selectUsuario = await screen.findByLabelText(/^usuario$/i);
+    expect(within(selectUsuario).getByRole("option", { name: /maría gómez/i })).toBeDefined();
+  });
+
+  it("al hacer clic en Detalle se abre el modal con la información completa", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarAuditoria(
+      eventoBase({
+        eventoId: "evt_modal_test",
+        tipo: "USUARIO_CREADO",
+        usuarioNombre: "Nuevo Cajero",
+      }),
+    );
+
+    renderPantalla(repo);
+
+    const botonDetalle = await screen.findByRole("button", {
+      name: /detalle de evento evt_modal_test/i,
+    });
+    fireEvent.click(botonDetalle);
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getAllByText(/nuevo cajero/i).length).toBeGreaterThan(0);
+  });
 });

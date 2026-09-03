@@ -63,6 +63,7 @@ export async function cerrarSesionImpl(
         sucursalId, // ticket #45: para el filtro del cajero
         sinConfirmar,
         excluidosPorInactivo,
+        ejecutadoPor,
       });
     });
     throw new HttpsError("failed-precondition", "Hay cajeros con conteos sin sincronizar", {
@@ -111,6 +112,7 @@ export async function cerrarSesionImpl(
       forzado: forzar,
       sinConfirmar,
       excluidosPorInactivo,
+      ejecutadoPor,
     });
   });
 
