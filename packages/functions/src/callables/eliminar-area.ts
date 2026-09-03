@@ -18,9 +18,10 @@ import { registrarAuditoria } from "../lib/auditoria.js";
  * imborrable para siempre cualquier área que alguna vez apareció en algún
  * conteo, sin ninguna ganancia: la línea histórica sigue mostrando su nombre
  * congelado exista o no el documento de área. La ÚNICA referencia viva a un
- * área es `categoriasValor.areaId`, que es lo que la guarda de abajo
- * consulta (misma ventana TOCTOU documentada en eliminar-categoria.ts, y por
- * el mismo motivo: `count()` no puede ir dentro de una transacción).
+ * área es `categoriasValor.areaIds` (N:M, issue #81), que es lo que la
+ * guarda de abajo consulta con `array-contains` (misma ventana TOCTOU
+ * documentada en eliminar-categoria.ts, y por el mismo motivo: `count()` no
+ * puede ir dentro de una transacción).
  */
 export async function eliminarAreaImpl(
   db: Firestore,
@@ -30,7 +31,11 @@ export async function eliminarAreaImpl(
   const { areaId } = input;
   const areaRef = db.doc(`areas/${areaId}`);
 
-  const usos = await db.collection("categoriasValor").where("areaId", "==", areaId).count().get();
+  const usos = await db
+    .collection("categoriasValor")
+    .where("areaIds", "array-contains", areaId)
+    .count()
+    .get();
   const n = usos.data().count;
   if (n > 0) {
     throw new HttpsError(

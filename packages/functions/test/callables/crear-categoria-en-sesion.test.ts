@@ -119,7 +119,7 @@ describe("crearCategoriaEnSesionImpl (I-9/ADR-07, ADR-21)", () => {
     });
     registrarCategoria(conArea.categoriaId);
     const categoriaConArea = await db.doc(`categoriasValor/${conArea.categoriaId}`).get();
-    expect(categoriaConArea.get("areaId")).toBe(areaId);
+    expect(categoriaConArea.get("areaIds")).toEqual([areaId]);
     const lineaConArea = await db.doc(`sesiones/${sesionId}/lineas/${conArea.categoriaId}`).get();
     expect(lineaConArea.get("area")).toBe("Aseo");
   });

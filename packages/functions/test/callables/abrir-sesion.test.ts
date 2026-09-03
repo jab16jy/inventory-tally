@@ -24,7 +24,7 @@ async function crearCategoria(
   valor: number,
   activa = true,
   sucursalesAsignadas?: readonly string[],
-  areaId?: string,
+  areaIds?: readonly string[],
 ) {
   await db.doc(`categoriasValor/${categoriaId}`).set({
     valor,
@@ -32,7 +32,7 @@ async function crearCategoria(
     activa,
     orden: 1,
     ...(sucursalesAsignadas !== undefined && { sucursalesAsignadas }),
-    ...(areaId !== undefined && { areaId }),
+    ...(areaIds !== undefined && { areaIds }),
   });
 }
 
@@ -182,14 +182,31 @@ describe("abrirSesionImpl", () => {
     const catId = `cat_${randomUUID()}`;
     await crearSucursal(sucursalId);
     await crearArea(areaId, "Aseo");
-    await crearCategoria(catId, 5000, true, undefined, areaId);
+    await crearCategoria(catId, 5000, true, undefined, [areaId]);
 
     const { sesionId } = await abrirSesionImpl(db, "uid_admin", { sucursalId });
 
     const linea = await db.doc(`sesiones/${sesionId}/lineas/${catId}`).get();
     expect(linea.get("area")).toBe("Aseo");
-    // ADR-22: areaId ya venía fijado en el catálogo, la línea queda congelada.
+    // ADR-22: areaIds ya venía fijado en el catálogo, la línea queda congelada.
     expect(linea.get("areaFijaPorAdmin")).toBe(true);
+  });
+
+  it("I-7 · siembra la línea con SIN_AREA cuando la categoría tiene más de un área (N:M, porArea llega después)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const areaUno = `area_${randomUUID()}`;
+    const areaDos = `area_${randomUUID()}`;
+    const catId = `cat_${randomUUID()}`;
+    await crearSucursal(sucursalId);
+    await crearArea(areaUno, "Aseo");
+    await crearArea(areaDos, "Talleres");
+    await crearCategoria(catId, 5000, true, undefined, [areaUno, areaDos]);
+
+    const { sesionId } = await abrirSesionImpl(db, "uid_admin", { sucursalId });
+
+    const linea = await db.doc(`sesiones/${sesionId}/lineas/${catId}`).get();
+    expect(linea.get("area")).toBe("Sin área");
+    expect(linea.get("areaFijaPorAdmin")).toBe(false);
   });
 
   it("I-7 · siembra la línea con 'Sin área' cuando la categoría no tiene areaId", async () => {

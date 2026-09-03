@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { crearCategoriaSchema } from "./crear-categoria.schema.js";
+import { actualizarCategoriaSchema } from "./actualizar-categoria.schema.js";
 
 const valido = {
   etiqueta: "Litro",
@@ -57,13 +58,52 @@ describe("crearCategoriaSchema (docs/plan-panel-administrador.md §3)", () => {
     expect(resultado.success).toBe(false);
   });
 
-  it("acepta sin areaId (categoría sin área, comportamiento válido)", () => {
+  it("acepta sin areaIds (categoría sin área, comportamiento válido)", () => {
     const resultado = crearCategoriaSchema.safeParse(valido);
     expect(resultado.success).toBe(true);
   });
 
-  it("acepta areaId cuando se especifica", () => {
-    const resultado = crearCategoriaSchema.safeParse({ ...valido, areaId: "area_aseo" });
+  it("acepta un areaId cuando se especifica", () => {
+    const resultado = crearCategoriaSchema.safeParse({ ...valido, areaIds: ["area_aseo"] });
     expect(resultado.success).toBe(true);
+  });
+
+  it("acepta varios areaIds (N:M: la categoría vive en varias áreas)", () => {
+    const resultado = crearCategoriaSchema.safeParse({
+      ...valido,
+      areaIds: ["area_aseo", "area_bebidas"],
+    });
+    expect(resultado.success).toBe(true);
+  });
+
+  it("rechaza areaIds vacío (footgun: mismo criterio que sucursalesAsignadas)", () => {
+    const resultado = crearCategoriaSchema.safeParse({ ...valido, areaIds: [] });
+    expect(resultado.success).toBe(false);
+  });
+
+  it("rechaza claves desconocidas como el areaId legado (strict)", () => {
+    const resultado = crearCategoriaSchema.safeParse({ ...valido, areaId: "area_legada" });
+    expect(resultado.success).toBe(false);
+  });
+});
+
+describe("actualizarCategoriaSchema", () => {
+  const validoActualizar = {
+    categoriaId: "cat_1",
+    etiqueta: "Litro",
+    valor: 1000,
+    orden: 1,
+  };
+
+  it("acepta objeto válido", () => {
+    expect(actualizarCategoriaSchema.safeParse(validoActualizar).success).toBe(true);
+  });
+
+  it("rechaza claves desconocidas como el areaId legado (strict)", () => {
+    const resultado = actualizarCategoriaSchema.safeParse({
+      ...validoActualizar,
+      areaId: "area_legada",
+    });
+    expect(resultado.success).toBe(false);
   });
 });

@@ -276,7 +276,7 @@ describe("categoriaValorDesdeDoc (docs/plan-panel-administrador.md §4)", () => 
     expect(categoria.sucursalesAsignadas).toEqual(["suc_norte"]);
   });
 
-  it("mapea areaId cuando está presente (agrupación de categorías por área)", () => {
+  it("mapea areaIds cuando está presente (N:M, issue #81)", () => {
     const creadaEn = Timestamp.fromDate(new Date("2026-01-10T08:00:00Z"));
     const categoria = categoriaValorDesdeDoc("cat_5000", {
       valor: 5000,
@@ -284,10 +284,10 @@ describe("categoriaValorDesdeDoc (docs/plan-panel-administrador.md §4)", () => 
       activa: true,
       orden: 1,
       creadaEn,
-      areaId: "area_efectivo",
+      areaIds: ["area_efectivo", "area_aseo"],
     });
 
-    expect(categoria.areaId).toBe("area_efectivo");
+    expect(categoria.areaIds).toEqual(["area_efectivo", "area_aseo"]);
   });
 });
 
