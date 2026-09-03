@@ -49,6 +49,7 @@ async function crearSesion(sesionId: string, estado: "abierta" | "cerrada"): Pro
 
 interface DatosLinea {
   readonly cantidadTotal: number;
+  readonly porArea?: Record<string, number>;
   readonly aplicados?: Record<string, number>;
   readonly versiones?: Record<string, number>;
   readonly numAportantes?: number;
@@ -66,6 +67,7 @@ async function sembrarLinea(
     valorUnitario,
     etiqueta,
     cantidadTotal: datos.cantidadTotal,
+    porArea: datos.porArea ?? {},
     aplicados: datos.aplicados ?? {},
     versiones: datos.versiones ?? {},
     numAportantes: datos.numAportantes ?? 0,
@@ -81,10 +83,12 @@ async function sembrarAporte(
   nombre: string,
   cantidad: number,
   version: number,
+  areaId = "area_1",
 ): Promise<void> {
+  const claveAporte = `${uid}__${areaId}`;
   await db
-    .doc(`sesiones/${sesionId}/lineas/${categoriaId}/aportes/${uid}`)
-    .set({ uid, nombre, cantidad, version });
+    .doc(`sesiones/${sesionId}/lineas/${categoriaId}/aportes/${claveAporte}`)
+    .set({ uid, areaId, nombre, cantidad, version });
 }
 
 async function lineaDe(sesionId: string, categoriaId: string) {
@@ -107,16 +111,18 @@ describe("reconciliarLineasImpl", () => {
 
     await sembrarLinea(sesionId, "cat_ok", 1000, "OK", {
       cantidadTotal: 10,
-      aplicados: { uid_ana: 10 },
-      versiones: { uid_ana: 1 },
+      porArea: { area_1: 10 },
+      aplicados: { uid_ana__area_1: 10 },
+      versiones: { uid_ana__area_1: 1 },
       numAportantes: 1,
     });
     await sembrarAporte(sesionId, "cat_ok", "uid_ana", "Ana", 10, 1);
 
     await sembrarLinea(sesionId, "cat_mal", 500, "MAL", {
       cantidadTotal: 50,
-      aplicados: { uid_luis: 50 },
-      versiones: { uid_luis: 1 },
+      porArea: { area_1: 50 },
+      aplicados: { uid_luis__area_1: 50 },
+      versiones: { uid_luis__area_1: 1 },
       numAportantes: 1,
     });
     await sembrarAporte(sesionId, "cat_mal", "uid_luis", "Luis", 30, 1);
@@ -126,10 +132,12 @@ describe("reconciliarLineasImpl", () => {
 
     const ok = await lineaDe(sesionId, "cat_ok");
     expect(ok.get("cantidadTotal")).toBe(10);
+    expect(ok.get("porArea")).toEqual({ area_1: 10 });
     expect(await reconciliacionesDe("cat_ok")).toHaveLength(0);
 
     const mal = await lineaDe(sesionId, "cat_mal");
     expect(mal.get("cantidadTotal")).toBe(53);
+    expect(mal.get("porArea")).toEqual({ area_1: 53 });
 
     // `totalUnidades` de la sesión sube por el DELTA (53-50=3), no por el
     // total corregido: la línea sana no aporta nada. Sin esta aserción, un
@@ -155,26 +163,28 @@ describe("reconciliarLineasImpl", () => {
     expect(await reconciliacionesDe("cat_b")).toHaveLength(0);
   });
 
-  it("corrección reescribe aplicados/versiones/numAportantes por completo, no sólo cantidadTotal (D-5)", async () => {
+  it("corrección reescribe aplicados/versiones/numAportantes/porArea por completo, no sólo cantidadTotal (D-5)", async () => {
     const sesionId = `ses_${randomUUID()}`;
     await crearSesion(sesionId, "abierta");
     // uid_fantasma no tiene aporte real (simula uno borrado tras un trigger
     // fallido) y los dos uids reales traen valores desactualizados.
     await sembrarLinea(sesionId, "cat_x", 200, "X", {
       cantidadTotal: 999,
-      aplicados: { uid_fantasma: 40, uid_ana: 1, uid_luis: 1 },
-      versiones: { uid_fantasma: 5, uid_ana: 1, uid_luis: 1 },
+      porArea: { area_1: 999 },
+      aplicados: { uid_fantasma__area_1: 40, uid_ana__area_1: 1, uid_luis__area_2: 1 },
+      versiones: { uid_fantasma__area_1: 5, uid_ana__area_1: 1, uid_luis__area_2: 1 },
       numAportantes: 3,
     });
-    await sembrarAporte(sesionId, "cat_x", "uid_ana", "Ana", 10, 3);
-    await sembrarAporte(sesionId, "cat_x", "uid_luis", "Luis", 7, 2);
+    await sembrarAporte(sesionId, "cat_x", "uid_ana", "Ana", 10, 3, "area_1");
+    await sembrarAporte(sesionId, "cat_x", "uid_luis", "Luis", 7, 2, "area_2");
 
     await reconciliarLineasImpl(db);
 
     const linea = await lineaDe(sesionId, "cat_x");
     expect(linea.get("cantidadTotal")).toBe(17);
-    expect(linea.get("aplicados")).toEqual({ uid_ana: 10, uid_luis: 7 });
-    expect(linea.get("versiones")).toEqual({ uid_ana: 3, uid_luis: 2 });
+    expect(linea.get("aplicados")).toEqual({ uid_ana__area_1: 10, uid_luis__area_2: 7 });
+    expect(linea.get("versiones")).toEqual({ uid_ana__area_1: 3, uid_luis__area_2: 2 });
+    expect(linea.get("porArea")).toEqual({ area_1: 10, area_2: 7 });
     expect(linea.get("numAportantes")).toBe(2);
   });
 

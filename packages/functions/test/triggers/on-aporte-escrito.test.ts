@@ -43,8 +43,8 @@ describe("procesarAporteEscrito", () => {
     const sesionId = `ses_${randomUUID()}`;
     const categoriaId = "cat_5000";
     await crearSesionAbierta(sesionId);
-    const params = { sesionId, categoriaId, uid: "uid_ana" };
-    const despues = { uid: "uid_ana", nombre: "Ana", cantidad: 10, version: 1 };
+    const params = { sesionId, categoriaId, claveAporte: "uid_ana__area_1" };
+    const despues = { uid: "uid_ana", areaId: "area_1", nombre: "Ana", cantidad: 10, version: 1 };
 
     await procesarAporteEscrito(db, params, undefined, despues);
     await procesarAporteEscrito(db, params, undefined, despues); // el trigger reejecuta el mismo evento
@@ -52,27 +52,29 @@ describe("procesarAporteEscrito", () => {
     const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
     expect(linea.get("cantidadTotal")).toBe(10);
     expect(linea.get("numAportantes")).toBe(1);
+    expect(linea.get("porArea")).toEqual({ area_1: 10 });
   });
 
   it("D2 · entrega fuera de orden (v2 antes que v1) no pierde el delta", async () => {
     const sesionId = `ses_${randomUUID()}`;
     const categoriaId = "cat_5000";
     await crearSesionAbierta(sesionId);
-    const params = { sesionId, categoriaId, uid: "uid_ana" };
+    const params = { sesionId, categoriaId, claveAporte: "uid_ana__area_1" };
 
     // v2 llega primero (Firestore es at-least-once y NO garantiza orden):
     // 5 → 12, delta real 7.
     await procesarAporteEscrito(
       db,
       params,
-      { uid: "uid_ana", nombre: "Ana", cantidad: 5, version: 1 },
-      { uid: "uid_ana", nombre: "Ana", cantidad: 12, version: 2 },
+      { uid: "uid_ana", areaId: "area_1", nombre: "Ana", cantidad: 5, version: 1 },
+      { uid: "uid_ana", areaId: "area_1", nombre: "Ana", cantidad: 12, version: 2 },
     );
     // v1 llega después: 0 → 5. La guardia de versión (1 <= 2) la descarta;
     // con el cálculo viejo (delta contra el `before` del propio evento) esto
     // perdía el delta y dejaba el total en 7 en vez de 12.
     await procesarAporteEscrito(db, params, undefined, {
       uid: "uid_ana",
+      areaId: "area_1",
       nombre: "Ana",
       cantidad: 5,
       version: 1,
@@ -80,6 +82,7 @@ describe("procesarAporteEscrito", () => {
 
     const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
     expect(linea.get("cantidadTotal")).toBe(12);
+    expect(linea.get("porArea")).toEqual({ area_1: 12 });
   });
 
   it("T-1/T-8 · dos cajeros distintos suman sin pisarse", async () => {
@@ -88,47 +91,100 @@ describe("procesarAporteEscrito", () => {
     await crearSesionAbierta(sesionId);
 
     await Promise.all([
-      procesarAporteEscrito(db, { sesionId, categoriaId, uid: "uid_ana" }, undefined, {
-        uid: "uid_ana",
-        nombre: "Ana",
-        cantidad: 30,
-        version: 1,
-      }),
-      procesarAporteEscrito(db, { sesionId, categoriaId, uid: "uid_luis" }, undefined, {
-        uid: "uid_luis",
-        nombre: "Luis",
-        cantidad: 25,
-        version: 1,
-      }),
+      procesarAporteEscrito(
+        db,
+        { sesionId, categoriaId, claveAporte: "uid_ana__area_1" },
+        undefined,
+        {
+          uid: "uid_ana",
+          areaId: "area_1",
+          nombre: "Ana",
+          cantidad: 30,
+          version: 1,
+        },
+      ),
+      procesarAporteEscrito(
+        db,
+        { sesionId, categoriaId, claveAporte: "uid_luis__area_1" },
+        undefined,
+        {
+          uid: "uid_luis",
+          areaId: "area_1",
+          nombre: "Luis",
+          cantidad: 25,
+          version: 1,
+        },
+      ),
     ]);
 
     const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
     expect(linea.get("cantidadTotal")).toBe(55);
     expect(linea.get("numAportantes")).toBe(2);
-    expect(linea.get("versiones")).toEqual({ uid_ana: 1, uid_luis: 1 });
+    expect(linea.get("versiones")).toEqual({ uid_ana__area_1: 1, uid_luis__area_1: 1 });
+    expect(linea.get("porArea")).toEqual({ area_1: 55 });
   });
 
-  it("D2/RNF-03 · dos entregas concurrentes del MISMO evento (mismo uid+version) no duplican el delta", async () => {
+  it("ADR-23 · dos aportes de la misma cajera en áreas distintas suman en porArea sin pisarse", async () => {
     const sesionId = `ses_${randomUUID()}`;
     const categoriaId = "cat_5000";
     await crearSesionAbierta(sesionId);
-    const params = { sesionId, categoriaId, uid: "uid_ana" };
+
+    await Promise.all([
+      procesarAporteEscrito(
+        db,
+        { sesionId, categoriaId, claveAporte: "uid_ana__area_caja" },
+        undefined,
+        {
+          uid: "uid_ana",
+          areaId: "area_caja",
+          nombre: "Ana",
+          cantidad: 15,
+          version: 1,
+        },
+      ),
+      procesarAporteEscrito(
+        db,
+        { sesionId, categoriaId, claveAporte: "uid_ana__area_bodega" },
+        undefined,
+        {
+          uid: "uid_ana",
+          areaId: "area_bodega",
+          nombre: "Ana",
+          cantidad: 10,
+          version: 1,
+        },
+      ),
+    ]);
+
+    const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
+    expect(linea.get("cantidadTotal")).toBe(25);
+    expect(linea.get("numAportantes")).toBe(2);
+    expect(linea.get("versiones")).toEqual({
+      uid_ana__area_caja: 1,
+      uid_ana__area_bodega: 1,
+    });
+    expect(linea.get("porArea")).toEqual({
+      area_caja: 15,
+      area_bodega: 10,
+    });
+  });
+
+  it("D2/RNF-03 · dos entregas concurrentes del MISMO evento (mismo uid+area+version) no duplican el delta", async () => {
+    const sesionId = `ses_${randomUUID()}`;
+    const categoriaId = "cat_5000";
+    await crearSesionAbierta(sesionId);
+    const params = { sesionId, categoriaId, claveAporte: "uid_ana__area_1" };
 
     // Estado previo: version 1 ya aplicada (cantidad 10).
     await procesarAporteEscrito(db, params, undefined, {
       uid: "uid_ana",
+      areaId: "area_1",
       nombre: "Ana",
       cantidad: 10,
       version: 1,
     });
 
-    // Firestore es at-least-once: el mismo evento (version 2) puede llegar
-    // dos veces en paralelo. Ambas transacciones leen `versiones.uid_ana: 1`
-    // antes de que la primera confirme, así que la guardia (60 <= 1) no basta
-    // por sí sola; lo que evita duplicar es que `runTransaction` detecta el
-    // conflicto de escritura sobre la misma línea y reintenta la perdedora,
-    // que en el reintento sí ve version 2 aplicada y se descarta.
-    const despues = { uid: "uid_ana", nombre: "Ana", cantidad: 25, version: 2 };
+    const despues = { uid: "uid_ana", areaId: "area_1", nombre: "Ana", cantidad: 25, version: 2 };
     await Promise.all([
       procesarAporteEscrito(db, params, undefined, despues),
       procesarAporteEscrito(db, params, undefined, despues),
@@ -137,7 +193,8 @@ describe("procesarAporteEscrito", () => {
     const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
     expect(linea.get("cantidadTotal")).toBe(25); // 10 + delta(15) aplicado UNA vez, no 40
     expect(linea.get("numAportantes")).toBe(1);
-    expect(linea.get("versiones")).toEqual({ uid_ana: 2 });
+    expect(linea.get("versiones")).toEqual({ uid_ana__area_1: 2 });
+    expect(linea.get("porArea")).toEqual({ area_1: 25 });
   });
 
   it("corrige un aporte propio por delta sin tocar el de otro cajero (doc 05 §2)", async () => {
@@ -145,29 +202,42 @@ describe("procesarAporteEscrito", () => {
     const categoriaId = "cat_5000";
     await crearSesionAbierta(sesionId);
 
-    await procesarAporteEscrito(db, { sesionId, categoriaId, uid: "uid_ana" }, undefined, {
-      uid: "uid_ana",
-      nombre: "Ana",
-      cantidad: 30,
-      version: 1,
-    });
-    await procesarAporteEscrito(db, { sesionId, categoriaId, uid: "uid_luis" }, undefined, {
-      uid: "uid_luis",
-      nombre: "Luis",
-      cantidad: 25,
-      version: 1,
-    });
+    await procesarAporteEscrito(
+      db,
+      { sesionId, categoriaId, claveAporte: "uid_ana__area_1" },
+      undefined,
+      {
+        uid: "uid_ana",
+        areaId: "area_1",
+        nombre: "Ana",
+        cantidad: 30,
+        version: 1,
+      },
+    );
+    await procesarAporteEscrito(
+      db,
+      { sesionId, categoriaId, claveAporte: "uid_luis__area_1" },
+      undefined,
+      {
+        uid: "uid_luis",
+        areaId: "area_1",
+        nombre: "Luis",
+        cantidad: 25,
+        version: 1,
+      },
+    );
     // Ana se equivocó: eran 28, no 30.
     await procesarAporteEscrito(
       db,
-      { sesionId, categoriaId, uid: "uid_ana" },
-      { uid: "uid_ana", nombre: "Ana", cantidad: 30, version: 1 },
-      { uid: "uid_ana", nombre: "Ana", cantidad: 28, version: 2 },
+      { sesionId, categoriaId, claveAporte: "uid_ana__area_1" },
+      { uid: "uid_ana", areaId: "area_1", nombre: "Ana", cantidad: 30, version: 1 },
+      { uid: "uid_ana", areaId: "area_1", nombre: "Ana", cantidad: 28, version: 2 },
     );
 
     const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
     expect(linea.get("cantidadTotal")).toBe(53);
     expect(linea.get("numAportantes")).toBe(2);
+    expect(linea.get("porArea")).toEqual({ area_1: 53 });
   });
 
   it("I-4 · no agrega sobre una sesión cerrada", async () => {
@@ -180,12 +250,18 @@ describe("procesarAporteEscrito", () => {
       totalUnidades: 0,
     });
 
-    await procesarAporteEscrito(db, { sesionId, categoriaId, uid: "uid_ana" }, undefined, {
-      uid: "uid_ana",
-      nombre: "Ana",
-      cantidad: 30,
-      version: 1,
-    });
+    await procesarAporteEscrito(
+      db,
+      { sesionId, categoriaId, claveAporte: "uid_ana__area_1" },
+      undefined,
+      {
+        uid: "uid_ana",
+        areaId: "area_1",
+        nombre: "Ana",
+        cantidad: 30,
+        version: 1,
+      },
+    );
 
     const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
     expect(linea.exists).toBe(false);
@@ -196,12 +272,18 @@ describe("procesarAporteEscrito", () => {
     const categoriaId = "cat_5000";
     await crearSesionAbierta(sesionId);
 
-    await procesarAporteEscrito(db, { sesionId, categoriaId, uid: "uid_ana" }, undefined, {
-      uid: "uid_ana",
-      nombre: "Ana",
-      cantidad: 30,
-      version: 1,
-    });
+    await procesarAporteEscrito(
+      db,
+      { sesionId, categoriaId, claveAporte: "uid_ana__area_1" },
+      undefined,
+      {
+        uid: "uid_ana",
+        areaId: "area_1",
+        nombre: "Ana",
+        cantidad: 30,
+        version: 1,
+      },
+    );
 
     const eventos = await db.collection("auditoria").where("sesionId", "==", sesionId).get();
     expect(eventos.size).toBe(1);
@@ -213,12 +295,18 @@ describe("procesarAporteEscrito", () => {
     const categoriaId = "cat_5000";
     await crearSesionAbierta(sesionId); // sucursalId: "suc_norte"
 
-    await procesarAporteEscrito(db, { sesionId, categoriaId, uid: "uid_ana" }, undefined, {
-      uid: "uid_ana",
-      nombre: "Ana",
-      cantidad: 30,
-      version: 1,
-    });
+    await procesarAporteEscrito(
+      db,
+      { sesionId, categoriaId, claveAporte: "uid_ana__area_1" },
+      undefined,
+      {
+        uid: "uid_ana",
+        areaId: "area_1",
+        nombre: "Ana",
+        cantidad: 30,
+        version: 1,
+      },
+    );
 
     const eventos = await db.collection("auditoria").where("sesionId", "==", sesionId).get();
     expect(eventos.docs[0]?.get("sucursalId")).toBe("suc_norte");
@@ -229,21 +317,27 @@ describe("procesarAporteEscrito", () => {
     const categoriaId = "cat_5000";
     await crearSesionAbierta(sesionId);
 
-    await procesarAporteEscrito(db, { sesionId, categoriaId, uid: "uid_ana" }, undefined, {
-      uid: "uid_ana",
-      nombre: "Ana",
-      cantidad: 30,
-      version: 1,
-    });
+    await procesarAporteEscrito(
+      db,
+      { sesionId, categoriaId, claveAporte: "uid_ana__area_1" },
+      undefined,
+      {
+        uid: "uid_ana",
+        areaId: "area_1",
+        nombre: "Ana",
+        cantidad: 30,
+        version: 1,
+      },
+    );
     const resumenTrasPrimero = await db.doc(`sesiones/${sesionId}/resumen/actual`).get();
     expect(resumenTrasPrimero.get("dirty")).toBe(true);
     expect(resumenTrasPrimero.get("marcaAportes")).toBe(1);
 
     await procesarAporteEscrito(
       db,
-      { sesionId, categoriaId, uid: "uid_ana" },
-      { uid: "uid_ana", nombre: "Ana", cantidad: 30, version: 1 },
-      { uid: "uid_ana", nombre: "Ana", cantidad: 28, version: 2 },
+      { sesionId, categoriaId, claveAporte: "uid_ana__area_1" },
+      { uid: "uid_ana", areaId: "area_1", nombre: "Ana", cantidad: 30, version: 1 },
+      { uid: "uid_ana", areaId: "area_1", nombre: "Ana", cantidad: 28, version: 2 },
     );
     const resumenTrasSegundo = await db.doc(`sesiones/${sesionId}/resumen/actual`).get();
     expect(resumenTrasSegundo.get("marcaAportes")).toBe(2); // sube, nunca se reinicia
@@ -258,12 +352,18 @@ describe("procesarAporteEscrito", () => {
       actualizadoEn: null,
     });
 
-    await procesarAporteEscrito(db, { sesionId, categoriaId, uid: "uid_ana" }, undefined, {
-      uid: "uid_ana",
-      nombre: "Ana",
-      cantidad: 30,
-      version: 1,
-    });
+    await procesarAporteEscrito(
+      db,
+      { sesionId, categoriaId, claveAporte: "uid_ana__area_1" },
+      undefined,
+      {
+        uid: "uid_ana",
+        areaId: "area_1",
+        nombre: "Ana",
+        cantidad: 30,
+        version: 1,
+      },
+    );
 
     const sync = await db.doc(`sesiones/${sesionId}/sincronizacion/estado`).get();
     expect(sync.get("participantes.uid_luis.confirmadoEn")).toBeNull();

@@ -5,7 +5,6 @@
 // el filtro "sólo pendientes" (doc 10 §2, "la función más útil del
 // dashboard"), el Deck de totales y la Hoja con teclado numérico.
 import type { Auth } from "firebase/auth";
-import { FirebaseError } from "firebase/app";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -28,7 +27,6 @@ import { useSesion } from "../state/useSesion.js";
 import { BannerPendientes } from "./BannerPendientes.js";
 import { BotonSalir } from "./BotonSalir.js";
 import { FilaCategoria } from "./FilaCategoria.js";
-import { HojaAreas } from "./HojaAreas.js";
 import { HojaNuevoProducto } from "./HojaNuevoProducto.js";
 import { ModalSesionCerrada } from "./ModalSesionCerrada.js";
 import { BarraProgreso } from "./primitivos/BarraProgreso.js";
@@ -38,37 +36,13 @@ import { Hoja } from "./primitivos/Hoja.js";
 import { Icono } from "./primitivos/Icono.js";
 import { Placa } from "./primitivos/Placa.js";
 
-/** Áreas activas del catálogo, para reetiquetar una línea reetiquetable
- *  (ADR-21/ADR-22) o preseleccionar una al crear un producto. Hook local, no
- *  un archivo en `state/`: un solo consumidor (esta pantalla) y ~6 líneas. */
+/** Áreas activas del catálogo, para preseleccionar una al crear un producto
+ *  (HojaNuevoProducto). Hook local, no un archivo en `state/`: un solo
+ *  consumidor (esta pantalla) y ~6 líneas. */
 function useAreasActivas(repo: ConteoRepository): Area[] {
   const [areas, setAreas] = useState<Area[]>([]);
   useEffect(() => repo.observarAreasActivas(setAreas), [repo]);
   return areas;
-}
-
-/**
- * mensajeDeErrorReetiquetado — mismo criterio que mensajeDeError en
- * HojaNuevoProducto.tsx: diferencia los códigos que
- * reetiquetarLineaEnSesionImpl puede rechazar de forma legítima
- * (packages/functions/src/callables/reetiquetar-linea-en-sesion.ts,
- * verificado por packages/functions/test/callables/reetiquetar-linea-en-sesion.test.ts)
- * — el resto (red, etc.) cae al mensaje genérico, que sigue siendo honesto
- * para una causa no reconocida.
- */
-function mensajeDeErrorReetiquetado(error: unknown): string {
-  if (error instanceof FirebaseError) {
-    if (error.code === "functions/failed-precondition") {
-      return "Esa categoría ya no se puede reetiquetar, o la sesión ya no está abierta.";
-    }
-    if (error.code === "functions/permission-denied") {
-      return "No tienes acceso a esta sesión.";
-    }
-    if (error.code === "functions/not-found") {
-      return "Esa línea o el área elegida ya no existen.";
-    }
-  }
-  return "No se pudo reetiquetar el área. Intenta de nuevo.";
 }
 
 export interface ConteoScreenProps {
@@ -150,8 +124,6 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
   const [soloPendientes, setSoloPendientes] = useState(false);
   const [areaFiltro, setAreaFiltro] = useState("");
   const [categoriaEnEdicion, setCategoriaEnEdicion] = useState<string | null>(null);
-  const [hojaAreasAbierta, setHojaAreasAbierta] = useState(false);
-  const [errorReetiquetado, setErrorReetiquetado] = useState<string | null>(null);
   const [nuevoProductoAbierta, setNuevoProductoAbierta] = useState(false);
   const areasActivas = useAreasActivas(repo);
 
@@ -199,26 +171,6 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
     setCategoriaEnEdicion(siguientePendiente(lineas, uid, categoriaEnEdicion));
   }
 
-  // ADR-22 (supersede parcial de ADR-21): reetiqueta el área de una línea
-  // cuya categoría sigue sin `areaId` de catálogo, tantas veces como el
-  // cajero quiera — nunca crea áreas, sólo las que el admin ya dio de alta.
-  // `areaId` ausente vuelve la línea a SIN_AREA ("Quitar área").
-  //
-  // La callable puede rechazar legítimamente (categoría fijada por admin,
-  // sesión cerrada, área inactiva/inexistente, sucursal equivocada — ver
-  // reetiquetar-linea-en-sesion.test.ts). Antes ese rechazo se perdía en un
-  // `void`: mismo criterio que confirmarCreacion en HojaNuevoProducto.tsx,
-  // ahora con console.error + mensaje visible al cajero.
-  async function reetiquetarArea(categoriaId: string, areaId?: string): Promise<void> {
-    setErrorReetiquetado(null);
-    try {
-      await repo.reetiquetarLineaEnSesion({ sesionId, categoriaId, areaId });
-    } catch (error) {
-      console.error("reetiquetarLineaEnSesion falló", error);
-      setErrorReetiquetado(mensajeDeErrorReetiquetado(error));
-    }
-  }
-
   // Cierra la Hoja sólo tras confirmar la escritura (no en un `finally`):
   // si `crearCategoriaEnSesion` rechaza, HojaNuevoProducto se queda abierta
   // mostrando el error y el nombre tecleado sigue ahí para reintentar.
@@ -242,18 +194,12 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
   // de arriba (BarraProgreso, progreso del EQUIPO, doc 10 §2) y
   // `siguientePendiente` (línea ~150) siguen leyendo `lineas` completas,
   // nunca `lineasVisibles`; este filtro no los toca.
-  const areas = [...new Set(lineas.map((l) => l.area))].sort();
-  // ADR-22: reetiquetables son las líneas de categorías SIN `areaId` de
-  // catálogo (`areaFijaPorAdmin === false`), sin importar su área actual —
-  // ya no sólo las que siguen en SIN_AREA (ADR-21). Se calcula de `lineas`
-  // completas, no de `lineasVisibles`, para no depender del filtro/búsqueda
-  // en curso.
-  const lineasReetiquetables = lineas.filter((l) => !l.areaFijaPorAdmin);
+  const areas = [...new Set(lineas.flatMap((l) => Object.keys(l.porArea ?? {})))].sort();
 
   const consulta = busqueda.trim().toLowerCase();
   const soloDigitos = consulta.replace(/\D/g, "");
   const lineasVisibles = lineas.filter((linea) => {
-    if (areaFiltro && linea.area !== areaFiltro) return false;
+    if (areaFiltro && !(linea.porArea && linea.porArea[areaFiltro])) return false;
     if (soloPendientes && !estaPendiente(linea, uid)) return false;
     if (!consulta) return true;
     return (
@@ -322,9 +268,9 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
 
         {/* Fila propia: no cabe apretada junto a búsqueda+Pendientes+Salir
             sin bajar del objetivo táctil mínimo (--size-toque). Con menos de
-            dos áreas el selector no filtraría nada, pero "Reetiquetar área
-            (N)" y "+ Producto" (ADR-21/ADR-22) no dependen del número de
-            áreas, sólo de que la sesión siga abierta. */}
+            dos áreas el selector no filtraría nada, pero "+ Producto"
+            (ADR-21) no depende del número de áreas, sólo de que la sesión
+            siga abierta. */}
         {(areas.length > 1 || !sesionCerrada) && (
           <div className="flex items-center gap-2">
             {areas.length > 1 && (
@@ -343,19 +289,6 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
                   ))}
                 </select>
               </label>
-            )}
-
-            {/* Desaparece con 0 líneas reetiquetables — no hay nada que
-                reetiquetar cuando toda categoría de la sesión ya tiene
-                `areaId` fijo en catálogo (ADR-22). */}
-            {!sesionCerrada && lineasReetiquetables.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setHojaAreasAbierta(true)}
-                className="min-h-[var(--size-toque)] shrink-0 rounded-placa border border-borde px-3 text-micro font-semibold text-tenue"
-              >
-                Reetiquetar área ({lineasReetiquetables.length})
-              </button>
             )}
 
             {!sesionCerrada && (
@@ -437,24 +370,6 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
         promedioCategoria={promedioEnEdicion}
         onConfirmar={confirmarDesdeHoja}
         onVolver={() => setCategoriaEnEdicion(null)}
-      />
-
-      {/* ADR-21/ADR-22. Montadas siempre (como Hoja arriba), después de ella
-          y antes de ModalSesionCerrada a propósito: si el admin cierra la
-          sesión con cualquiera de estas dos abierta, el showModal() del
-          modal bloqueante se invoca más tarde y queda encima en el top
-          layer nativo (orden de invocación, no de DOM — mismo criterio que
-          ModalSesionCerrada más abajo). */}
-      <HojaAreas
-        abierta={hojaAreasAbierta}
-        lineasReetiquetables={lineasReetiquetables}
-        areas={areasActivas}
-        error={errorReetiquetado}
-        onReetiquetar={reetiquetarArea}
-        onVolver={() => {
-          setHojaAreasAbierta(false);
-          setErrorReetiquetado(null);
-        }}
       />
 
       <HojaNuevoProducto

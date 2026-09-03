@@ -6,9 +6,8 @@
 // nunca dentro de FilaCategoria (fijada por 6 archivos de test y su medición
 // de ~82 px, doc 11 §4).
 import { FakeConteoRepository } from "@conteo/data";
-import type { Area, LineaConteo, SesionConteo } from "@conteo/shared";
-import { FirebaseError } from "firebase/app";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import type { LineaConteo, SesionConteo } from "@conteo/shared";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ConteoRepositoryProvider } from "../state/repositorio-contexto.js";
@@ -39,23 +38,12 @@ function crearLinea(overrides: Partial<LineaConteo> = {}): LineaConteo {
     categoriaId: "cat_5000",
     valorUnitario: 5000,
     etiqueta: "$5.000",
-    area: "Aseo",
-    areaFijaPorAdmin: false,
+    porArea: {},
     cantidadTotal: 0,
     numAportantes: 0,
     versiones: {},
     actualizadaEn: new Date("2026-08-02T08:00:00Z"),
     actualizadaPor: "",
-    ...overrides,
-  };
-}
-
-function crearArea(overrides: Partial<Area> = {}): Area {
-  return {
-    areaId: "area_aseo",
-    nombre: "Aseo",
-    activa: true,
-    creadaEn: new Date("2026-01-15T10:00:00Z"),
     ...overrides,
   };
 }
@@ -77,7 +65,7 @@ function crearSesion(overrides: Partial<SesionConteo> = {}): SesionConteo {
   };
 }
 
-describe("ConteoScreen · catálogo en conteo (ADR-21/ADR-22, doc 11 §4/§10)", () => {
+describe("ConteoScreen · catálogo en conteo (ADR-21, doc 11 §4/§10)", () => {
   it("la confirmación es obligatoria: crearCategoriaEnSesion no se llama hasta 'Sí, crear', y 'Corregir' cancela sin llamar", async () => {
     const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
     repo.sembrarLinea("ses_1", crearLinea());
@@ -107,85 +95,14 @@ describe("ConteoScreen · catálogo en conteo (ADR-21/ADR-22, doc 11 §4/§10)",
     });
   });
 
-  it('con 12 líneas reetiquetables aparece "Reetiquetar área (12)"', async () => {
+  it("con sesión cerrada no existe el botón + Producto", async () => {
     const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
-    for (let i = 0; i < 12; i++) {
-      repo.sembrarLinea("ses_1", crearLinea({ categoriaId: `cat_${i}`, area: "Sin área" }));
-    }
-    renderConteoScreen(repo);
-
-    expect(
-      await screen.findByRole("button", { name: /reetiquetar área \(12\)/i }),
-    ).toBeInTheDocument();
-  });
-
-  // Par negativo del test anterior (AGENTS.md §2): sin esto, "N > 0" podría
-  // invertirse o desaparecer sin que ningún test lo note.
-  it("con 0 líneas reetiquetables (areaId ya fijo en catálogo) el botón no existe", async () => {
-    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
-    repo.sembrarLinea("ses_1", crearLinea({ area: "Aseo", areaFijaPorAdmin: true }));
-    renderConteoScreen(repo);
-
-    expect(await screen.findByRole("button", { name: /\+ producto/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /reetiquetar área/i })).not.toBeInTheDocument();
-  });
-
-  it("reetiquetar desde HojaAreas llama a reetiquetarLineaEnSesion con los args exactos, y sigue reetiquetable después (ADR-22)", async () => {
-    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
-    repo.sembrarArea(crearArea({ areaId: "area_cocina", nombre: "Cocina" }));
-    repo.sembrarLinea("ses_1", crearLinea({ area: "Sin área" }));
-    renderConteoScreen(repo);
-
-    fireEvent.click(await screen.findByRole("button", { name: /reetiquetar área \(1\)/i }));
-    // Con `within`, no ambiguo con el "Sumar $5.000" de FilaCategoria fuera
-    // del diálogo: el mismo texto vive en dos botones distintos de la pantalla.
-    const dialogoReetiquetar = screen.getByRole("dialog", { name: /reetiquetar área/i });
-    fireEvent.click(within(dialogoReetiquetar).getByRole("button", { name: /\$5\.000/ }));
-    fireEvent.click(within(dialogoReetiquetar).getByRole("button", { name: "Cocina" }));
-
-    expect(repo.llamadas).toHaveLength(1);
-    expect(repo.llamadas[0]).toEqual({
-      metodo: "reetiquetarLineaEnSesion",
-      payload: { sesionId: "ses_1", categoriaId: "cat_5000", areaId: "area_cocina" },
-    });
-    // ADR-22, a diferencia de la vieja vincularArea (ADR-21): la afordancia
-    // NO se autoextingue — la línea sigue sin `areaId` de catálogo, así que
-    // sigue siendo reetiquetable.
-    expect(screen.getByRole("button", { name: /reetiquetar área \(1\)/i })).toBeInTheDocument();
-  });
-
-  // Antes: un rechazo de reetiquetarLineaEnSesion (failed-precondition,
-  // permission-denied, not-found — reetiquetar-linea-en-sesion.test.ts) se
-  // perdía en un `void` sin try/catch ni estado de error. El cajero no
-  // recibía ninguna señal de que el reetiquetado no se aplicó.
-  it("si reetiquetarLineaEnSesion rechaza, el cajero ve un mensaje de error visible", async () => {
-    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
-    repo.sembrarArea(crearArea({ areaId: "area_cocina", nombre: "Cocina" }));
-    repo.sembrarLinea("ses_1", crearLinea({ area: "Sin área" }));
-    repo.reetiquetarLineaEnSesion = vi
-      .fn()
-      .mockRejectedValue(new FirebaseError("functions/failed-precondition", "sesión cerrada"));
-    renderConteoScreen(repo);
-
-    fireEvent.click(await screen.findByRole("button", { name: /reetiquetar área \(1\)/i }));
-    const dialogoReetiquetar = screen.getByRole("dialog", { name: /reetiquetar área/i });
-    fireEvent.click(within(dialogoReetiquetar).getByRole("button", { name: /\$5\.000/ }));
-    fireEvent.click(within(dialogoReetiquetar).getByRole("button", { name: "Cocina" }));
-
-    expect(
-      await within(dialogoReetiquetar).findByRole("status"),
-    ).toHaveTextContent(/no se puede reetiquetar|sesión ya no está abierta/i);
-  });
-
-  it("con sesión cerrada no existe ninguno de los dos botones", async () => {
-    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
-    repo.sembrarLinea("ses_1", crearLinea({ area: "Sin área" }));
+    repo.sembrarLinea("ses_1", crearLinea());
     repo.sembrarSesion(crearSesion({ estado: "cerrada" }));
     renderConteoScreen(repo);
 
     expect(await screen.findByRole("dialog", { name: /sesión cerrada/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /\+ producto/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /reetiquetar área/i })).not.toBeInTheDocument();
   });
 
   it("regresión doc 11 §10: ningún nombre accesible matchea /cerrar|descartar/i, y sigue habiendo un solo role=alert como máximo", async () => {
@@ -193,11 +110,11 @@ describe("ConteoScreen · catálogo en conteo (ADR-21/ADR-22, doc 11 §4/§10)",
       { uid: "uid_ana", nombre: "Ana Ramírez" },
       { retrasoSincronizacionMs: 10_000 },
     );
-    repo.sembrarLinea("ses_1", crearLinea({ area: "Sin área" }));
+    repo.sembrarLinea("ses_1", crearLinea());
     renderConteoScreen(repo);
 
-    // Dispara el banner de pendientes (único role="alert" permitido) con las
-    // dos hojas nuevas montadas (cerradas) alrededor.
+    // Dispara el banner de pendientes (único role="alert" permitido) con la
+    // hoja montada (cerrada).
     fireEvent.click(await screen.findByRole("button", { name: /sumar \$5\.000/i }));
     await screen.findByRole("alert");
     expect(screen.getAllByRole("alert")).toHaveLength(1);

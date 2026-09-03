@@ -3,9 +3,9 @@ import { construirFirebaseConfig } from "./firebase.js";
 
 describe("construirFirebaseConfig", () => {
   it("en un build real sin emuladores y sin variables reales, revienta en vez de caer al demo", () => {
-    expect(() =>
-      construirFirebaseConfig({}, { usaEmuladores: false, esBuildReal: true }),
-    ).toThrow(/VITE_FIREBASE_API_KEY/);
+    expect(() => construirFirebaseConfig({}, { usaEmuladores: false, esBuildReal: true })).toThrow(
+      /VITE_FIREBASE_API_KEY/,
+    );
   });
 
   it("bajo emuladores, cae al proyecto demo aunque sea un build real", () => {

@@ -1,7 +1,6 @@
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { FieldValue, getFirestore, type Firestore } from "firebase-admin/firestore";
 import { crearCategoriaEnSesionSchema, type CrearCategoriaEnSesionInput } from "@conteo/contracts";
-import { SIN_AREA } from "@conteo/shared/models/linea-conteo.js";
 import {
   autorizacionDe,
   exigirAdminOCajeroDeSesion,
@@ -46,7 +45,6 @@ export async function crearCategoriaEnSesionImpl(
     const sesion = await tx.get(sesionRef);
     const { sucursalId } = exigirAdminOCajeroDeSesion(auth, sesion);
 
-    let nombreArea = SIN_AREA;
     if (areaRef) {
       const area = await tx.get(areaRef);
       if (!area.exists) {
@@ -55,7 +53,6 @@ export async function crearCategoriaEnSesionImpl(
       if (area.get("activa") !== true) {
         throw new HttpsError("failed-precondition", "El área no está activa");
       }
-      nombreArea = area.get("nombre") as string;
     }
 
     tx.create(categoriaRef, {
@@ -74,11 +71,6 @@ export async function crearCategoriaEnSesionImpl(
         categoriaId: categoriaRef.id,
         valorUnitario: 0,
         etiqueta,
-        area: nombreArea,
-        // ADR-22: si el cajero fija un área al crear el producto, esta misma
-        // transacción la guarda en `categoriaRef.areaId` (línea de arriba) —
-        // queda fija de inmediato, igual que si la hubiera fijado el admin.
-        areaFijaPorAdmin: Boolean(areaId),
         actualizadaPor: auth.uid,
       }),
     );

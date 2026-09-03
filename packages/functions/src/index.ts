@@ -27,7 +27,6 @@ export { actualizarArea } from "./callables/actualizar-area.js";
 export { desactivarArea } from "./callables/desactivar-area.js";
 export { eliminarArea } from "./callables/eliminar-area.js";
 export { reactivarArea } from "./callables/reactivar-area.js";
-export { reetiquetarLineaEnSesion } from "./callables/reetiquetar-linea-en-sesion.js";
 export { crearCategoriaEnSesion } from "./callables/crear-categoria-en-sesion.js";
 export { recalcularResumenes } from "./scheduled/recalcular-resumenes.js";
 export { reconciliarLineas } from "./scheduled/reconciliar-lineas.js";

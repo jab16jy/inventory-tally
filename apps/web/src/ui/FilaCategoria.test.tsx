@@ -5,18 +5,18 @@
 // Archivo nuevo: los cinco de la primera ola son la red de regresión del
 // rediseño y quedan intactos.
 import { FakeConteoRepository } from "@conteo/data";
+import type { LineaConteo } from "@conteo/shared";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ConteoRepositoryProvider } from "../state/repositorio-contexto.js";
 import { FilaCategoria } from "./FilaCategoria.js";
 
 function renderFila(repo: FakeConteoRepository, versiones: Record<string, number> = {}) {
-  const linea = {
+  const linea: LineaConteo = {
     categoriaId: "cat_5000",
     valorUnitario: 5000,
     etiqueta: "$5.000",
-    area: "Aseo",
-    areaFijaPorAdmin: false,
+    porArea: {},
     cantidadTotal: 0,
     numAportantes: 0,
     versiones,
@@ -51,8 +51,7 @@ describe("FilaCategoria · estado de sincronización (RF-16)", () => {
       categoriaId: "cat_5000",
       valorUnitario: 5000,
       etiqueta: "$5.000",
-      area: "Aseo",
-      areaFijaPorAdmin: false,
+      porArea: {},
       cantidadTotal: 0,
       numAportantes: 0,
       versiones: {},

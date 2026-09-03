@@ -17,7 +17,8 @@ import type { LineaConteo } from "../models/linea-conteo.js";
  */
 export function aporteConfirmado(linea: LineaConteo, aporte: Aporte | null): boolean {
   if (!aporte) return false;
-  return (linea.versiones[aporte.uid] ?? 0) >= aporte.version;
+  const clave = aporte.areaId ? `${aporte.uid}__${aporte.areaId}` : aporte.uid;
+  return (linea.versiones[clave] ?? linea.versiones[aporte.uid] ?? 0) >= aporte.version;
 }
 
 /**

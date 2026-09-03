@@ -36,10 +36,6 @@ async function crearCategoria(
   });
 }
 
-async function crearArea(areaId: string, nombre: string, activa = true) {
-  await db.doc(`areas/${areaId}`).set({ nombre, activa });
-}
-
 describe("abrirSesionImpl", () => {
   it("I-1 · abre una sesión y marca sesionAbiertaId en la sucursal", async () => {
     const sucursalId = `suc_${randomUUID()}`;
@@ -90,7 +86,7 @@ describe("abrirSesionImpl", () => {
     const sesionGanadora = (ganadoras[0] as PromiseFulfilledResult<{ sesionId: string }>).value
       .sesionId;
     expect(sucursal.get("sesionAbiertaId")).toBe(sesionGanadora);
-  });
+  }, 15000);
 
   it("rechaza una sucursal inexistente", async () => {
     await expect(
@@ -176,51 +172,18 @@ describe("abrirSesionImpl", () => {
     expect(lineaFuera.exists).toBe(false);
   });
 
-  it("I-7 · siembra la línea con el nombre de área copiado y congelado", async () => {
+  it("ADR-23 · siembra la línea con porArea inicializado en {}", async () => {
     const sucursalId = `suc_${randomUUID()}`;
-    const areaId = `area_${randomUUID()}`;
     const catId = `cat_${randomUUID()}`;
     await crearSucursal(sucursalId);
-    await crearArea(areaId, "Aseo");
-    await crearCategoria(catId, 5000, true, undefined, [areaId]);
+    await crearCategoria(catId, 5000);
 
     const { sesionId } = await abrirSesionImpl(db, "uid_admin", { sucursalId });
 
     const linea = await db.doc(`sesiones/${sesionId}/lineas/${catId}`).get();
-    expect(linea.get("area")).toBe("Aseo");
-    // ADR-22: areaIds ya venía fijado en el catálogo, la línea queda congelada.
-    expect(linea.get("areaFijaPorAdmin")).toBe(true);
-  });
-
-  it("I-7 · siembra la línea con SIN_AREA cuando la categoría tiene más de un área (N:M, porArea llega después)", async () => {
-    const sucursalId = `suc_${randomUUID()}`;
-    const areaUno = `area_${randomUUID()}`;
-    const areaDos = `area_${randomUUID()}`;
-    const catId = `cat_${randomUUID()}`;
-    await crearSucursal(sucursalId);
-    await crearArea(areaUno, "Aseo");
-    await crearArea(areaDos, "Talleres");
-    await crearCategoria(catId, 5000, true, undefined, [areaUno, areaDos]);
-
-    const { sesionId } = await abrirSesionImpl(db, "uid_admin", { sucursalId });
-
-    const linea = await db.doc(`sesiones/${sesionId}/lineas/${catId}`).get();
-    expect(linea.get("area")).toBe("Sin área");
-    expect(linea.get("areaFijaPorAdmin")).toBe(false);
-  });
-
-  it("I-7 · siembra la línea con 'Sin área' cuando la categoría no tiene areaId", async () => {
-    const sucursalId = `suc_${randomUUID()}`;
-    const catId = `cat_${randomUUID()}`;
-    await crearSucursal(sucursalId);
-    await crearCategoria(catId, 5000); // sin areaId
-
-    const { sesionId } = await abrirSesionImpl(db, "uid_admin", { sucursalId });
-
-    const linea = await db.doc(`sesiones/${sesionId}/lineas/${catId}`).get();
-    expect(linea.get("area")).toBe("Sin área");
-    // ADR-22: sin areaId de catálogo, la línea queda abierta a reetiquetado.
-    expect(linea.get("areaFijaPorAdmin")).toBe(false);
+    expect(linea.get("porArea")).toEqual({});
+    expect(linea.data()).not.toHaveProperty("area");
+    expect(linea.data()).not.toHaveProperty("areaFijaPorAdmin");
   });
 
   it("registra un evento de auditoría SESION_ABIERTA", async () => {

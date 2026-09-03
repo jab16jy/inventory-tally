@@ -47,23 +47,30 @@ async function reconciliarUnaLinea(
 
     const aplicados: Record<string, number> = {};
     const versiones: Record<string, number> = {};
+    const porArea: Record<string, number> = {};
     for (const aporte of aportesSnap.docs) {
-      aplicados[aporte.id] = aporte.get("cantidad") as number;
-      versiones[aporte.id] = aporte.get("version") as number;
+      const cant = (aporte.get("cantidad") as number | undefined) ?? 0;
+      aplicados[aporte.id] = cant;
+      versiones[aporte.id] = (aporte.get("version") as number | undefined) ?? 0;
+      const areaId = aporte.get("areaId") as string | undefined;
+      if (areaId) {
+        porArea[areaId] = (porArea[areaId] ?? 0) + cant;
+      }
     }
     const esperado = cantidadTotalDesdeAportes(aportesSnap.docs.map((d) => d.data() as Aporte));
     const cantidadAnterior = (linea.get("cantidadTotal") as number | undefined) ?? 0;
     if (esperado === cantidadAnterior) return; // idempotencia: nada que corregir
 
     // `tx.update` (reemplazo TOTAL), no `set({merge:true})`: el trigger
-    // calcula su delta contra `aplicados[uid]` (on-aporte-escrito.ts), así
+    // calcula su delta contra `aplicados[claveAporte]` (on-aporte-escrito.ts), así
     // que corregir sólo `cantidadTotal` deja un baseline fantasma — el
-    // siguiente aporte de ese uid volvería a corromper el total. `merge`
-    // además dejaría vivas claves de uids sin aporte real.
+    // siguiente aporte de esa clave volvería a corromper el total. `merge`
+    // además dejaría vivas claves sin aporte real.
     tx.update(lineaRef, {
       cantidadTotal: esperado,
       aplicados,
       versiones,
+      porArea,
       numAportantes: aportesSnap.size,
       actualizadaEn: FieldValue.serverTimestamp(),
       actualizadaPor: "reconciliacion",

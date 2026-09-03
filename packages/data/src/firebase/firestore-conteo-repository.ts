@@ -30,7 +30,6 @@ import type { Pagina } from "../repositories/admin-repository.js";
 import type {
   ConteoRepository,
   CrearCategoriaEnSesionPayload,
-  ReetiquetarLineaEnSesionPayload,
   RegistrarAporteInput,
   Unsubscribe,
 } from "../repositories/conteo-repository.js";
@@ -306,10 +305,6 @@ export class FirestoreConteoRepository implements ConteoRepository {
     });
   }
 
-  async reetiquetarLineaEnSesion(payload: ReetiquetarLineaEnSesionPayload): Promise<void> {
-    await this.llamar("reetiquetarLineaEnSesion", payload);
-  }
-
   async crearCategoriaEnSesion(
     payload: CrearCategoriaEnSesionPayload,
   ): Promise<{ categoriaId: string }> {
@@ -408,8 +403,7 @@ export class FirestoreConteoRepository implements ConteoRepository {
   // normal). El round-trip por JSON elimina las claves `undefined` en vez de
   // dejar que Firebase las convierta: es el único punto por el que pasan
   // TODAS las llamadas de este repositorio, así que arregla la causa raíz
-  // una sola vez, no por schema. `null` explícito (p.ej. "Quitar área" de
-  // reetiquetarLineaEnSesion) sí sobrevive el round-trip intacto.
+  // una sola vez, no por schema. `null` explícito sí sobrevive el round-trip intacto.
   private async llamar<Entrada, Salida>(nombre: string, payload: Entrada): Promise<Salida> {
     const llamada = httpsCallable<Entrada, Salida>(this.functions, nombre);
     const payloadSaneado = JSON.parse(JSON.stringify(payload)) as Entrada;
