@@ -7,16 +7,16 @@ import { registrarAuditoria } from "../lib/auditoria.js";
 
 /**
  * actualizarCategoriaImpl — núcleo de la callable (docs/plan-panel-administrador.md
- * §3). Editables: `etiqueta`, `valor`, `orden`, `areaId`, `sucursalesAsignadas`
+ * §3). Editables: `etiqueta`, `valor`, `orden`, `areaIds`, `sucursalesAsignadas`
  * — mismo conjunto que crearCategoriaImpl. `activa`/`creadaEn` los maneja
  * desactivar/reactivarCategoria (I-7), no esta callable. Sin guarda de
  * nombre duplicado: a diferencia de área, `categoriasValor` no tiene esa
  * invariante (ver crear-categoria.ts).
  *
- * `areaId`/`sucursalesAsignadas` son opcionales en el modelo: si el input
+ * `areaIds`/`sucursalesAsignadas` son opcionales en el modelo: si el input
  * los omite, se borra el campo con `FieldValue.delete()` en vez de dejar un
- * `undefined` (que `tx.update` rechaza) — así una edición puede quitar un
- * área o volver una categoría "nombrada" a global.
+ * `undefined` (que `tx.update` rechaza) — así una edición puede quitar todas
+ * las áreas o volver una categoría "nombrada" a global.
  *
  * I-7 (issue #67): esta callable NUNCA toca `sesiones/*\/lineas`. Cambiar
  * `valor` aquí no afecta ninguna sesión ya abierta porque `resumen.ts` lee
@@ -29,7 +29,7 @@ export async function actualizarCategoriaImpl(
   ejecutadoPor: string,
   input: ActualizarCategoriaInput,
 ): Promise<{ categoriaId: string; actualizada: true }> {
-  const { categoriaId, etiqueta, valor, orden, areaId, sucursalesAsignadas } = input;
+  const { categoriaId, etiqueta, valor, orden, areaIds, sucursalesAsignadas } = input;
   const categoriaRef = db.doc(`categoriasValor/${categoriaId}`);
 
   await db.runTransaction(async (tx) => {
@@ -42,7 +42,7 @@ export async function actualizarCategoriaImpl(
       etiqueta,
       valor,
       orden,
-      areaId: areaId ?? FieldValue.delete(),
+      areaIds: areaIds ?? FieldValue.delete(),
       sucursalesAsignadas: sucursalesAsignadas ?? FieldValue.delete(),
     });
     registrarAuditoria(tx, db, {

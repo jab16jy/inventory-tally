@@ -23,7 +23,7 @@ import { registrarAuditoria } from "../lib/auditoria.js";
  * snapshot de la sesión se lee aquí mismo y se pasa a
  * `exigirAdminOCajeroDeSesion`.
  *
- * Condición dura (no negociable): una categoría con `areaId` ya fijado en el
+ * Condición dura (no negociable): una categoría con `areaIds` ya fijado en el
  * catálogo — por el admin, o por el propio cajero al crear el producto vía
  * `crearCategoriaEnSesion` — es intocable, sin excepción. Por eso el chequeo
  * lee `categoriasValor/{categoriaId}` EN VIVO dentro de la misma transacción,
@@ -56,7 +56,8 @@ export async function reetiquetarLineaEnSesionImpl(
     if (!categoria.exists) {
       throw new HttpsError("not-found", "Categoría inexistente");
     }
-    if (categoria.get("areaId") !== undefined) {
+    const areaIdsDeCatalogo = categoria.get("areaIds") as readonly string[] | undefined;
+    if (areaIdsDeCatalogo !== undefined && areaIdsDeCatalogo.length === 1) {
       throw new HttpsError(
         "failed-precondition",
         "Esta categoría tiene un área fija asignada por administración",

@@ -28,7 +28,7 @@ function useSucursales(): Sucursal[] {
 }
 
 // Mismo patrón que useSucursales de arriba: se necesita tanto en la tabla
-// (resolver areaId → nombre) como en el formulario (poblar el <select>).
+// (resolver areaIds → nombres) como en el formulario (poblar los checkboxes).
 // Trackea `cargando` igual que useCategorias de abajo y que el useAreas() de
 // AreasScreen.tsx: sin esto, la tabla se pinta con datos ("Sin área" para
 // toda fila) antes de que observarAreas resuelva (issue #52).
@@ -62,9 +62,17 @@ function useCategorias(): { categorias: CategoriaValor[]; cargando: boolean } {
   return { categorias, cargando };
 }
 
+// N:M (issue #81): la columna lista los N nombres de área, o el aviso pasivo
+// "Sin área" cuando `areaIds` está vacío/ausente — nunca un bloqueo.
+function nombresDeAreas(categoria: CategoriaValor, areas: Area[]): string {
+  const nombres = (categoria.areaIds ?? [])
+    .map((id) => areas.find((a) => a.areaId === id)?.nombre)
+    .filter((nombre): nombre is string => Boolean(nombre));
+  return nombres.length > 0 ? nombres.join(", ") : "Sin área";
+}
+
 type EstadoFormulario =
-  | { readonly modo: "crear" }
-  | { readonly modo: "editar"; readonly categoria: CategoriaValor };
+  { readonly modo: "crear" } | { readonly modo: "editar"; readonly categoria: CategoriaValor };
 
 export function CategoriasScreen() {
   const repo = useAdminRepository();
@@ -183,8 +191,8 @@ export function CategoriasScreen() {
     {
       clave: "area",
       etiqueta: "Área",
-      render: (c) => areas.find((a) => a.areaId === c.areaId)?.nombre ?? "Sin área",
-      valorOrden: (c) => areas.find((a) => a.areaId === c.areaId)?.nombre ?? "",
+      render: (c) => nombresDeAreas(c, areas),
+      valorOrden: (c) => nombresDeAreas(c, areas),
     },
     {
       clave: "activa",
@@ -342,7 +350,9 @@ function FormularioCategoria({
   const [etiqueta, setEtiqueta] = useState(categoria?.etiqueta ?? "");
   const [valor, setValor] = useState(categoria ? String(categoria.valor) : "");
   const [orden, setOrden] = useState(categoria ? String(categoria.orden) : "");
-  const [areaId, setAreaId] = useState(categoria?.areaId ?? "");
+  const [areaIds, setAreaIds] = useState<string[]>(
+    categoria?.areaIds ? [...categoria.areaIds] : [],
+  );
   const [sucursalesAsignadas, setSucursalesAsignadas] = useState<string[]>(
     categoria?.sucursalesAsignadas ? [...categoria.sucursalesAsignadas] : [],
   );
@@ -351,7 +361,6 @@ function FormularioCategoria({
   const idEtiqueta = useId();
   const idValor = useId();
   const idOrden = useId();
-  const idArea = useId();
 
   // D6: la sola presencia de sucursales marcadas ES la distinción entre
   // categoría global y "nombrada" — no hay un toggle aparte de tipo.
@@ -363,6 +372,13 @@ function FormularioCategoria({
     );
   }
 
+  // N:M (issue #81): mismo patrón de checkbox múltiple que alternarSucursal.
+  function alternarArea(areaId: string): void {
+    setAreaIds((actual) =>
+      actual.includes(areaId) ? actual.filter((id) => id !== areaId) : [...actual, areaId],
+    );
+  }
+
   async function manejarEnvio(evento: FormEvent<HTMLFormElement>): Promise<void> {
     evento.preventDefault();
     setEnviando(true);
@@ -371,7 +387,7 @@ function FormularioCategoria({
         etiqueta,
         valor: Number(valor),
         orden: Number(orden),
-        ...(areaId && { areaId }),
+        ...(areaIds.length > 0 && { areaIds }),
         ...(sucursalesAsignadas.length > 0 && { sucursalesAsignadas }),
       };
       if (modo === "crear") {
@@ -389,7 +405,7 @@ function FormularioCategoria({
       onSubmit={(evento) => void manejarEnvio(evento)}
       className="mb-6 flex flex-col gap-4 rounded-placa border border-borde bg-placa p-4"
     >
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div>
           <label htmlFor={idEtiqueta} className="mb-1.5 block text-micro text-tenue">
             Etiqueta
@@ -434,26 +450,27 @@ function FormularioCategoria({
             className={CAMPO}
           />
         </div>
-
-        <div>
-          <label htmlFor={idArea} className="mb-1.5 block text-micro text-tenue">
-            Área
-          </label>
-          <select
-            id={idArea}
-            value={areaId}
-            onChange={(e) => setAreaId(e.target.value)}
-            className={CAMPO}
-          >
-            <option value="">Sin área</option>
-            {areas.map((a) => (
-              <option key={a.areaId} value={a.areaId}>
-                {a.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
+
+      {areas.length > 0 && (
+        <fieldset>
+          <legend className="mb-1.5 block text-micro text-tenue">
+            Áreas (ninguna marcada = sin área, aviso pasivo en la tabla)
+          </legend>
+          <div className="flex flex-wrap gap-3">
+            {areas.map((a) => (
+              <label key={a.areaId} className="flex items-center gap-1.5 text-micro text-tinta">
+                <input
+                  type="checkbox"
+                  checked={areaIds.includes(a.areaId)}
+                  onChange={() => alternarArea(a.areaId)}
+                />
+                {a.nombre}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
 
       {sucursales.length > 0 && (
         <fieldset>

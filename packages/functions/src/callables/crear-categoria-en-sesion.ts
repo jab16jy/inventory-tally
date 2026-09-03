@@ -65,7 +65,7 @@ export async function crearCategoriaEnSesionImpl(
       activa: true,
       creadaEn: FieldValue.serverTimestamp(),
       sucursalesAsignadas: [sucursalId],
-      ...(areaId && { areaId }),
+      ...(areaId && { areaIds: [areaId] }),
     });
 
     tx.create(

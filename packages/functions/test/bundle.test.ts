@@ -56,18 +56,18 @@ describe("bundle desplegable (lib/index.js)", () => {
     }
   });
 
-  it("el script `build` produce lib/index.js con exactamente los exports de src/index.ts y pesa menos de 50 KB", async () => {
+  it("el script `build` produce lib/index.js con exactamente los exports de src/index.ts y pesa menos de 55 KB", async () => {
     // ponytail: el `timeout` va aquí y no basta con el de `it` — execSync
     // bloquea el hilo único, así que el temporizador de Vitest no puede
     // dispararse mientras el proceso hijo siga vivo. Sin esto, un build colgado
     // cuelga también el job de CI.
     execSync("npm run build", { cwd: RAIZ, timeout: 60_000 });
 
-    // 50 KB: el bundle propio pesa ~30 KB y sólo crece con código nuevo de este
-    // paquete. El umbral no vigila ese crecimiento, vigila el salto de orden de
+    // 55 KB (issue #81 subió el bundle propio a ~50 KB): el umbral no vigila
+    // el crecimiento normal de código propio, vigila el salto de orden de
     // magnitud de volver a inlinar una dependencia — con zod dentro son 573 KB.
     // Si el código propio llegara a acercarse, subir el número es lo correcto.
-    expect(statSync(SALIDA).size).toBeLessThan(50 * 1024);
+    expect(statSync(SALIDA).size).toBeLessThan(55 * 1024);
 
     // ponytail: specifier relativo, no `pathToFileURL(SALIDA).href` — con una
     // ruta con espacios (p.ej. "PC RYZEN" en el perfil de Windows), el

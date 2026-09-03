@@ -69,7 +69,7 @@ describe("actualizarCategoriaImpl", () => {
       etiqueta: etiquetaNueva,
       valor: 2000,
       orden: 2,
-      areaId: "area_aseo",
+      areaIds: ["area_aseo", "area_bebidas"],
       sucursalesAsignadas: ["suc_norte"],
     });
 
@@ -78,7 +78,7 @@ describe("actualizarCategoriaImpl", () => {
     expect(categoria.get("etiqueta")).toBe(etiquetaNueva);
     expect(categoria.get("valor")).toBe(2000);
     expect(categoria.get("orden")).toBe(2);
-    expect(categoria.get("areaId")).toBe("area_aseo");
+    expect(categoria.get("areaIds")).toEqual(["area_aseo", "area_bebidas"]);
     expect(categoria.get("sucursalesAsignadas")).toEqual(["suc_norte"]);
 
     const eventos = await db
@@ -117,9 +117,9 @@ describe("actualizarCategoriaImpl", () => {
     ).rejects.toMatchObject({ code: "not-found" });
   });
 
-  it("borra areaId/sucursalesAsignadas cuando la edición los omite (vuelve a categoría global)", async () => {
+  it("borra areaIds/sucursalesAsignadas cuando la edición los omite (vuelve a categoría global)", async () => {
     const categoriaId = await sembrarCategoria({
-      areaId: "area_aseo",
+      areaIds: ["area_aseo"],
       sucursalesAsignadas: ["suc_norte"],
     });
 
@@ -131,7 +131,7 @@ describe("actualizarCategoriaImpl", () => {
     });
 
     const categoria = await db.doc(`categoriasValor/${categoriaId}`).get();
-    expect(categoria.data()).not.toHaveProperty("areaId");
+    expect(categoria.data()).not.toHaveProperty("areaIds");
     expect(categoria.data()).not.toHaveProperty("sucursalesAsignadas");
   });
 

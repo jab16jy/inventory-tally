@@ -603,7 +603,12 @@ acumulado hasta hoy.
 
 ## ADR-21 {#adr-21}
 
-### `"Sin área"` es un hueco, no un valor congelado
+### `"Sin área"` es un hueco, no un valor congelado — **superseded por [ADR-23](#adr-23)**
+
+> **Superseded.** [ADR-23](#adr-23) rediseña el área como división de trabajo del
+> contador: el sentinel `SIN_AREA`, el campo `LineaConteo.area` y la lectura de
+> [ADR-07](#adr-07) que sostenía esta decisión ya no aplican. Se conserva como registro
+> histórico de por qué el modelo anterior existió.
 
 **Contexto.** La invariante I-7 ([03 §6](03-modelo-de-dominio.md)) congela `valorUnitario`
 en la línea al sembrarla, por una razón contable concreta: si el negocio sube un precio de
@@ -667,7 +672,11 @@ acumulado — sólo a los cierres posteriores.
 
 ## ADR-22 {#adr-22}
 
-### Reetiquetado de línea por sesión — supersede parcial de ADR-21
+### Reetiquetado de línea por sesión — supersede parcial de ADR-21 — **superseded por [ADR-23](#adr-23)**
+
+> **Superseded.** [ADR-23](#adr-23) borra el reetiquetado que esta decisión introdujo: el
+> área deja de ser un campo de línea que se corrige, así que no hay nada que reetiquetar.
+> Se conserva como registro histórico.
 
 **Contexto.** [ADR-21](#adr-21) resolvió el hueco de `"Sin área"`, pero sólo en un
 sentido: de `SIN_AREA` a un área real, una sola vez. En la práctica, el cajero de pie
@@ -716,6 +725,106 @@ cambiar si el cajero reetiqueta después — mitigado por auditoría, no elimina
 
 **Detonante de reevaluación:** si el negocio pide reetiquetar líneas de sesiones **ya
 cerradas**, esto no basta — mismo límite de inmutabilidad de `Historico` que señala ADR-21.
+
+---
+
+## ADR-23 {#adr-23}
+
+### El área es división de trabajo del contador, no atributo congelado de la línea — supersede [ADR-21](#adr-21) y [ADR-22](#adr-22)
+
+**Contexto.** El cliente cuenta repartiendo el trabajo: varios contadores se dividen el
+local **por áreas** y cada uno cuenta su zona. El modelo que dejaron [ADR-21](#adr-21) y
+[ADR-22](#adr-22) no representa eso — trata el área como un atributo casi-congelado de la
+línea, algo que se "descubre" y se corrige, no algo que el contador elige de entrada para
+organizar su trabajo.
+
+Además, ambos ADR construyen su decisión sobre una lectura de [ADR-07](#adr-07) que no se
+sostiene: ADR-21 rechazó "que el contador fije también el precio" razonando que "cruza la
+separación monetaria por rol de ADR-07 e I-9, que es estructural y no cosmética". Pero el
+texto de ADR-07 dice lo contrario de esa lectura: *"El cajero conoce valor y unidades: la
+separación no oculta lo deducible, impide entregar el consolidado."* Lo que ADR-07 protege
+son `resumen` e `historicos` — el consolidado — no el valor unitario de la línea, que ya
+viaja sin protección en cada `LineaConteo` y que además está impreso en la etiqueta de la
+categoría (p. ej. `"$5.000"`). La restricción que ADR-21/22 creían heredar de ADR-07 nunca
+existió.
+
+Cuatro problemas concretos que produce el modelo anterior:
+
+1. **No se puede contar la misma categoría en dos áreas** — la línea es
+   `sesiones/{sesionId}/lineas/{categoriaId}`, una fila por categoría, y
+   `CategoriaValor.areaId?: string` admite sólo una.
+2. **El contador se auto-bloquea.** Si el admin fija un área al crear la categoría
+   (`areaFijaPorAdmin`), esa línea nunca se puede reetiquetar — el flujo premia no
+   clasificar.
+3. **El análisis agrupa por NOMBRE de área**, no por id: dos áreas homónimas (una activa,
+   otra borrada y recreada con el mismo nombre) se funden en silencio.
+4. **El cajero no ve dinero por convención de UI, no por seguridad** — como corrige el
+   párrafo anterior, ADR-07 nunca lo prohibió.
+
+**Decisión.** El área pasa a ser el contexto de trabajo que el contador elige **al entrar
+a la sesión**, no un dato que se descubre línea por línea:
+
+- **Catálogo N:M.** `CategoriaValor.areaIds?: readonly string[]` reemplaza
+  `areaId?: string` — una categoría puede vivir en varias áreas, un área agrupa varias
+  categorías.
+- **Desglose, no identidad.** La línea sigue siendo
+  `sesiones/{sesionId}/lineas/{categoriaId}` — una categoría, una fila — y gana
+  `porArea: Readonly<Record<areaId, number>>`, el desglose de `cantidadTotal` por área.
+  `LineaConteo.area` (nombre congelado) y `areaFijaPorAdmin` se retiran del modelo en la
+  unidad que agrega `porArea`.
+- **El aporte lleva el área.** `Aporte` gana `areaId`: el área activa del contador en el
+  momento de aportar. La clave del documento pasa de `{uid}` a `{uid}__{areaId}` — el
+  mismo contador puede aportar a la misma categoría desde dos áreas distintas de la misma
+  sesión sin pisarse.
+- **Área activa obligatoria.** El contador elige un área al entrar a la sesión
+  (persistida en `localStorage` por `sesionId`); "Empezar a contar" queda deshabilitado
+  hasta elegir. El catálogo filtra por esa área por defecto, con un interruptor "ver
+  todo" visible.
+- **"Sin área" es un aviso pasivo del catálogo**, nunca un bloqueo ni un sentinel de
+  dominio: una categoría sin `areaIds` simplemente aparece marcada así en la pantalla de
+  administración. `SIN_AREA` se retira del modelo en la misma unidad que introduce `porArea`.
+- **El cajero ve precio unitario y subtotal de su propia línea** — nunca el total de la
+  sesión: `resumen` sigue siendo admin-only, sin cambios en `firestore.rules`. Corrige la
+  lectura errónea de ADR-07 señalada arriba.
+- **Precio opcional al crear producto desde el conteo** — ya no se fuerza `valor: 0`.
+- **El reetiquetado deja de tener sentido.** `HojaAreas`, `reetiquetarLineaEnSesion` y el
+  sentinel `SIN_AREA` se retiran en la unidad que introduce `porArea`: corregir una
+  clasificación errónea pasa a ser cambiar de área activa y aportar de nuevo, no reescribir
+  un campo congelado.
+- **`eliminarArea` bloquea también por conteos vivos**, no sólo por referencias del
+  catálogo: si alguna sesión abierta tiene `porArea[areaId] > 0`, el borrado se rechaza —
+  misma forma de guarda (`collectionGroup`) que ya usa `eliminarCategoria`.
+
+Supersede **total** a [ADR-21](#adr-21) y [ADR-22](#adr-22): el sentinel `SIN_AREA`, el
+reetiquetado de línea y la condición dura "una categoría con `areaId` de admin es
+intocable" dejan de tener sentido en un modelo donde el área ya no es un atributo de la
+línea, sino un desglose (`porArea`) que se construye con la elección de área activa del
+contador al aportar — y donde corregir es simplemente aportar desde otra área.
+
+| Alternativa | Por qué se descartó |
+| --- | --- |
+| Clave compuesta `lineas/{categoriaId}__{areaId}` | El dinero es propiedad de la categoría, no del área: duplicaría `valorUnitario` en N documentos de la misma categoría y rompería `resumen.porCategoria` (indexado por `linea.id`, `packages/functions/src/lib/resumen.ts:54`) — se rompe el eje contable para modelar un reparto de trabajo |
+| Mantener el reetiquetado de ADR-22 sobre `porArea` | Reintroduce el mismo problema que motivó borrarlo: un campo que se "corrige" en vez de un aporte nuevo que ya lleva su área — dos caminos para el mismo resultado |
+| Asignación formal de contadores a áreas por el admin | El equipo ya se reparte hablando; sin evidencia de que haga falta forzarlo en el modelo |
+| Progreso en vivo por área en el panel admin | Pertenece al panel (`PanelScreen`), no al catálogo ni al modelo de dominio — no es una decisión de esta ADR |
+
+**Consecuencias.** ✅ Una categoría puede contarse en varias áreas simultáneamente,
+resolviendo el problema #1 · ✅ El contador nunca vuelve a auto-bloquearse: no hay campo
+congelado que un admin pueda fijar por adelantado · ✅ El análisis agrupa por `areaId`, no
+por nombre — dos áreas homónimas ya no se funden en silencio · ✅ El cajero ve el precio de
+su propia línea, alineado con lo que ADR-07 realmente permite · ⚠️ `LineaConteo` gana un
+campo (`porArea`) que replica información ya presente en los aportes — es un desglose
+materializado, no una fuente nueva de verdad, y hay que mantenerlo coherente con la suma
+de aportes por área en el mismo trigger que ya mantiene `cantidadTotal` (I-2) · ⚠️ La clave
+de `Aporte` cambia de `{uid}` a `{uid}__{areaId}`: cualquier código que asuma un aporte por
+cajero por línea queda invalidado, no sólo el que lee `area` · ⚠️ Sin migración ni
+compatibilidad hacia atrás (entorno de desarrollo, datos de prueba): se despliega y se
+borra lo que haya.
+
+**Detonante de reevaluación:** si el negocio pide asignar formalmente contadores a áreas
+(en vez de que cada uno elija la suya), o mover unidades ya contadas de un área a otra sin
+volver a contarlas, esta ADR no alcanza — ambos casos quedaron fuera de alcance
+deliberadamente.
 
 ---
 

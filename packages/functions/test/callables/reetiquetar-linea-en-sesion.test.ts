@@ -57,14 +57,15 @@ async function crearArea(nombre: string, activa = true) {
   return areaId;
 }
 
-async function crearCategoria(areaId?: string) {
+async function crearCategoria(areaIds?: string | readonly string[]) {
   const categoriaId = `cat_${randomUUID()}`;
+  const ids = typeof areaIds === "string" ? [areaIds] : areaIds;
   await db.doc(`categoriasValor/${categoriaId}`).set({
     etiqueta: `Categoría ${randomUUID()}`,
     valor: 1000,
     activa: true,
     orden: 1,
-    ...(areaId !== undefined && { areaId }),
+    ...(ids !== undefined && { areaIds: ids }),
   });
   categoriasCreadas.push(categoriaId);
   return categoriaId;
@@ -103,7 +104,7 @@ describe("reetiquetarLineaEnSesionImpl (I-6/A-3/A-4, ADR-22)", () => {
     expect(linea.get("area")).toBe("Talleres");
     // Nunca toca el catálogo (diferencia estructural con vincularArea).
     const categoria = await db.doc(`categoriasValor/${categoriaId}`).get();
-    expect(categoria.get("areaId")).toBeUndefined();
+    expect(categoria.get("areaIds")).toBeUndefined();
   });
 
   it("ADR-22 · reetiqueta una línea que YA tenía un área real, más de una vez, en la misma sesión", async () => {
@@ -162,6 +163,25 @@ describe("reetiquetarLineaEnSesionImpl (I-6/A-3/A-4, ADR-22)", () => {
     ).rejects.toThrow(HttpsError);
     const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
     expect(linea.get("area")).toBe("Fija"); // sin cambios
+  });
+
+  it("permite reetiquetar cuando la categoría tiene múltiples áreas en el catálogo (ambiguo, decide el cajero)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const sesionId = await crearSesion(sucursalId);
+    const area1Id = await crearArea("Area 1");
+    const area2Id = await crearArea("Area 2");
+    const nuevaId = await crearArea("Nueva");
+    const categoriaId = await crearCategoria([area1Id, area2Id]);
+    await crearLinea(sesionId, categoriaId, SIN_AREA);
+
+    const resultado = await reetiquetarLineaEnSesionImpl(db, admin, {
+      sesionId,
+      categoriaId,
+      areaId: nuevaId,
+    });
+    expect(resultado).toEqual({ categoriaId, areaId: nuevaId });
+    const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
+    expect(linea.get("area")).toBe("Nueva");
   });
 
   it("área inactiva → failed-precondition", async () => {

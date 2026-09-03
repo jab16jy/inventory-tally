@@ -47,7 +47,7 @@ async function sembrarCategoria(areaId: string, activa = true) {
     etiqueta: "Litro",
     valor: 1000,
     orden: 1,
-    areaId,
+    areaIds: [areaId],
     activa,
   });
   categoriasCreadas.push(categoriaId);
@@ -113,7 +113,28 @@ describe("eliminarAreaImpl", () => {
     expect(area.exists).toBe(true);
   });
 
-  it("área cuyo nombre sólo aparece congelado en una línea de sesión (sin categoriasValor.areaId) · SÍ es eliminable (I-7)", async () => {
+  it("área referenciada como una de VARIAS en areaIds (N:M) · rechaza failed-precondition", async () => {
+    const areaId = await sembrarArea();
+    const otraAreaId = await sembrarArea();
+    const categoriaId = `cat_${randomUUID()}`;
+    await db.doc(`categoriasValor/${categoriaId}`).set({
+      etiqueta: "Litro",
+      valor: 1000,
+      orden: 1,
+      areaIds: [otraAreaId, areaId],
+      activa: true,
+    });
+    categoriasCreadas.push(categoriaId);
+
+    await expect(eliminarAreaImpl(db, "uid_admin", { areaId })).rejects.toThrow(
+      /usada en 1 categoría/,
+    );
+
+    const area = await db.doc(`areas/${areaId}`).get();
+    expect(area.exists).toBe(true);
+  });
+
+  it("área cuyo nombre sólo aparece congelado en una línea de sesión (sin categoriasValor.areaIds) · SÍ es eliminable (I-7)", async () => {
     const areaId = await sembrarArea();
     await sembrarCategoria(areaId); // deja que abrirSesionImpl congele el nombre en la línea
     const sucursalId = await sembrarSucursal();
@@ -123,7 +144,7 @@ describe("eliminarAreaImpl", () => {
     const lineas = await db.collection(`sesiones/${sesionId}/lineas`).get();
     expect(lineas.docs.some((linea) => linea.get("area") === "Aseo")).toBe(true);
 
-    // La única referencia viva (categoriasValor.areaId) se retira borrando la
+    // La única referencia viva (categoriasValor.areaIds) se retira borrando la
     // categoría: así la línea congelada queda como la ÚNICA mención al área,
     // que es justo el escenario que este test regresiona.
     const categoriaId = categoriasCreadas.pop()!;

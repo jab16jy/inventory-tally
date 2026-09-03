@@ -66,6 +66,26 @@ describe("CategoriasScreen (F3)", () => {
     expect(screen.getByText("$ 5.000")).toBeInTheDocument();
   });
 
+  it("muestra 'Sin área' como aviso pasivo cuando la categoría no tiene areaIds", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarCategoria(categoriaBase());
+
+    renderPantalla(repo);
+
+    expect(screen.getByText("Sin área")).toBeInTheDocument();
+  });
+
+  it("lista los N nombres de área de una categoría con varias (N:M)", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarArea(areaBase({ areaId: "area_aseo", nombre: "Aseo" }));
+    repo.sembrarArea(areaBase({ areaId: "area_bebidas", nombre: "Bebidas" }));
+    repo.sembrarCategoria(categoriaBase({ areaIds: ["area_aseo", "area_bebidas"] }));
+
+    renderPantalla(repo);
+
+    expect(screen.getByText("Aseo, Bebidas")).toBeInTheDocument();
+  });
+
   it("crea una categoría con el formulario", async () => {
     const repo = new FakeAdminRepository();
 
@@ -137,7 +157,7 @@ describe("CategoriasScreen (F3)", () => {
   it("crea una categoría con área seleccionada y resuelve el nombre en la tabla", async () => {
     const repo = new FakeAdminRepository();
     repo.sembrarArea(areaBase());
-    repo.sembrarCategoria(categoriaBase({ areaId: "area_aseo" }));
+    repo.sembrarCategoria(categoriaBase({ areaIds: ["area_aseo"] }));
 
     renderPantalla(repo);
 
@@ -147,14 +167,44 @@ describe("CategoriasScreen (F3)", () => {
     fireEvent.change(screen.getByLabelText(/etiqueta/i), { target: { value: "$10.000" } });
     fireEvent.change(screen.getByLabelText(/^valor$/i), { target: { value: "10000" } });
     fireEvent.change(screen.getByLabelText(/orden/i), { target: { value: "2" } });
-    fireEvent.change(screen.getByLabelText(/área/i), { target: { value: "area_aseo" } });
+    fireEvent.click(screen.getByLabelText("Aseo"));
     fireEvent.click(screen.getByRole("button", { name: /crear categoría/i }));
 
     await vi.waitFor(() => {
       expect(repo.llamadas).toEqual([
         {
           metodo: "crearCategoria",
-          payload: { etiqueta: "$10.000", valor: 10000, orden: 2, areaId: "area_aseo" },
+          payload: { etiqueta: "$10.000", valor: 10000, orden: 2, areaIds: ["area_aseo"] },
+        },
+      ]);
+    });
+  });
+
+  it("crea una categoría con varias áreas marcadas (N:M)", async () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarArea(areaBase({ areaId: "area_aseo", nombre: "Aseo" }));
+    repo.sembrarArea(areaBase({ areaId: "area_bebidas", nombre: "Bebidas" }));
+
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /nueva categoría/i }));
+    fireEvent.change(screen.getByLabelText(/etiqueta/i), { target: { value: "$10.000" } });
+    fireEvent.change(screen.getByLabelText(/^valor$/i), { target: { value: "10000" } });
+    fireEvent.change(screen.getByLabelText(/orden/i), { target: { value: "2" } });
+    fireEvent.click(screen.getByLabelText("Aseo"));
+    fireEvent.click(screen.getByLabelText("Bebidas"));
+    fireEvent.click(screen.getByRole("button", { name: /crear categoría/i }));
+
+    await vi.waitFor(() => {
+      expect(repo.llamadas).toEqual([
+        {
+          metodo: "crearCategoria",
+          payload: {
+            etiqueta: "$10.000",
+            valor: 10000,
+            orden: 2,
+            areaIds: ["area_aseo", "area_bebidas"],
+          },
         },
       ]);
     });
@@ -164,7 +214,7 @@ describe("CategoriasScreen (F3)", () => {
     const repo = new FakeAdminRepository();
     repo.sembrarArea(areaBase());
     repo.sembrarCategoria(
-      categoriaBase({ areaId: "area_aseo", sucursalesAsignadas: ["suc_norte"] }),
+      categoriaBase({ areaIds: ["area_aseo"], sucursalesAsignadas: ["suc_norte"] }),
     );
     repo.sembrarSucursal(sucursalBase({ sucursalId: "suc_norte", nombre: "Norte" }));
 
@@ -174,7 +224,7 @@ describe("CategoriasScreen (F3)", () => {
     expect(screen.getByLabelText(/etiqueta/i)).toHaveValue("$5.000");
     expect(screen.getByLabelText(/^valor$/i)).toHaveValue(5000);
     expect(screen.getByLabelText(/orden/i)).toHaveValue(1);
-    expect(screen.getByLabelText(/área/i)).toHaveValue("area_aseo");
+    expect(screen.getByLabelText("Aseo")).toBeChecked();
     expect(screen.getByLabelText("Norte")).toBeChecked();
 
     fireEvent.change(screen.getByLabelText(/etiqueta/i), { target: { value: "$6.000" } });
@@ -189,7 +239,7 @@ describe("CategoriasScreen (F3)", () => {
             etiqueta: "$6.000",
             valor: 5000,
             orden: 1,
-            areaId: "area_aseo",
+            areaIds: ["area_aseo"],
             sucursalesAsignadas: ["suc_norte"],
           },
         },
@@ -197,7 +247,7 @@ describe("CategoriasScreen (F3)", () => {
     });
   });
 
-  it("no ofrece áreas inactivas en el selector del formulario (evitaría degradar a 'Sin área' al abrir sesión)", () => {
+  it("no ofrece áreas inactivas en el fieldset del formulario (evitaría degradar a 'Sin área' al abrir sesión)", () => {
     const repo = new FakeAdminRepository();
     repo.sembrarArea(areaBase({ areaId: "area_aseo", nombre: "Aseo", activa: true }));
     repo.sembrarArea(areaBase({ areaId: "area_vieja", nombre: "Vieja", activa: false }));
@@ -205,9 +255,8 @@ describe("CategoriasScreen (F3)", () => {
     renderPantalla(repo);
     fireEvent.click(screen.getByRole("button", { name: /nueva categoría/i }));
 
-    const opciones = screen.getAllByRole("option").map((o) => o.textContent);
-    expect(opciones).toContain("Aseo");
-    expect(opciones).not.toContain("Vieja");
+    expect(screen.getByLabelText("Aseo")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Vieja")).not.toBeInTheDocument();
   });
 
   it("ofrece desactivar y eliminar sólo a las categorías activas, reactivar sólo a las inactivas", () => {

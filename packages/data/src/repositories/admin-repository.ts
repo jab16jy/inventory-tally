@@ -112,7 +112,7 @@ export interface CrearCategoriaPayload {
   readonly valor: number;
   readonly orden: number;
   readonly sucursalesAsignadas?: readonly string[];
-  readonly areaId?: string;
+  readonly areaIds?: readonly string[];
 }
 
 // Espejo de contracts/schemas/actualizar-categoria.schema.ts. Mismos campos
@@ -124,7 +124,7 @@ export interface ActualizarCategoriaPayload {
   readonly valor: number;
   readonly orden: number;
   readonly sucursalesAsignadas?: readonly string[];
-  readonly areaId?: string;
+  readonly areaIds?: readonly string[];
 }
 
 // Espejo de contracts/schemas/crear-area.schema.ts.

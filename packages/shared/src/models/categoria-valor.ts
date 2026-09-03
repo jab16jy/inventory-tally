@@ -20,5 +20,7 @@ export interface CategoriaValor {
   readonly orden: number;
   readonly creadaEn: Date;
   readonly sucursalesAsignadas?: readonly string[];
-  readonly areaId?: string;
+  /** N:M (issue #81, ADR-23): una categoría puede vivir en varias áreas.
+   * Ausente/vacío = sin área — aviso pasivo en el catálogo, nunca un bloqueo. */
+  readonly areaIds?: readonly string[];
 }
