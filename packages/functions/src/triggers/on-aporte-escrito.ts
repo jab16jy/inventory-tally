@@ -10,17 +10,17 @@ import { registrarAuditoria } from "../lib/auditoria.js";
 export interface ParametrosAporte {
   readonly sesionId: string;
   readonly categoriaId: string;
-  readonly uid: string;
+  readonly claveAporte: string;
 }
 
 /**
- * procesarAporteEscrito — núcleo del trigger (doc 05 §3), separado de
+ * procesarAporteEscrito — núcleo del trigger (doc 05 §3, ADR-23), separado de
  * `onDocumentWritten` para poder probarlo directamente contra el emulador de
  * Firestore sin levantar el emulador de Functions (decisión de la ola O3:
  * más simple y más estable en Windows que orquestar ambos emuladores).
  *
  * DESVIACIÓN DOCUMENTADA respecto al literal de doc 05 §3: el snippet del doc
- * escribe los campos anidados (`versiones.${uid}`, `participantes.${uid}`)
+ * escribe los campos anidados (`versiones.${claveAporte}`, `participantes.${uid}`)
  * como claves con punto dentro de un objeto pasado a `tx.set(ref, obj, {
  * merge: true })`. Comprobado contra el emulador real: `set(..., {merge:true})`
  * NO interpreta una clave de nivel superior con puntos como un FieldPath —crea
@@ -33,12 +33,14 @@ export interface ParametrosAporte {
  */
 export async function procesarAporteEscrito(
   db: Firestore,
-  { sesionId, categoriaId, uid }: ParametrosAporte,
+  { sesionId, categoriaId, claveAporte }: ParametrosAporte,
   antes: DocumentData | undefined,
   despues: DocumentData | undefined,
 ): Promise<void> {
   const cantidadAnterior = (antes?.cantidad as number | undefined) ?? 0;
   const cantidadNueva = (despues?.cantidad as number | undefined) ?? 0;
+  const uid = (despues?.uid ?? antes?.uid ?? claveAporte.split("__")[0]) as string;
+  const areaId = (despues?.areaId ?? antes?.areaId) as string;
 
   const sesionRef = db.doc(`sesiones/${sesionId}`);
   const lineaRef = db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`);
@@ -55,7 +57,7 @@ export async function procesarAporteEscrito(
     // garantiza entrega *at-least-once* y NO garantiza orden. La guardia de
     // versión descarta eventos obsoletos.
     const versiones = (linea.get("versiones") as Record<string, number> | undefined) ?? {};
-    const versionAplicada = versiones[uid] ?? 0;
+    const versionAplicada = versiones[claveAporte] ?? 0;
     const versionEntrante = (despues?.version as number | undefined) ?? 0;
     if (versionEntrante <= versionAplicada) return;
 
@@ -63,7 +65,7 @@ export async function procesarAporteEscrito(
     // `before` del propio evento) para que un evento entregado fuera de
     // orden no borre el delta de otro más reciente ya aplicado.
     const aplicados = (linea.get("aplicados") as Record<string, number> | undefined) ?? {};
-    const cantidadAplicada = aplicados[uid] ?? 0;
+    const cantidadAplicada = aplicados[claveAporte] ?? 0;
     const delta = cantidadNueva - cantidadAplicada;
     if (delta === 0) return;
 
@@ -71,8 +73,9 @@ export async function procesarAporteEscrito(
 
     const cambiosLinea: Record<string, unknown> = {
       cantidadTotal: FieldValue.increment(delta),
-      versiones: { [uid]: versionEntrante },
-      aplicados: { [uid]: cantidadNueva },
+      versiones: { [claveAporte]: versionEntrante },
+      aplicados: { [claveAporte]: cantidadNueva },
+      porArea: { [areaId]: FieldValue.increment(delta) },
       actualizadaEn: FieldValue.serverTimestamp(),
       actualizadaPor: uid,
     };
@@ -118,17 +121,17 @@ export async function procesarAporteEscrito(
 
 export const onAporteEscrito = onDocumentWritten(
   {
-    document: "sesiones/{sesionId}/lineas/{categoriaId}/aportes/{uid}",
+    document: "sesiones/{sesionId}/lineas/{categoriaId}/aportes/{claveAporte}",
     // D4: reintento de fondo opt-in en Functions v2. Sólo es seguro porque D2
     // hace el handler idempotente de verdad (delta contra el último estado
     // aplicado, guardia de versión) — sin eso, reintentar podría duplicar.
     retry: true,
   },
   async (event) => {
-    const { sesionId, categoriaId, uid } = event.params;
+    const { sesionId, categoriaId, claveAporte } = event.params;
     await procesarAporteEscrito(
       getFirestore(),
-      { sesionId, categoriaId, uid },
+      { sesionId, categoriaId, claveAporte },
       event.data?.before.data(),
       event.data?.after.data(),
     );

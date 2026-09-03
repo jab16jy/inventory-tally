@@ -66,16 +66,18 @@ service cloud.firestore {
     }
 
     // ─────────── aportes: ÚNICO ESCRITO POR EL CLIENTE ───────────
-    match /sesiones/{sesionId}/lineas/{categoriaId}/aportes/{uid} {
+    match /sesiones/{sesionId}/lineas/{categoriaId}/aportes/{claveAporte} {
 
       allow read: if autenticado() && tieneSucursal(sesion(sesionId).sucursalId);
 
       allow create, update: if autenticado()
-        && uid == miUid()                                       // sólo el propio
+        && claveAporte == miUid() + '__' + request.resource.data.areaId
         && tieneSucursal(sesion(sesionId).sucursalId)            // ← A-3
         && sesionAbierta(sesionId)                               // ← A-4
         && request.resource.data.keys().hasOnly(
-             ['uid', 'nombre', 'cantidad', 'registradoEn', 'dispositivoId', 'version'])
+             ['uid', 'areaId', 'nombre', 'cantidad', 'registradoEn', 'dispositivoId', 'version'])
+        && request.resource.data.areaId is string
+        && request.resource.data.areaId.size() > 0
         && request.resource.data.cantidad is int
         && request.resource.data.cantidad >= 0                   // ← A-7
         && request.resource.data.cantidad <= 100000

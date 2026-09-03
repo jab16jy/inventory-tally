@@ -14,7 +14,6 @@ import { HttpsError } from "firebase-functions/v2/https";
 import { describe, expect, it, afterEach } from "vitest";
 import { crearCategoriaEnSesionImpl } from "../../src/callables/crear-categoria-en-sesion.js";
 import type { AutorizacionCajero } from "../../src/lib/exigir-cajero-de-sesion.js";
-import { SIN_AREA } from "@conteo/shared/models/linea-conteo.js";
 
 if (getApps().length === 0) {
   initializeApp({ projectId: "demo-conteo-eficiente" });
@@ -99,7 +98,7 @@ describe("crearCategoriaEnSesionImpl (I-9/ADR-07, ADR-21)", () => {
     expect(linea.get("cantidadTotal")).toBe(0);
   });
 
-  it("sin areaId la línea nace con SIN_AREA; con areaId nace con el nombre del área (par afirmativo)", async () => {
+  it("con areaId guarda areaIds en categoriaValor; la línea siempre nace con porArea: {} (ADR-23)", async () => {
     const sucursalId = `suc_${randomUUID()}`;
     const sesionId = await crearSesion(sucursalId);
 
@@ -109,7 +108,8 @@ describe("crearCategoriaEnSesionImpl (I-9/ADR-07, ADR-21)", () => {
     });
     registrarCategoria(sinArea.categoriaId);
     const lineaSinArea = await db.doc(`sesiones/${sesionId}/lineas/${sinArea.categoriaId}`).get();
-    expect(lineaSinArea.get("area")).toBe(SIN_AREA);
+    expect(lineaSinArea.get("porArea")).toEqual({});
+    expect(lineaSinArea.data()).not.toHaveProperty("area");
 
     const areaId = await crearArea("Aseo");
     const conArea = await crearCategoriaEnSesionImpl(db, admin, {
@@ -121,7 +121,8 @@ describe("crearCategoriaEnSesionImpl (I-9/ADR-07, ADR-21)", () => {
     const categoriaConArea = await db.doc(`categoriasValor/${conArea.categoriaId}`).get();
     expect(categoriaConArea.get("areaIds")).toEqual([areaId]);
     const lineaConArea = await db.doc(`sesiones/${sesionId}/lineas/${conArea.categoriaId}`).get();
-    expect(lineaConArea.get("area")).toBe("Aseo");
+    expect(lineaConArea.get("porArea")).toEqual({});
+    expect(lineaConArea.data()).not.toHaveProperty("area");
   });
 
   it("cajero SIN la sucursal de la sesión → permission-denied", async () => {

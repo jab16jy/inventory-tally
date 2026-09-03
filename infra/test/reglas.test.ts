@@ -130,8 +130,9 @@ beforeEach(async () => {
       versiones: { uid_ana: 1 },
     });
 
-    await db.doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana").set({
+    await db.doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1").set({
       uid: "uid_ana",
+      areaId: "area_1",
       nombre: "Ana Ramírez",
       cantidad: 10,
       version: 1,
@@ -224,8 +225,8 @@ describe("A-3 · aportes fuera de la sucursal asignada", () => {
     await assertFails(
       cajero("uid_ana", ["suc_sur"])
         .firestore()
-        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana")
-        .set({ uid: "uid_ana", cantidad: 5 }),
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1")
+        .set({ uid: "uid_ana", areaId: "area_1", cantidad: 5, version: 1 }),
     );
   });
 
@@ -233,8 +234,8 @@ describe("A-3 · aportes fuera de la sucursal asignada", () => {
     await assertSucceeds(
       cajero("uid_ana", ["suc_norte"])
         .firestore()
-        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana")
-        .set({ uid: "uid_ana", cantidad: 12, version: 2 }), // seed trae version:1
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1")
+        .set({ uid: "uid_ana", areaId: "area_1", cantidad: 12, version: 2 }), // seed trae version:1
     );
   });
 });
@@ -244,8 +245,8 @@ describe("A-4 · escritura sobre una sesión cerrada", () => {
     await assertFails(
       cajero("uid_ana", ["suc_norte"])
         .firestore()
-        .doc("sesiones/ses_cerrada/lineas/cat_5000/aportes/uid_ana")
-        .set({ uid: "uid_ana", cantidad: 5 }),
+        .doc("sesiones/ses_cerrada/lineas/cat_5000/aportes/uid_ana__area_1")
+        .set({ uid: "uid_ana", areaId: "area_1", cantidad: 5, version: 1 }),
     );
   });
 });
@@ -269,8 +270,8 @@ describe("A-7 · validación de cantidad (enteros 0..100000)", () => {
     await assertFails(
       cajero("uid_ana", ["suc_norte"])
         .firestore()
-        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana")
-        .set({ uid: "uid_ana", cantidad: -1 }),
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1")
+        .set({ uid: "uid_ana", areaId: "area_1", cantidad: -1, version: 2 }),
     );
   });
 
@@ -278,8 +279,8 @@ describe("A-7 · validación de cantidad (enteros 0..100000)", () => {
     await assertFails(
       cajero("uid_ana", ["suc_norte"])
         .firestore()
-        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana")
-        .set({ uid: "uid_ana", cantidad: 3.5 }),
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1")
+        .set({ uid: "uid_ana", areaId: "area_1", cantidad: 3.5, version: 2 }),
     );
   });
 
@@ -287,8 +288,8 @@ describe("A-7 · validación de cantidad (enteros 0..100000)", () => {
     await assertFails(
       cajero("uid_ana", ["suc_norte"])
         .firestore()
-        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana")
-        .set({ uid: "uid_ana", cantidad: 100001 }),
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1")
+        .set({ uid: "uid_ana", areaId: "area_1", cantidad: 100001, version: 2 }),
     );
   });
 
@@ -296,8 +297,8 @@ describe("A-7 · validación de cantidad (enteros 0..100000)", () => {
     await assertSucceeds(
       cajero("uid_ana", ["suc_norte"])
         .firestore()
-        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana")
-        .set({ uid: "uid_ana", cantidad: 100000, version: 2 }), // seed trae version:1
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1")
+        .set({ uid: "uid_ana", areaId: "area_1", cantidad: 100000, version: 2 }), // seed trae version:1
     );
   });
 });
@@ -307,8 +308,8 @@ describe("D1 · version obligatoria y monótona en aportes", () => {
     await assertFails(
       cajero("uid_ana", ["suc_norte"])
         .firestore()
-        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana")
-        .set({ uid: "uid_ana", cantidad: 50, version: 1 }), // seed ya tiene version:1
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1")
+        .set({ uid: "uid_ana", areaId: "area_1", cantidad: 50, version: 1 }), // seed ya tiene version:1
     );
   });
 
@@ -316,8 +317,8 @@ describe("D1 · version obligatoria y monótona en aportes", () => {
     await assertFails(
       cajero("uid_ana", ["suc_norte"])
         .firestore()
-        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana")
-        .set({ uid: "uid_ana", cantidad: 50, version: 1.5 }),
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1")
+        .set({ uid: "uid_ana", areaId: "area_1", cantidad: 50, version: 1.5 }),
     );
   });
 
@@ -331,8 +332,46 @@ describe("D1 · version obligatoria y monótona en aportes", () => {
     const db = cajero("uid_ana", ["suc_norte"]).firestore();
     await assertSucceeds(
       db
-        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana")
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1")
         .update({ cantidad: 50, version: incremento(db, 1) }),
+    );
+  });
+});
+
+describe("ADR-23 · claveAporte y areaId en aportes", () => {
+  it("rechaza si claveAporte no coincide con miUid() + '__' + areaId", async () => {
+    await assertFails(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_otra")
+        .set({ uid: "uid_ana", areaId: "area_1", cantidad: 5, version: 1 }),
+    );
+  });
+
+  it("rechaza si areaId está vacío", async () => {
+    await assertFails(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__")
+        .set({ uid: "uid_ana", areaId: "", cantidad: 5, version: 1 }),
+    );
+  });
+
+  it("rechaza si incluye campos no permitidos en hasOnly", async () => {
+    await assertFails(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1")
+        .set({ uid: "uid_ana", areaId: "area_1", cantidad: 5, version: 2, campoExtra: 123 }),
+    );
+  });
+
+  it("un cajero SÍ puede aportar a dos áreas distintas de la misma línea (ADR-23)", async () => {
+    await assertSucceeds(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_cocina")
+        .set({ uid: "uid_ana", areaId: "area_cocina", cantidad: 8, version: 1 }),
     );
   });
 });

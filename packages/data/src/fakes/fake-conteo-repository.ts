@@ -4,7 +4,7 @@
 import { CantidadInvalidaError } from "@conteo/shared/errors.js";
 import type { Area } from "@conteo/shared/models/area.js";
 import type { Aporte } from "@conteo/shared/models/aporte.js";
-import { SIN_AREA, type LineaConteo } from "@conteo/shared/models/linea-conteo.js";
+import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import type { LlamadaEscritura } from "./fake-admin-repository.js";
@@ -12,7 +12,6 @@ import type { Pagina } from "../repositories/admin-repository.js";
 import type {
   ConteoRepository,
   CrearCategoriaEnSesionPayload,
-  ReetiquetarLineaEnSesionPayload,
   RegistrarAporteInput,
   Unsubscribe,
 } from "../repositories/conteo-repository.js";
@@ -50,17 +49,11 @@ export class FakeConteoRepository implements ConteoRepository {
   private readonly sucursales = new Map<string, Sucursal>();
   private readonly pendientesPorSesion = new Map<string, number>();
   private readonly areas = new Map<string, Area>();
-  // ponytail: sólo el areaId por categoría, no un store completo de
-  // CategoriaValor — nada en ConteoRepository lee la categoría entera, esto
-  // sólo modela el efecto real de un áreaId ya fijado en catálogo (ADR-22):
-  // hoy sólo `crearCategoriaEnSesion` la puebla, `reetiquetarLineaEnSesion`
-  // nunca escribe aquí (a diferencia de la vieja `vincularArea`).
-  private readonly categoriaAreaId = new Map<string, string>();
   private contadorCategoriaId = 0;
 
   /** Igual que FakeAdminRepository.llamadas: registro para que los tests de
    *  UI asserten los argumentos exactos de
-   *  reetiquetarLineaEnSesion/crearCategoriaEnSesion. */
+   *  crearCategoriaEnSesion. */
   readonly llamadas: LlamadaEscritura[] = [];
 
   // Issue #41: seam de prueba para simular rechazos deterministas del
@@ -202,6 +195,7 @@ export class FakeConteoRepository implements ConteoRepository {
 
     const aporte: Aporte = {
       uid: this.usuario.uid,
+      areaId: "area_default",
       nombre: this.usuario.nombre,
       cantidad,
       registradoEn: new Date(),
@@ -273,34 +267,6 @@ export class FakeConteoRepository implements ConteoRepository {
     return () => {};
   }
 
-  async reetiquetarLineaEnSesion({
-    sesionId,
-    categoriaId,
-    areaId,
-  }: ReetiquetarLineaEnSesionPayload): Promise<void> {
-    this.llamadas.push({
-      metodo: "reetiquetarLineaEnSesion",
-      payload: { sesionId, categoriaId, areaId },
-    });
-
-    // Condición dura ADR-22, replicada como no-op silencioso (mismo criterio
-    // que el resto del fake: modela el efecto observable, no la excepción
-    // HttpsError real): una categoría con areaId ya fijo en catálogo es
-    // intocable, sin importar cuántas veces se intente.
-    if (this.categoriaAreaId.has(categoriaId)) return;
-
-    const lineas = this.lineasDeSesion(sesionId);
-    const linea = lineas.get(categoriaId);
-    if (!linea) return;
-
-    // ADR-22, a diferencia de la vieja `vincularArea` (ADR-21): reetiqueta
-    // SIEMPRE, sin importar el área actual de la línea, y sin límite de
-    // veces — nunca escribe `categoriaAreaId` (nunca toca el catálogo).
-    const nombreArea = (areaId && this.areas.get(areaId)?.nombre) || SIN_AREA;
-    lineas.set(categoriaId, { ...linea, area: nombreArea });
-    this.notificar(this.listenersLineas, sesionId, [...lineas.values()]);
-  }
-
   async crearCategoriaEnSesion({
     sesionId,
     etiqueta,
@@ -311,16 +277,12 @@ export class FakeConteoRepository implements ConteoRepository {
       metodo: "crearCategoriaEnSesion",
       payload: { sesionId, etiqueta, areaId },
     });
-    if (areaId) this.categoriaAreaId.set(categoriaId, areaId);
 
     const linea: LineaConteo = {
       categoriaId,
       valorUnitario: 0,
       etiqueta,
-      area: (areaId && this.areas.get(areaId)?.nombre) || SIN_AREA,
-      // ADR-22: si se fija un área al crear, queda fija de inmediato en el
-      // catálogo simulado (línea de arriba) — misma semántica que la callable real.
-      areaFijaPorAdmin: Boolean(areaId),
+      porArea: {},
       cantidadTotal: 0,
       numAportantes: 0,
       versiones: {},

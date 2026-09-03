@@ -47,9 +47,12 @@ async function aportar(
   nombre: string,
   cantidad: number,
   version: number,
+  areaId = "area_1",
 ): Promise<void> {
-  await procesarAporteEscrito(db, { sesionId, categoriaId, uid }, undefined, {
+  const claveAporte = `${uid}__${areaId}`;
+  await procesarAporteEscrito(db, { sesionId, categoriaId, claveAporte }, undefined, {
     uid,
+    areaId,
     nombre,
     cantidad,
     version,

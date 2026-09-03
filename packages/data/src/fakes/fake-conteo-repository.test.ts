@@ -1,6 +1,6 @@
 import { CantidadInvalidaError } from "@conteo/shared/errors.js";
 import type { Area } from "@conteo/shared/models/area.js";
-import { SIN_AREA, type LineaConteo } from "@conteo/shared/models/linea-conteo.js";
+import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import { describe, expect, it, vi } from "vitest";
@@ -11,8 +11,7 @@ function crearLinea(overrides: Partial<LineaConteo> = {}): LineaConteo {
     categoriaId: "cat_5000",
     valorUnitario: 5000,
     etiqueta: "$5.000",
-    area: "Aseo",
-    areaFijaPorAdmin: false,
+    porArea: {},
     cantidadTotal: 0,
     numAportantes: 0,
     versiones: {},
@@ -404,74 +403,6 @@ describe("FakeConteoRepository — catálogo-en-conteo (vincular área / crear c
     repo.observarAreasActivas((areas) => recibidas.push(areas));
 
     expect(recibidas.at(-1)?.map((a) => a.areaId)).toEqual(["area_activa"]);
-  });
-
-  it("reetiquetarLineaEnSesion re-etiqueta una línea cuya área es SIN_AREA y notifica al listener", async () => {
-    const repo = new FakeConteoRepository();
-    repo.sembrarArea(crearArea({ areaId: "area_aseo", nombre: "Aseo" }));
-    repo.sembrarLinea("ses_1", crearLinea({ area: SIN_AREA, areaFijaPorAdmin: false }));
-
-    const recibidas: LineaConteo[][] = [];
-    repo.observarLineas("ses_1", (lineas) => recibidas.push(lineas));
-
-    await repo.reetiquetarLineaEnSesion({
-      sesionId: "ses_1",
-      categoriaId: "cat_5000",
-      areaId: "area_aseo",
-    });
-
-    expect(recibidas.at(-1)?.[0]?.area).toBe("Aseo");
-  });
-
-  it("ADR-22 · reetiquetarLineaEnSesion SÍ re-etiqueta una línea que ya tenía un área real, sin límite de veces", async () => {
-    // A diferencia de la vieja vincularArea (ADR-21, una sola vez): ésta es
-    // justo la capacidad nueva que ADR-22 agrega.
-    const repo = new FakeConteoRepository();
-    repo.sembrarArea(crearArea({ areaId: "area_cocina", nombre: "Cocina" }));
-    repo.sembrarArea(crearArea({ areaId: "area_aseo", nombre: "Aseo" }));
-    repo.sembrarLinea("ses_1", crearLinea({ area: "Aseo", areaFijaPorAdmin: false }));
-
-    const recibidas: LineaConteo[][] = [];
-    repo.observarLineas("ses_1", (lineas) => recibidas.push(lineas));
-
-    await repo.reetiquetarLineaEnSesion({
-      sesionId: "ses_1",
-      categoriaId: "cat_5000",
-      areaId: "area_cocina",
-    });
-    expect(recibidas.at(-1)?.[0]?.area).toBe("Cocina");
-
-    await repo.reetiquetarLineaEnSesion({
-      sesionId: "ses_1",
-      categoriaId: "cat_5000",
-      areaId: undefined,
-    });
-    expect(recibidas.at(-1)?.[0]?.area).toBe(SIN_AREA);
-  });
-
-  // Par negativo del test anterior (AGENTS.md §2): la condición dura de
-  // ADR-22 sigue vigente para una categoría creada con `areaId` ya fijo.
-  it("condición dura ADR-22 · reetiquetarLineaEnSesion NO toca una línea de categoría con areaId ya fijo en catálogo", async () => {
-    const repo = new FakeConteoRepository();
-    repo.sembrarArea(crearArea({ areaId: "area_cocina", nombre: "Cocina" }));
-    await repo.crearCategoriaEnSesion({
-      sesionId: "ses_1",
-      etiqueta: "Producto fijo",
-      areaId: "area_cocina",
-    }); // fija areaId en catálogo (simulado) al crearse con área
-
-    const recibidas: LineaConteo[][] = [];
-    repo.observarLineas("ses_1", (lineas) => recibidas.push(lineas));
-    const categoriaId = recibidas.at(-1)?.[0]?.categoriaId;
-    expect(categoriaId).toBeDefined();
-
-    await repo.reetiquetarLineaEnSesion({
-      sesionId: "ses_1",
-      categoriaId: categoriaId as string,
-      areaId: undefined,
-    });
-
-    expect(recibidas.at(-1)?.[0]?.area).toBe("Cocina"); // sin cambios
   });
 
   it("crearCategoriaEnSesion siembra una línea visible para observarLineas, con valorUnitario: 0", async () => {

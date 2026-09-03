@@ -5,6 +5,7 @@ import {
   areaDesdeDoc,
   categoriaValorDesdeDoc,
   eventoAuditoriaDesdeDoc,
+  historicoDesdeDoc,
   lineaConteoDesdeDoc,
   sesionConteoDesdeDoc,
   sucursalDesdeDoc,
@@ -16,6 +17,7 @@ describe("aporteDesdeDoc (doc 04 §3)", () => {
     const registradoEn = Timestamp.fromDate(new Date("2026-08-02T09:12:10Z"));
     const aporte = aporteDesdeDoc({
       uid: "uid_ana",
+      areaId: "area_efectivo",
       nombre: "Ana Ramírez",
       cantidad: 30,
       registradoEn,
@@ -25,6 +27,7 @@ describe("aporteDesdeDoc (doc 04 §3)", () => {
 
     expect(aporte).toEqual({
       uid: "uid_ana",
+      areaId: "area_efectivo",
       nombre: "Ana Ramírez",
       cantidad: 30,
       registradoEn: registradoEn.toDate(),
@@ -35,16 +38,15 @@ describe("aporteDesdeDoc (doc 04 §3)", () => {
 });
 
 describe("lineaConteoDesdeDoc (doc 04 §3)", () => {
-  it("mapea un documento de línea a LineaConteo, usando el id como categoriaId", () => {
+  it("mapea un documento de línea a LineaConteo, usando el id como categoriaId y mapeando porArea", () => {
     const actualizadaEn = Timestamp.fromDate(new Date("2026-08-02T09:14:33Z"));
     const linea = lineaConteoDesdeDoc("cat_5000", {
       valorUnitario: 5000,
       etiqueta: "$5.000",
-      area: "Efectivo",
-      areaFijaPorAdmin: true,
+      porArea: { area_efectivo: 55 },
       cantidadTotal: 55,
       numAportantes: 2,
-      versiones: { uid_ana: 3, uid_luis: 1 },
+      versiones: { uid_ana__area_efectivo: 3, uid_luis__area_efectivo: 1 },
       actualizadaEn,
       actualizadaPor: "uid_luis",
     });
@@ -53,14 +55,28 @@ describe("lineaConteoDesdeDoc (doc 04 §3)", () => {
       categoriaId: "cat_5000",
       valorUnitario: 5000,
       etiqueta: "$5.000",
-      area: "Efectivo",
-      areaFijaPorAdmin: true,
+      porArea: { area_efectivo: 55 },
       cantidadTotal: 55,
       numAportantes: 2,
-      versiones: { uid_ana: 3, uid_luis: 1 },
+      versiones: { uid_ana__area_efectivo: 3, uid_luis__area_efectivo: 1 },
       actualizadaEn: actualizadaEn.toDate(),
       actualizadaPor: "uid_luis",
     });
+  });
+
+  it("deja porArea en {} cuando el doc no lo trae (línea legacy o sembrada sin él)", () => {
+    const actualizadaEn = Timestamp.fromDate(new Date("2026-08-02T09:14:33Z"));
+    const linea = lineaConteoDesdeDoc("cat_5000", {
+      valorUnitario: 5000,
+      etiqueta: "$5.000",
+      cantidadTotal: 0,
+      numAportantes: 0,
+      versiones: {},
+      actualizadaEn,
+      actualizadaPor: "uid_admin",
+    });
+
+    expect(linea.porArea).toEqual({});
   });
 
   it("mapea aplicados cuando el doc lo trae (base de onAporteEscrito/reconciliarLineas)", () => {
@@ -68,17 +84,16 @@ describe("lineaConteoDesdeDoc (doc 04 §3)", () => {
     const linea = lineaConteoDesdeDoc("cat_5000", {
       valorUnitario: 5000,
       etiqueta: "$5.000",
-      area: "Efectivo",
-      areaFijaPorAdmin: true,
+      porArea: { area_efectivo: 55 },
       cantidadTotal: 55,
       numAportantes: 2,
-      versiones: { uid_ana: 3, uid_luis: 1 },
+      versiones: { uid_ana__area_efectivo: 3, uid_luis__area_efectivo: 1 },
       actualizadaEn,
       actualizadaPor: "uid_luis",
-      aplicados: { uid_ana: 40, uid_luis: 15 },
+      aplicados: { uid_ana__area_efectivo: 40, uid_luis__area_efectivo: 15 },
     });
 
-    expect(linea.aplicados).toEqual({ uid_ana: 40, uid_luis: 15 });
+    expect(linea.aplicados).toEqual({ uid_ana__area_efectivo: 40, uid_luis__area_efectivo: 15 });
   });
 
   it("deja aplicados en undefined cuando el doc no lo trae (abrirSesion siembra líneas sin ese mapa)", () => {
@@ -86,8 +101,7 @@ describe("lineaConteoDesdeDoc (doc 04 §3)", () => {
     const linea = lineaConteoDesdeDoc("cat_5000", {
       valorUnitario: 5000,
       etiqueta: "$5.000",
-      area: "Efectivo",
-      areaFijaPorAdmin: false,
+      porArea: {},
       cantidadTotal: 0,
       numAportantes: 0,
       versiones: {},
@@ -330,5 +344,41 @@ describe("eventoAuditoriaDesdeDoc (docs/plan-panel-administrador.md §4)", () =>
       sinConfirmar: false,
       campos: { antes: 10, despues: 12 },
     });
+  });
+});
+
+describe("historicoDesdeDoc (doc 04 §3)", () => {
+  it("mapea un documento historico a Historico con porArea", () => {
+    const cerradaEn = Timestamp.fromDate(new Date("2026-08-02T18:00:00Z"));
+    const historico = historicoDesdeDoc({
+      sesionId: "ses_1",
+      cerradaEn,
+      totalUnidades: 100,
+      totalMonetario: 500000,
+      porCategoria: { cat_5000: { cantidad: 100, subtotal: 500000 } },
+      porArea: { area_1: 100 },
+    });
+
+    expect(historico).toEqual({
+      sesionId: "ses_1",
+      cerradaEn: cerradaEn.toDate(),
+      totalUnidades: 100,
+      totalMonetario: 500000,
+      porCategoria: { cat_5000: { cantidad: 100, subtotal: 500000 } },
+      porArea: { area_1: 100 },
+    });
+  });
+
+  it("deja porArea en {} cuando el doc no lo trae (historico legacy)", () => {
+    const cerradaEn = Timestamp.fromDate(new Date("2026-08-02T18:00:00Z"));
+    const historico = historicoDesdeDoc({
+      sesionId: "ses_1",
+      cerradaEn,
+      totalUnidades: 100,
+      totalMonetario: 500000,
+      porCategoria: { cat_5000: { cantidad: 100, subtotal: 500000 } },
+    });
+
+    expect(historico.porArea).toEqual({});
   });
 });

@@ -14,6 +14,7 @@ import type { RolUsuario, Usuario } from "@conteo/shared/models/usuario.js";
 
 interface AporteDoc {
   readonly uid: string;
+  readonly areaId: string;
   readonly nombre: string;
   readonly cantidad: number;
   readonly registradoEn: Timestamp;
@@ -24,6 +25,7 @@ interface AporteDoc {
 export function aporteDesdeDoc(data: AporteDoc): Aporte {
   return {
     uid: data.uid,
+    areaId: data.areaId,
     nombre: data.nombre,
     cantidad: data.cantidad,
     registradoEn: data.registradoEn.toDate(),
@@ -35,8 +37,7 @@ export function aporteDesdeDoc(data: AporteDoc): Aporte {
 interface LineaConteoDoc {
   readonly valorUnitario: number;
   readonly etiqueta: string;
-  readonly area: string;
-  readonly areaFijaPorAdmin: boolean;
+  readonly porArea?: Record<string, number>;
   readonly cantidadTotal: number;
   readonly numAportantes: number;
   readonly versiones: Record<string, number>;
@@ -50,8 +51,7 @@ export function lineaConteoDesdeDoc(categoriaId: string, data: LineaConteoDoc): 
     categoriaId,
     valorUnitario: data.valorUnitario,
     etiqueta: data.etiqueta,
-    area: data.area,
-    areaFijaPorAdmin: data.areaFijaPorAdmin,
+    porArea: (data.porArea as Record<string, number> | undefined) ?? {},
     cantidadTotal: data.cantidadTotal,
     numAportantes: data.numAportantes,
     versiones: data.versiones,
@@ -198,6 +198,7 @@ interface HistoricoDoc {
   readonly totalUnidades: number;
   readonly totalMonetario: number;
   readonly porCategoria: Record<string, { cantidad: number; subtotal: number }>;
+  readonly porArea?: Record<string, number>;
 }
 
 export function historicoDesdeDoc(data: HistoricoDoc): Historico {
@@ -207,5 +208,6 @@ export function historicoDesdeDoc(data: HistoricoDoc): Historico {
     totalUnidades: data.totalUnidades,
     totalMonetario: data.totalMonetario,
     porCategoria: data.porCategoria,
+    porArea: (data.porArea as Record<string, number> | undefined) ?? {},
   };
 }

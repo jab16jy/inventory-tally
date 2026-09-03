@@ -571,27 +571,8 @@ describe("FirestoreConteoRepository.observarAreasActivas (catálogo-en-conteo)",
   });
 });
 
-describe("FirestoreConteoRepository.reetiquetarLineaEnSesion/crearCategoriaEnSesion (routing vía httpsCallable)", () => {
+describe("FirestoreConteoRepository.crearCategoriaEnSesion (routing vía httpsCallable)", () => {
   beforeEach(() => vi.clearAllMocks());
-
-  it("reetiquetarLineaEnSesion llama a httpsCallable('reetiquetarLineaEnSesion') con el payload exacto", async () => {
-    const llamada = vi.fn().mockResolvedValue({ data: undefined });
-    httpsCallable.mockReturnValue(llamada);
-    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
-
-    await repo.reetiquetarLineaEnSesion({
-      sesionId: "ses_1",
-      categoriaId: "cat_5000",
-      areaId: "area_1",
-    });
-
-    expect(httpsCallable).toHaveBeenCalledWith(functions, "reetiquetarLineaEnSesion");
-    expect(llamada).toHaveBeenCalledWith({
-      sesionId: "ses_1",
-      categoriaId: "cat_5000",
-      areaId: "area_1",
-    });
-  });
 
   it("crearCategoriaEnSesion llama a httpsCallable('crearCategoriaEnSesion') con el payload exacto", async () => {
     const llamada = vi.fn().mockResolvedValue({ data: { categoriaId: "cat_nueva" } });

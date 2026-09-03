@@ -44,28 +44,15 @@ async function sembrarLineas(
     return sucursalesAsignadas === undefined || sucursalesAsignadas.includes(sucursalId);
   });
 
-  const areas = await db.collection("areas").where("activa", "==", true).get();
-  const nombresPorArea = new Map(areas.docs.map((area) => [area.id, area.get("nombre") as string]));
-
   for (let i = 0; i < docs.length; i += LOTE_MAXIMO) {
     const lote = db.batch();
     for (const categoria of docs.slice(i, i + LOTE_MAXIMO)) {
-      const areaIds = categoria.get("areaIds") as readonly string[] | undefined;
-      // ponytail: LineaConteo.area es un solo string y no puede representar
-      // N áreas; con 0 o con varias queda SIN_AREA. El desglose real
-      // (porArea, ADR-23) llega en la unidad que lo introduce.
-      const area = areaIds && areaIds.length === 1 ? nombresPorArea.get(areaIds[0]!) : undefined;
       lote.set(
         db.doc(`sesiones/${sesionId}/lineas/${categoria.id}`),
         lineaSembrada({
           categoriaId: categoria.id,
           valorUnitario: categoria.get("valor"),
           etiqueta: categoria.get("etiqueta"),
-          area,
-          // ADR-22: fijado por admin en el catálogo al abrir la sesión si
-          // asignó un área inequívoca (exactamente una). Con varias es ambiguo
-          // y decide el cajero.
-          areaFijaPorAdmin: areaIds?.length === 1,
           actualizadaPor: ejecutadoPor,
         }),
       );

@@ -8,8 +8,7 @@ function linea(versiones: Record<string, number>): LineaConteo {
     categoriaId: "cat_5000",
     valorUnitario: 5000,
     etiqueta: "$5.000",
-    area: "Aseo",
-    areaFijaPorAdmin: false,
+    porArea: {},
     cantidadTotal: 0,
     numAportantes: 0,
     versiones,
@@ -18,9 +17,10 @@ function linea(versiones: Record<string, number>): LineaConteo {
   };
 }
 
-function aporte(uid: string, version: number): Aporte {
+function aporte(uid: string, version: number, areaId = "area_1"): Aporte {
   return {
     uid,
+    areaId,
     nombre: "Ana Ramírez",
     cantidad: 12,
     registradoEn: new Date(),
@@ -59,6 +59,12 @@ describe("aporteConfirmado (doc 05 §3 — RF-16)", () => {
     // Sin esto, el aporte de un compañero pondría la regla en sólido y el
     // cajero creería que su conteo está a salvo cuando no lo está.
     expect(aporteConfirmado(linea({ uid_beto: 9 }), aporte("uid_ana", 1))).toBe(false);
+  });
+
+  it("queda confirmado cuando la línea registra la versión bajo la clave {uid}__{areaId} (ADR-23)", () => {
+    expect(aporteConfirmado(linea({ uid_ana__area_1: 2 }), aporte("uid_ana", 2, "area_1"))).toBe(
+      true,
+    );
   });
 });
 
