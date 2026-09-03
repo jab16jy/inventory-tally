@@ -14,8 +14,7 @@ function crearLinea(overrides: Partial<LineaConteo> = {}): LineaConteo {
     categoriaId: "cat_5000",
     valorUnitario: 5000,
     etiqueta: "$5.000",
-    area: "Aseo",
-    areaFijaPorAdmin: false,
+    porArea: {},
     cantidadTotal: 55,
     numAportantes: 2,
     versiones: { uid_ana: 3, uid_luis: 1 },
@@ -28,6 +27,7 @@ function crearLinea(overrides: Partial<LineaConteo> = {}): LineaConteo {
 function crearAporte(overrides: Partial<Aporte> = {}): Aporte {
   return {
     uid: "uid_ana",
+    areaId: "area_1",
     nombre: "Ana Ramírez",
     cantidad: 30,
     registradoEn: new Date("2026-08-02T09:12:10Z"),
@@ -106,22 +106,33 @@ describe("totalMonetarioSesion", () => {
 });
 
 describe("totalPorArea", () => {
-  it("suma cantidadTotal de líneas de la misma área, independientemente del precio", () => {
+  it("suma cantidad de líneas de la misma área, independientemente del precio", () => {
     const lineas = [
-      crearLinea({ categoriaId: "cat_5000", area: "Aseo", cantidadTotal: 55, valorUnitario: 5000 }),
-      crearLinea({ categoriaId: "cat_2000", area: "Aseo", cantidadTotal: 310, valorUnitario: 2000 }),
+      crearLinea({ categoriaId: "cat_5000", porArea: { area_aseo: 55 }, valorUnitario: 5000 }),
+      crearLinea({ categoriaId: "cat_2000", porArea: { area_aseo: 310 }, valorUnitario: 2000 }),
     ];
-    expect(totalPorArea(lineas)).toEqual([{ area: "Aseo", cantidad: 365 }]);
+    expect(totalPorArea(lineas)).toEqual([{ areaId: "area_aseo", cantidad: 365 }]);
   });
 
   it("separa áreas distintas", () => {
     const lineas = [
-      crearLinea({ categoriaId: "cat_5000", area: "Aseo", cantidadTotal: 55 }),
-      crearLinea({ categoriaId: "cat_2000", area: "Cocina", cantidadTotal: 310 }),
+      crearLinea({ categoriaId: "cat_5000", porArea: { area_aseo: 55 } }),
+      crearLinea({ categoriaId: "cat_2000", porArea: { area_cocina: 310 } }),
     ];
     expect(totalPorArea(lineas)).toEqual([
-      { area: "Aseo", cantidad: 55 },
-      { area: "Cocina", cantidad: 310 },
+      { areaId: "area_aseo", cantidad: 55 },
+      { areaId: "area_cocina", cantidad: 310 },
+    ]);
+  });
+
+  it("suma múltiples áreas dentro de la misma línea", () => {
+    const lineas = [
+      crearLinea({ categoriaId: "cat_5000", porArea: { area_aseo: 10, area_cocina: 20 } }),
+      crearLinea({ categoriaId: "cat_2000", porArea: { area_aseo: 15 } }),
+    ];
+    expect(totalPorArea(lineas)).toEqual([
+      { areaId: "area_aseo", cantidad: 25 },
+      { areaId: "area_cocina", cantidad: 20 },
     ]);
   });
 
@@ -129,12 +140,16 @@ describe("totalPorArea", () => {
     expect(totalPorArea([])).toEqual([]);
   });
 
-  it("ordena el resultado alfabéticamente por área", () => {
+  it("ordena el resultado alfabéticamente por areaId", () => {
     const lineas = [
-      crearLinea({ categoriaId: "cat_1", area: "Cocina", cantidadTotal: 1 }),
-      crearLinea({ categoriaId: "cat_2", area: "Aseo", cantidadTotal: 1 }),
-      crearLinea({ categoriaId: "cat_3", area: "Ferretería", cantidadTotal: 1 }),
+      crearLinea({ categoriaId: "cat_1", porArea: { area_cocina: 1 } }),
+      crearLinea({ categoriaId: "cat_2", porArea: { area_aseo: 1 } }),
+      crearLinea({ categoriaId: "cat_3", porArea: { area_ferreteria: 1 } }),
     ];
-    expect(totalPorArea(lineas).map((t) => t.area)).toEqual(["Aseo", "Cocina", "Ferretería"]);
+    expect(totalPorArea(lineas).map((t) => t.areaId)).toEqual([
+      "area_aseo",
+      "area_cocina",
+      "area_ferreteria",
+    ]);
   });
 });

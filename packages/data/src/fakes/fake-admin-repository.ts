@@ -300,9 +300,7 @@ export class FakeAdminRepository implements AdminRepository {
     return { areaId, desactivada: true };
   }
 
-  async eliminarCategoria(
-    categoriaId: string,
-  ): Promise<{ categoriaId: string; eliminada: true }> {
+  async eliminarCategoria(categoriaId: string): Promise<{ categoriaId: string; eliminada: true }> {
     this.registrar("eliminarCategoria", { categoriaId });
     return { categoriaId, eliminada: true };
   }

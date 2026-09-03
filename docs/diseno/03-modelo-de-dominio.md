@@ -203,22 +203,18 @@ contable; mutarla destruye el valor de la auditoría.
 > históricos deben conservar el valor vigente al momento del conteo. Por eso la línea
 > guarda una copia del valor, no una referencia viva al catálogo.
 >
-> El área **dejará de seguir este patrón** ([ADR-23](13-decisiones-adr.md#adr-23), que
-> supersede a ADR-21 y ADR-22): la decisión es que deje de ser un dato que se congela al
-> sembrar o un campo que se corrige después, y pase a ser el contexto de trabajo que el
-> contador elige al entrar a la sesión. La unidad que ejecuta esa decisión hace que la línea
-> (`sesiones/{sesionId}/lineas/{categoriaId}`, que sigue siendo una fila por categoría) gane
-> `porArea: Readonly<Record<areaId, number>>`, el desglose de `cantidadTotal` construido a
-> partir del `areaId` que cada `Aporte` ya trae consigo. Esa misma unidad retira el campo
-> `area` a congelar, el sentinel `"Sin área"` y el reetiquetado a auditar: corregir una
-> clasificación errónea pasará a ser aportar desde otra área, no reescribir la línea. Hasta
-> entonces, `CategoriaValor.areaIds` (N:M) ya reemplazó a `areaId`, pero `LineaConteo.area`
-> y `reetiquetarLineaEnSesion` siguen vigentes.
+> El área **sigue este modelo** ([ADR-23](13-decisiones-adr.md#adr-23), que
+> supersede a ADR-21 y ADR-22): ya no es un dato congelado al sembrar ni un campo que
+> se corrige después, sino una división de trabajo. La línea
+> (`sesiones/{sesionId}/lineas/{categoriaId}`, que sigue siendo una fila por categoría)
+> tiene `porArea: Readonly<Record<areaId, number>>`, el desglose de `cantidadTotal` construido a
+> partir del `areaId` que cada `Aporte` trae consigo (con clave compuesta `{uid}__{areaId}`).
+> Se retiraron el campo `area`, el sentinel `"Sin área"` y la callable de reetiquetado:
+> corregir una clasificación errónea es aportar desde otra área, no reescribir la línea.
 >
 > **El cajero sigue sin crear áreas al vuelo** — una entrada creada a mitad de conteo sólo
 > aplicaría a la próxima sesión, y ésa es la parte del razonamiento original que se
-> mantiene intacta. Vincula una existente; no la inventa. Tampoco edita ni borra
-> categorías: eso sigue siendo del admin.
+> mantiene intacta. Tampoco edita ni borra categorías: eso sigue siendo del admin.
 
 ---
 

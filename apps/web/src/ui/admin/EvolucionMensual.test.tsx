@@ -24,6 +24,7 @@ function historico(sesionId: string, cerradaEn: string, totalMonetario: number):
     totalUnidades: 1,
     totalMonetario,
     porCategoria: {},
+    porArea: {},
   };
 }
 

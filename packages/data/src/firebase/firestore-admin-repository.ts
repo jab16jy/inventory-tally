@@ -333,9 +333,7 @@ export class FirestoreAdminRepository implements AdminRepository {
     return this.llamar("desactivarArea", { areaId });
   }
 
-  async eliminarCategoria(
-    categoriaId: string,
-  ): Promise<{ categoriaId: string; eliminada: true }> {
+  async eliminarCategoria(categoriaId: string): Promise<{ categoriaId: string; eliminada: true }> {
     return this.llamar("eliminarCategoria", { categoriaId });
   }
 

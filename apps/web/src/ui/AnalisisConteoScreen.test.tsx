@@ -37,8 +37,7 @@ function crearLinea(overrides: Partial<LineaConteo> = {}): LineaConteo {
     // no se calcule/pinte DINERO (subtotal/total), no que el sistema entero
     // evite el carácter "$" en cualquier texto.
     etiqueta: "Categoría",
-    area: "Bodega",
-    areaFijaPorAdmin: false,
+    porArea: {},
     cantidadTotal: 0,
     numAportantes: 0,
     versiones: {},
@@ -89,7 +88,7 @@ describe("AnalisisConteoScreen", () => {
       "ses_1",
       crearLinea({
         categoriaId: "c1",
-        area: "Bodega",
+        porArea: { Bodega: 5 },
         cantidadTotal: 5,
         aplicados: { uid_ana: 5 },
       }),
@@ -98,7 +97,7 @@ describe("AnalisisConteoScreen", () => {
       "ses_1",
       crearLinea({
         categoriaId: "c2",
-        area: "Anaqueles",
+        porArea: { Anaqueles: 20 },
         cantidadTotal: 20,
         aplicados: { uid_luis: 20 },
       }),
@@ -123,11 +122,21 @@ describe("AnalisisConteoScreen", () => {
     // criterio (si coincidieran, pasaría igual ordenando por dinero).
     repo.sembrarLinea(
       "ses_1",
-      crearLinea({ categoriaId: "c1", area: "Bodega", valorUnitario: 100, cantidadTotal: 5 }),
+      crearLinea({
+        categoriaId: "c1",
+        porArea: { Bodega: 5 },
+        valorUnitario: 100,
+        cantidadTotal: 5,
+      }),
     );
     repo.sembrarLinea(
       "ses_1",
-      crearLinea({ categoriaId: "c2", area: "Anaqueles", valorUnitario: 10, cantidadTotal: 20 }),
+      crearLinea({
+        categoriaId: "c2",
+        porArea: { Anaqueles: 20 },
+        valorUnitario: 10,
+        cantidadTotal: 20,
+      }),
     );
 
     renderPantalla(repo);

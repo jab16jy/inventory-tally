@@ -230,7 +230,7 @@ function crearLineaAgrupable(overrides: Partial<LineaAgrupable> = {}): LineaAgru
   return {
     categoriaId: "cat-1",
     etiqueta: "línea",
-    area: "área",
+    porArea: { area_1: 1 },
     cantidadTotal: 1,
     valorUnitario: 1,
     ...overrides,
@@ -248,7 +248,7 @@ describe("agruparPorDimension", () => {
       crearLineaAgrupable({
         categoriaId: "cat-a",
         etiqueta: "Categoría A",
-        area: "Barra",
+        porArea: { area_barra: 10 },
         cantidadTotal: 10,
         valorUnitario: 5,
         aplicados: { uid1: 6, uid2: 4 },
@@ -256,15 +256,19 @@ describe("agruparPorDimension", () => {
       crearLineaAgrupable({
         categoriaId: "cat-b",
         etiqueta: "Categoría B",
-        area: "Cocina",
+        porArea: { area_cocina: 20 },
         cantidadTotal: 20,
         valorUnitario: 2,
         aplicados: { uid1: 20 },
       }),
     ];
 
+    const nombres = new Map([
+      ["area_barra", "Barra"],
+      ["area_cocina", "Cocina"],
+    ]);
     const porCategoria = agruparPorDimension(lineas, "categoria");
-    const porArea = agruparPorDimension(lineas, "area");
+    const porArea = agruparPorDimension(lineas, "area", nombres);
     const porCajero = agruparPorDimension(lineas, "cajero");
 
     expect(sumaUnidades(porCategoria)).toBe(30);
@@ -330,10 +334,65 @@ describe("agruparPorDimension", () => {
     expect(sumaValor(filas)).toBe(30);
   });
 
-  it("una línea con area vacía cae en «Sin área» (mismo rótulo que abrir-sesion.ts)", () => {
-    const linea = crearLineaAgrupable({ area: "", cantidadTotal: 4, valorUnitario: 2 });
-    const filas = agruparPorDimension([linea], "area");
-    expect(filas).toEqual([{ clave: "Sin área", etiqueta: "Sin área", unidades: 4, valor: 8 }]);
+  it("un areaId sin entrada en nombres cae al propio areaId como etiqueta", () => {
+    const linea = crearLineaAgrupable({ porArea: { "area-sin-nombre": 4 }, valorUnitario: 2 });
+    const filas = agruparPorDimension([linea], "area", new Map([["otra-area", "Otra"]]));
+    expect(filas).toEqual([
+      { clave: "area-sin-nombre", etiqueta: "area-sin-nombre", unidades: 4, valor: 8 },
+    ]);
+  });
+
+  it("dos áreas homónimas no se funden en silencio y mantienen claves separadas (#86)", () => {
+    const linea1 = crearLineaAgrupable({
+      categoriaId: "c1",
+      porArea: { area_activa: 10 },
+      valorUnitario: 2,
+    });
+    const linea2 = crearLineaAgrupable({
+      categoriaId: "c2",
+      porArea: { area_recreada: 5 },
+      valorUnitario: 2,
+    });
+    const nombres = new Map([
+      ["area_activa", "Cocina"],
+      ["area_recreada", "Cocina"],
+    ]);
+    const filas = agruparPorDimension([linea1, linea2], "area", nombres);
+    expect(filas).toHaveLength(2);
+    expect(filas).toEqual([
+      { clave: "area_activa", etiqueta: "Cocina", unidades: 10, valor: 20 },
+      { clave: "area_recreada", etiqueta: "Cocina", unidades: 5, valor: 10 },
+    ]);
+  });
+
+  it("cuando la suma de porArea es menor que cantidadTotal aparece la fila «Sin área»", () => {
+    const linea = crearLineaAgrupable({
+      cantidadTotal: 10,
+      valorUnitario: 3,
+      porArea: { area_aseo: 6 },
+    });
+    const filas = agruparPorDimension([linea], "area", new Map([["area_aseo", "Aseo"]]));
+    expect(filas).toEqual([
+      { clave: "area_aseo", etiqueta: "Aseo", unidades: 6, valor: 18 },
+      { clave: "", etiqueta: "Sin área", unidades: 4, valor: 12 },
+    ]);
+  });
+
+  it("ignora entradas con cantidad menor o igual a 0 en porArea", () => {
+    const linea = crearLineaAgrupable({
+      cantidadTotal: 5,
+      valorUnitario: 2,
+      porArea: { area_vacia: 0, area_valida: 5 },
+    });
+    const filas = agruparPorDimension(
+      [linea],
+      "area",
+      new Map([
+        ["area_valida", "Válida"],
+        ["area_vacia", "Vacía"],
+      ]),
+    );
+    expect(filas).toEqual([{ clave: "area_valida", etiqueta: "Válida", unidades: 5, valor: 10 }]);
   });
 
   it("ordena por valor descendente y desempata por etiqueta ascendente, de forma determinística", () => {

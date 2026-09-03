@@ -172,10 +172,10 @@ duplicar.
   "categoriaId": "cat_5000",
   "valorUnitario": 5000,
   "etiqueta": "$5.000",
-  "area": "Aseo",
+  "porArea": { "area_aseo": 55 },
   "cantidadTotal": 55,
   "numAportantes": 2,
-  "versiones": { "uid_ana": 3, "uid_luis": 1 },
+  "versiones": { "uid_ana__area_aseo": 3, "uid_luis__area_aseo": 1 },
   "actualizadaEn": "2026-08-02T09:14:33Z",
   "actualizadaPor": "uid_luis"
 }
@@ -184,27 +184,20 @@ duplicar.
 > **El `subtotal` ya no vive aquí** (cambio respecto a la v1). Se movió a `resumen` para
 > que el cajero, que necesita leer las líneas, no reciba importes consolidados.
 > `versiones` da idempotencia al trigger ([05](05-concurrencia-offline-tiempo-real.md)).
-> `area` sigue el patrón de `valorUnitario` (invariante I-7, [03](03-modelo-de-dominio.md))
-> **con dos excepciones**: se copia desde `categoriasValor.areaId` al sembrar la línea,
-> junto con `areaFijaPorAdmin` (si esa categoría ya tenía `areaId` en el catálogo al abrir
-> la sesión). `"Sin área"` es el **hueco**, no un valor congelado — es el fallback cuando la
-> categoría no tenía área asignada. Una línea cuya categoría **no** tiene `areaId` de
-> catálogo (`areaFijaPorAdmin: false`) puede reetiquetarse tantas veces como el cajero
-> quiera, incluyendo volver a `"Sin área"`; una línea con `areaFijaPorAdmin: true`, nunca
-> ([ADR-21](13-decisiones-adr.md#adr-21), [ADR-22](13-decisiones-adr.md#adr-22)).
->
-> El campo tiene **dos escritores**: `abrirSesion`, que lo siembra, y
-> `reetiquetarLineaEnSesion`, que sólo escribe sobre líneas con `areaFijaPorAdmin: false`.
-> `valorUnitario`, en cambio, sigue teniendo uno solo y sigue congelado sin excepción.
+> `porArea` registra el desglose de unidades por cada `areaId` de trabajo ([ADR-23](13-decisiones-adr.md#adr-23)).
+> Se retiraron `area`, `areaFijaPorAdmin`, el sentinel `"Sin área"` y la callable `reetiquetarLineaEnSesion`.
+> `valorUnitario`, en cambio, sigue teniendo un único escritor (`abrirSesion`) y sigue congelado sin excepción.
 
-### `sesiones/{sesionId}/lineas/{categoriaId}/aportes/{uid}`
+### `sesiones/{sesionId}/lineas/{categoriaId}/aportes/{uid}__{areaId}`
 
-ID del documento = UID del cajero. **Esta decisión es la que elimina los conflictos de
-escritura.**
+ID del documento = UID del cajero + `__` + ID del área. **Esta decisión permite que varios
+contadores se repartan el local por zonas y que un contador registre aportes en distintas áreas
+sin colisión ([ADR-23](13-decisiones-adr.md#adr-23)).**
 
 ```json
 {
   "uid": "uid_ana",
+  "areaId": "area_aseo",
   "nombre": "Ana Ramírez",
   "cantidad": 30,
   "registradoEn": "2026-08-02T09:12:10Z",

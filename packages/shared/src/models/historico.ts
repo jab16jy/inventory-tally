@@ -16,4 +16,5 @@ export interface Historico {
   readonly porCategoria: Readonly<
     Record<string, { readonly cantidad: number; readonly subtotal: number }>
   >;
+  readonly porArea: Readonly<Record<string /* areaId */, number>>;
 }

@@ -38,17 +38,19 @@ export function totalMonetarioSesion(lineas: readonly LineaSumable[]): number {
   return lineas.reduce((total, linea) => total + subtotal(linea), 0);
 }
 
-export type LineaAgrupablePorArea = Pick<LineaConteo, "area" | "cantidadTotal">;
+export type LineaAgrupablePorArea = Pick<LineaConteo, "porArea">;
 
-/** Unidades contadas por área: suma cantidadTotal agrupando por LineaConteo.area. */
+/** Unidades contadas por área: suma cantidad agrupando por areaId leyendo linea.porArea (ADR-23). */
 export function totalPorArea(
-  lineas: readonly LineaAgrupablePorArea[],
-): ReadonlyArray<{ area: string; cantidad: number }> {
+  lineas: readonly Pick<LineaConteo, "porArea">[],
+): ReadonlyArray<{ areaId: string; cantidad: number }> {
   const totales = new Map<string, number>();
   for (const linea of lineas) {
-    totales.set(linea.area, (totales.get(linea.area) ?? 0) + linea.cantidadTotal);
+    for (const [areaId, cantidad] of Object.entries(linea.porArea ?? {})) {
+      totales.set(areaId, (totales.get(areaId) ?? 0) + cantidad);
+    }
   }
   return [...totales.entries()]
-    .map(([area, cantidad]) => ({ area, cantidad }))
-    .sort((a, b) => a.area.localeCompare(b.area));
+    .map(([areaId, cantidad]) => ({ areaId, cantidad }))
+    .sort((a, b) => a.areaId.localeCompare(b.areaId));
 }

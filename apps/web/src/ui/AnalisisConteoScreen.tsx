@@ -81,7 +81,16 @@ export function AnalisisConteoScreen({ onSalir }: AnalisisConteoScreenProps) {
   const sesion = useSesion(sesionId);
 
   const equipo = totalUnidadesSesion(lineas);
-  const tuAporte = lineas.reduce((total, l) => total + (l.aplicados?.[uid] ?? 0), 0);
+  const tuAporte = lineas.reduce((total, l) => {
+    if (!l.aplicados) return total;
+    let suma = 0;
+    for (const [clave, cant] of Object.entries(l.aplicados)) {
+      if (clave === uid || clave.startsWith(`${uid}__`)) {
+        suma += cant;
+      }
+    }
+    return total + suma;
+  }, 0);
   const pct = participacion(tuAporte, equipo);
 
   const nombresCajero = useMemo(() => new Map([[uid, "Tú"]]), [uid]);

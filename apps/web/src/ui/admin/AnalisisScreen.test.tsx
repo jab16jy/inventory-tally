@@ -62,8 +62,7 @@ function lineaBase(
     categoriaId,
     valorUnitario,
     etiqueta: `$${valorUnitario}`,
-    area: "Aseo",
-    areaFijaPorAdmin: false,
+    porArea: {},
     cantidadTotal,
     numAportantes: 1,
     versiones: {},
@@ -80,6 +79,7 @@ function crearHistorico(overrides: Partial<Historico> = {}): Historico {
     totalUnidades: 100,
     totalMonetario: 500_000,
     porCategoria: {},
+    porArea: {},
     ...overrides,
   };
 }
@@ -513,7 +513,7 @@ describe("AnalisisScreen (rediseño)", () => {
   it('una línea sin area cae en el grupo "Sin área"', async () => {
     const repo = new FakeAdminRepository();
     repo.sembrarSesion(sesionBase());
-    repo.sembrarLinea("ses_1", lineaBase("cat_a", 1000, 5, { area: "" }));
+    repo.sembrarLinea("ses_1", lineaBase("cat_a", 1000, 5, { porArea: {} }));
     repo.sembrarSincronizacion("ses_1", todosSincronizados());
 
     renderPantalla(repo);
@@ -543,8 +543,8 @@ describe("AnalisisScreen (rediseño)", () => {
   it("dimensión Área suma varias líneas que comparten área en una sola fila", async () => {
     const repo = new FakeAdminRepository();
     repo.sembrarSesion(sesionBase());
-    repo.sembrarLinea("ses_1", lineaBase("cat_a", 2000, 100, { area: "Bodega" })); // 200.000
-    repo.sembrarLinea("ses_1", lineaBase("cat_b", 3000, 50, { area: "Bodega" })); // 150.000
+    repo.sembrarLinea("ses_1", lineaBase("cat_a", 2000, 100, { porArea: { Bodega: 100 } })); // 200.000
+    repo.sembrarLinea("ses_1", lineaBase("cat_b", 3000, 50, { porArea: { Bodega: 50 } })); // 150.000
     repo.sembrarSincronizacion("ses_1", todosSincronizados());
 
     renderPantalla(repo);

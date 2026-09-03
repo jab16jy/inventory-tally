@@ -112,9 +112,9 @@ export function FinalizarScreen({ auth, onSalir }: FinalizarScreenProps) {
 
       {porArea.length > 0 && (
         <ul className="mt-3 flex flex-col gap-0.5">
-          {porArea.map(({ area, cantidad }) => (
-            <li key={area} className="text-base text-tenue">
-              {area}: {cantidad} {cantidad === 1 ? "producto" : "productos"}
+          {porArea.map(({ areaId, cantidad }) => (
+            <li key={areaId} className="text-base text-tenue">
+              {areaId}: {cantidad} {cantidad === 1 ? "producto" : "productos"}
             </li>
           ))}
         </ul>

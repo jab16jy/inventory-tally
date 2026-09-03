@@ -32,8 +32,7 @@ function lineaBase(
     categoriaId,
     valorUnitario,
     etiqueta,
-    area: "Aseo",
-    areaFijaPorAdmin: false,
+    porArea: {},
     cantidadTotal: 0,
     numAportantes: 0,
     versiones: {},
@@ -79,15 +78,15 @@ describe("FinalizarScreen (F3-B, doc 11 §6)", () => {
     const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
     repo.sembrarLinea(
       "ses_1",
-      lineaBase("cat_1000", "$1.000", 1000, { area: "Aseo", cantidadTotal: 400 }),
+      lineaBase("cat_1000", "$1.000", 1000, { porArea: { Aseo: 400 }, cantidadTotal: 400 }),
     );
     repo.sembrarLinea(
       "ses_1",
-      lineaBase("cat_2000", "$2.000", 2000, { area: "Aseo", cantidadTotal: 205 }),
+      lineaBase("cat_2000", "$2.000", 2000, { porArea: { Aseo: 205 }, cantidadTotal: 205 }),
     );
     repo.sembrarLinea(
       "ses_1",
-      lineaBase("cat_500", "$500", 500, { area: "Mercancía", cantidadTotal: 1300 }),
+      lineaBase("cat_500", "$500", 500, { porArea: { Mercancía: 1300 }, cantidadTotal: 1300 }),
     );
 
     renderPantalla(repo);

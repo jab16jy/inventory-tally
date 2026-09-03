@@ -8,7 +8,6 @@ import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 import { describe, expect, it, afterEach } from "vitest";
 import { eliminarAreaImpl } from "../../src/callables/eliminar-area.js";
-import { abrirSesionImpl } from "../../src/callables/abrir-sesion.js";
 
 if (getApps().length === 0) {
   initializeApp({ projectId: "demo-conteo-eficiente" });
@@ -134,27 +133,40 @@ describe("eliminarAreaImpl", () => {
     expect(area.exists).toBe(true);
   });
 
-  it("área cuyo nombre sólo aparece congelado en una línea de sesión (sin categoriasValor.areaIds) · SÍ es eliminable (I-7)", async () => {
+  it("área con conteos activos (lineas.porArea > 0) · rechaza failed-precondition (issue #86)", async () => {
     const areaId = await sembrarArea();
-    await sembrarCategoria(areaId); // deja que abrirSesionImpl congele el nombre en la línea
     const sucursalId = await sembrarSucursal();
-    const { sesionId } = await abrirSesionImpl(db, "uid_admin", { sucursalId });
+    const sesionId = `ses_${randomUUID()}`;
     sesionesCreadas.push(sesionId);
+    await db.doc(`sesiones/${sesionId}`).set({ sucursalId, estado: "abierta" });
+    const catId = `cat_${randomUUID()}`;
+    await db.doc(`sesiones/${sesionId}/lineas/${catId}`).set({
+      porArea: { [areaId]: 5 },
+      cantidadTotal: 5,
+    });
 
-    const lineas = await db.collection(`sesiones/${sesionId}/lineas`).get();
-    expect(lineas.docs.some((linea) => linea.get("area") === "Aseo")).toBe(true);
+    await expect(eliminarAreaImpl(db, "uid_admin", { areaId })).rejects.toThrow(
+      "No se puede eliminar: usada en conteos activos",
+    );
 
-    // La única referencia viva (categoriasValor.areaIds) se retira borrando la
-    // categoría: así la línea congelada queda como la ÚNICA mención al área,
-    // que es justo el escenario que este test regresiona.
-    const categoriaId = categoriasCreadas.pop()!;
-    await db.doc(`categoriasValor/${categoriaId}`).delete();
+    const area = await db.doc(`areas/${areaId}`).get();
+    expect(area.exists).toBe(true);
+  });
+
+  it("área presente en porArea con cantidad 0 · SÍ es eliminable (issue #86)", async () => {
+    const areaId = await sembrarArea();
+    const sucursalId = await sembrarSucursal();
+    const sesionId = `ses_${randomUUID()}`;
+    sesionesCreadas.push(sesionId);
+    await db.doc(`sesiones/${sesionId}`).set({ sucursalId, estado: "abierta" });
+    const catId = `cat_${randomUUID()}`;
+    await db.doc(`sesiones/${sesionId}/lineas/${catId}`).set({
+      porArea: { [areaId]: 0 },
+      cantidadTotal: 0,
+    });
 
     const resultado = await eliminarAreaImpl(db, "uid_admin", { areaId });
-
     expect(resultado.eliminada).toBe(true);
     areasCreadas.splice(areasCreadas.indexOf(areaId), 1);
-    const lineaDespues = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
-    expect(lineaDespues.get("area")).toBe("Aseo");
   });
 });

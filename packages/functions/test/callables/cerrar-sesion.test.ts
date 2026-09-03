@@ -218,9 +218,21 @@ describe("cerrarSesionImpl", () => {
     await crearSesion(sesionId, sucursalId, "abierta");
     // Tres líneas distintas: una sola no distinguiría un `categoriaMayor`
     // calculado sobre la línea equivocada de uno calculado sobre la correcta.
-    await sembrarLinea(sesionId, "cat_5000", { cantidadTotal: 40, valorUnitario: 5000 });
-    await sembrarLinea(sesionId, "cat_2000", { cantidadTotal: 300, valorUnitario: 2000 });
-    await sembrarLinea(sesionId, "cat_10000", { cantidadTotal: 5, valorUnitario: 10000 });
+    await sembrarLinea(sesionId, "cat_5000", {
+      cantidadTotal: 40,
+      valorUnitario: 5000,
+      porArea: { area_1: 40 },
+    });
+    await sembrarLinea(sesionId, "cat_2000", {
+      cantidadTotal: 300,
+      valorUnitario: 2000,
+      porArea: { area_1: 200, area_2: 100 },
+    });
+    await sembrarLinea(sesionId, "cat_10000", {
+      cantidadTotal: 5,
+      valorUnitario: 10000,
+      porArea: { area_2: 5 },
+    });
 
     await cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false });
 
@@ -231,6 +243,7 @@ describe("cerrarSesionImpl", () => {
     expect(historico.get("totalUnidades")).toBe(resumen.get("totalUnidades"));
     expect(historico.get("totalMonetario")).toBe(resumen.get("totalMonetario"));
     expect(historico.get("porCategoria")).toEqual(resumen.get("porCategoria"));
+    expect(historico.get("porArea")).toEqual({ area_1: 240, area_2: 105 });
     expect(historico.get("totalUnidades")).toBe(40 + 300 + 5);
     expect(historico.get("totalMonetario")).toBe(40 * 5000 + 300 * 2000 + 5 * 10000);
   });

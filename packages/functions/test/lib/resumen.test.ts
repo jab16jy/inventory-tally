@@ -109,4 +109,28 @@ describe("calcularResumen", () => {
 
     expect(Object.keys(resumen.porCategoria)).toEqual(["cat_activa"]);
   });
+
+  it("agrega porArea sumando entre todas las líneas con conteo (ADR-23)", async () => {
+    const sesionId = `ses_${randomUUID()}`;
+    await sembrarLinea(sesionId, "cat_1", {
+      cantidadTotal: 55,
+      valorUnitario: 1000,
+      etiqueta: "$1.000",
+      porArea: { area_1: 30, area_2: 25 },
+    });
+    await sembrarLinea(sesionId, "cat_2", {
+      cantidadTotal: 15,
+      valorUnitario: 2000,
+      etiqueta: "$2.000",
+      porArea: { area_1: 10, area_3: 5 },
+    });
+
+    const resumen = calcularResumen(await lineasConConteo(sesionId));
+
+    expect(resumen.porArea).toEqual({
+      area_1: 40,
+      area_2: 25,
+      area_3: 5,
+    });
+  });
 });
