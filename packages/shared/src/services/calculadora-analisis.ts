@@ -1,5 +1,4 @@
 import type { LineaConteo } from "../models/linea-conteo.js";
-import { SIN_AREA } from "../models/linea-conteo.js";
 import { subtotal } from "./calculadora.js";
 
 /**
@@ -166,11 +165,11 @@ export type DimensionAnalisis = "categoria" | "cajero" | "area";
  *  entera para que los tests no tengan que fabricar campos irrelevantes. */
 export type LineaAgrupable = Pick<
   LineaConteo,
-  "categoriaId" | "etiqueta" | "area" | "cantidadTotal" | "valorUnitario" | "aplicados"
+  "categoriaId" | "etiqueta" | "porArea" | "cantidadTotal" | "valorUnitario" | "aplicados"
 >;
 
 /** Una fila de una tabla agrupada por dimensión: `clave` identifica la fila
- * (categoriaId, nombre de área o uid de cajero) y `etiqueta` es lo que se
+ * (categoriaId, areaId o uid de cajero) y `etiqueta` es lo que se
  * pinta en pantalla. */
 export interface FilaDimension {
   readonly clave: string;
@@ -187,10 +186,8 @@ const SIN_ATRIBUIR = "__sin_atribuir";
  * sesión en filas de tabla según `dimensión` (doc 10, tablas del panel F6).
  *
  * - `"categoria"`: una fila por línea (clave = categoriaId).
- * - `"area"`: agrupa por `linea.area`; área vacía cae en `"Sin área"`, el
- *   mismo rótulo que ya usa `abrir-sesion.ts` en producción, para que una
- *   línea con área vacía no invente una segunda categoría "vacía" distinta
- *   de la que ya existe.
+ * - `"area"`: agrupa iterando por `linea.porArea ?? {}`, usando `areaId` como clave
+ *   y `nombres.get(areaId) ?? areaId` como etiqueta (ADR-23, #86).
  * - `"cajero"`: reparte cada línea entre los uid de `linea.aplicados`,
  *   proporcional a las unidades que cada uno aportó (`unidades × valorUnitario`).
  *   **Nunca** se reparte `subtotal(linea) / numAportantes`: dividir el
@@ -234,8 +231,16 @@ export function agruparPorDimension(
     if (dimension === "categoria") {
       acumular(linea.categoriaId, linea.etiqueta, linea.cantidadTotal, subtotal(linea));
     } else if (dimension === "area") {
-      const nombreArea = linea.area || SIN_AREA;
-      acumular(nombreArea, nombreArea, linea.cantidadTotal, subtotal(linea));
+      let unidadesPorArea = 0;
+      for (const [areaId, cantidad] of Object.entries(linea.porArea ?? {})) {
+        if (cantidad <= 0) continue;
+        unidadesPorArea += cantidad;
+        acumular(areaId, nombres.get(areaId) ?? areaId, cantidad, cantidad * linea.valorUnitario);
+      }
+      const resto = linea.cantidadTotal - unidadesPorArea;
+      if (resto > 0) {
+        acumular("", "Sin área", resto, resto * linea.valorUnitario);
+      }
     } else {
       const aplicados = linea.aplicados ?? {};
       let unidadesAplicadas = 0;

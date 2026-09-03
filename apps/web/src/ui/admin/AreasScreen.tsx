@@ -31,7 +31,8 @@ function useAreas(): { areas: Area[]; cargando: boolean } {
   return { areas, cargando };
 }
 
-type EstadoFormulario = { readonly modo: "crear" } | { readonly modo: "editar"; readonly area: Area };
+type EstadoFormulario =
+  { readonly modo: "crear" } | { readonly modo: "editar"; readonly area: Area };
 
 export function AreasScreen() {
   const repo = useAdminRepository();

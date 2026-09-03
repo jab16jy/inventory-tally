@@ -22,6 +22,7 @@ export interface ResumenCalculado {
     string,
     { cantidad: number; subtotal: number; actualizadaEn: unknown }
   >;
+  readonly porArea: Record<string, number>;
 }
 
 /**
@@ -43,6 +44,7 @@ export function calcularResumen(lineas: readonly QueryDocumentSnapshot[]): Resum
   }));
 
   const porCategoria: ResumenCalculado["porCategoria"] = {};
+  const porArea: Record<string, number> = {};
   let categoriaMayor: EntradaCategoria | null = null;
   let categoriaMenor: EntradaCategoria | null = null;
 
@@ -50,6 +52,11 @@ export function calcularResumen(lineas: readonly QueryDocumentSnapshot[]): Resum
     const cantidadTotal = linea.get("cantidadTotal") as number;
     const valorUnitario = linea.get("valorUnitario") as number;
     const etiqueta = linea.get("etiqueta") as string;
+    const porAreaLinea = (linea.get("porArea") as Record<string, number> | undefined) ?? {};
+
+    for (const [areaId, cantidad] of Object.entries(porAreaLinea)) {
+      porArea[areaId] = (porArea[areaId] ?? 0) + cantidad;
+    }
 
     porCategoria[linea.id] = {
       cantidad: cantidadTotal,
@@ -72,5 +79,6 @@ export function calcularResumen(lineas: readonly QueryDocumentSnapshot[]): Resum
     categoriaMayor,
     categoriaMenor,
     porCategoria,
+    porArea,
   };
 }

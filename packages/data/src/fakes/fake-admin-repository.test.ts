@@ -37,6 +37,7 @@ function crearHistorico(overrides: Partial<Historico> = {}): Historico {
     totalUnidades: 120,
     totalMonetario: 600000,
     porCategoria: {},
+    porArea: {},
     ...overrides,
   };
 }

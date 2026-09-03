@@ -97,6 +97,7 @@ export async function cerrarSesionImpl(
       totalUnidades: resumenCalculado.totalUnidades,
       totalMonetario: resumenCalculado.totalMonetario,
       porCategoria: resumenCalculado.porCategoria,
+      porArea: resumenCalculado.porArea,
     });
     // `set` sin `merge` (mismo motivo que D-1): `resumen` es 100% derivado.
     tx.set(resumenRef, {

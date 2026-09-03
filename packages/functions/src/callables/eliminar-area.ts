@@ -7,21 +7,9 @@ import { registrarAuditoria } from "../lib/auditoria.js";
 
 /**
  * eliminarAreaImpl — núcleo de la callable (docs/plan-panel-administrador.md
- * §3). Borrado FÍSICO, bloqueado por referencias vivas, mismo patrón que
+ * §3, issue #86). Borrado FÍSICO, bloqueado por referencias vivas en catálogo
+ * (categoriasValor) y en conteos activos (lineas.porArea). Mismo patrón que
  * `eliminarCategoriaImpl`: sin cascada, historial nunca purgado.
- *
- * ponytail: `LineaConteo.area` deliberadamente NO bloquea el borrado de un
- * área. Es el NOMBRE del área, copiado y congelado en la línea al abrir la
- * sesión (invariante I-7, ver abrir-sesion.ts donde `nombresPorArea` se
- * resuelve una sola vez y se escribe en cada línea) — es una etiqueta
- * desnormalizada, no una foreign key viva. Bloquear por esto haría
- * imborrable para siempre cualquier área que alguna vez apareció en algún
- * conteo, sin ninguna ganancia: la línea histórica sigue mostrando su nombre
- * congelado exista o no el documento de área. La ÚNICA referencia viva a un
- * área es `categoriasValor.areaIds` (N:M, issue #81), que es lo que la
- * guarda de abajo consulta con `array-contains` (misma ventana TOCTOU
- * documentada en eliminar-categoria.ts, y por el mismo motivo: `count()` no
- * puede ir dentro de una transacción).
  */
 export async function eliminarAreaImpl(
   db: Firestore,
@@ -42,6 +30,15 @@ export async function eliminarAreaImpl(
       "failed-precondition",
       `No se puede eliminar: usada en ${n} ${n === 1 ? "categoría" : "categorías"}.`,
     );
+  }
+
+  const usosEnLineas = await db
+    .collectionGroup("lineas")
+    .where(`porArea.${areaId}`, ">", 0)
+    .count()
+    .get();
+  if (usosEnLineas.data().count > 0) {
+    throw new HttpsError("failed-precondition", "No se puede eliminar: usada en conteos activos");
   }
 
   await db.runTransaction(async (tx) => {
