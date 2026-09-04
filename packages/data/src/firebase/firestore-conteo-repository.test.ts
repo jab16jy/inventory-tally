@@ -63,7 +63,12 @@ describe("FirestoreConteoRepository.registrarAporte (doc 07 §6)", () => {
     const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
     await expect(
-      repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 }),
+      repo.registrarAporte({
+        sesionId: "ses_1",
+        categoriaId: "cat_5000",
+        areaId: "area_1",
+        cantidad: 12,
+      }),
     ).resolves.toBeUndefined();
   });
 
@@ -71,21 +76,53 @@ describe("FirestoreConteoRepository.registrarAporte (doc 07 §6)", () => {
     setDoc.mockResolvedValue(undefined);
     const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
-    await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 12,
+    });
 
     expect(setDoc).toHaveBeenCalledTimes(1);
     const [, datos, opciones] = setDoc.mock.calls[0] as [unknown, Record<string, unknown>, unknown];
     expect(Object.keys(datos).sort()).toEqual(
-      ["cantidad", "dispositivoId", "nombre", "registradoEn", "uid", "version"].sort(),
+      ["areaId", "cantidad", "dispositivoId", "nombre", "registradoEn", "uid", "version"].sort(),
     );
     expect(opciones).toEqual({ merge: true });
+  });
+
+  it("issue #83: el id del documento es la clave compuesta {uid}__{areaId} que exige infra/firestore.rules", async () => {
+    setDoc.mockResolvedValue(undefined);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
+
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 12,
+    });
+
+    expect(doc).toHaveBeenCalledWith(
+      {},
+      "sesiones",
+      "ses_1",
+      "lineas",
+      "cat_5000",
+      "aportes",
+      "uid_ana__area_1",
+    );
   });
 
   it("escribe version con increment(1), nunca un número literal (I-obligatoria de la regla de monotonía)", async () => {
     setDoc.mockResolvedValue(undefined);
     const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
-    await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 12,
+    });
 
     expect(increment).toHaveBeenCalledWith(1);
     const [, datos] = setDoc.mock.calls[0] as [unknown, Record<string, unknown>];
@@ -96,9 +133,34 @@ describe("FirestoreConteoRepository.registrarAporte (doc 07 §6)", () => {
     const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
     await expect(
-      repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: -1 }),
+      repo.registrarAporte({
+        sesionId: "ses_1",
+        categoriaId: "cat_5000",
+        areaId: "area_1",
+        cantidad: -1,
+      }),
     ).rejects.toBeInstanceOf(CantidadInvalidaError);
     expect(setDoc).not.toHaveBeenCalled();
+  });
+});
+
+describe("FirestoreConteoRepository.observarMiAporte (issue #83)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("observa el documento de la clave compuesta {uid}__{areaId}, no el uid pelado", () => {
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
+
+    repo.observarMiAporte("ses_1", "cat_5000", "area_1", () => {});
+
+    expect(doc).toHaveBeenCalledWith(
+      {},
+      "sesiones",
+      "ses_1",
+      "lineas",
+      "cat_5000",
+      "aportes",
+      "uid_ana__area_1",
+    );
   });
 });
 
@@ -300,7 +362,12 @@ describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
     repo.observarEscriturasPendientes("ses_1", (n) => valores.push(n));
     expect(valores.at(-1)).toBe(0);
 
-    await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 12,
+    });
     expect(valores.at(-1)).toBe(1);
 
     resolver(undefined);
@@ -320,7 +387,12 @@ describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
       const valores: number[] = [];
       repo.observarEscriturasPendientes("ses_1", (n) => valores.push(n));
 
-      await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+      await repo.registrarAporte({
+        sesionId: "ses_1",
+        categoriaId: "cat_5000",
+        areaId: "area_1",
+        cantidad: 12,
+      });
       expect(valores.at(-1)).toBe(1);
       expect(setDoc).toHaveBeenCalledTimes(1);
 
@@ -361,7 +433,12 @@ describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
       repo.observarEscriturasPendientes("ses_1", (n) => pendientes.push(n));
       repo.observarEscriturasConError("ses_1", (n) => errores.push(n));
 
-      await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+      await repo.registrarAporte({
+        sesionId: "ses_1",
+        categoriaId: "cat_5000",
+        areaId: "area_1",
+        cantidad: 12,
+      });
       expect(errores.at(-1)).toBe(0);
 
       for (let intento = 0; intento < 3; intento++) {
@@ -397,7 +474,12 @@ describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
       repo.observarEscriturasPendientes("ses_1", (n) => pendientes.push(n));
       repo.observarEscriturasConError("ses_1", (n) => errores.push(n));
 
-      await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+      await repo.registrarAporte({
+        sesionId: "ses_1",
+        categoriaId: "cat_5000",
+        areaId: "area_1",
+        cantidad: 12,
+      });
 
       rechazador(new Error("permission-denied"));
       await p0.catch(() => {});
@@ -431,7 +513,12 @@ describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
       repo.observarEscriturasPendientes("ses_1", (n) => pendientes.push(n));
       repo.observarEscriturasConError("ses_1", (n) => errores.push(n));
 
-      await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+      await repo.registrarAporte({
+        sesionId: "ses_1",
+        categoriaId: "cat_5000",
+        areaId: "area_1",
+        cantidad: 12,
+      });
 
       for (let intento = 0; intento < 4; intento++) {
         diferidos[intento]!.rechazador(new Error("permission-denied"));

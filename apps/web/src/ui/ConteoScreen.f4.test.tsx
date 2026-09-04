@@ -46,6 +46,8 @@ function sesionBase(overrides: Partial<SesionConteo> = {}): SesionConteo {
 }
 
 function renderConteoScreen(repo: FakeConteoRepository, sesionId = "ses_1") {
+  // ADR-23: sin esto, ConteoScreen redirige a /preparar por falta de área activa.
+  localStorage.setItem(`areaActiva:${sesionId}`, "area_1");
   return render(
     <MemoryRouter initialEntries={[`/conteo/${sesionId}`]}>
       <ConteoRepositoryProvider repo={repo}>
@@ -126,7 +128,12 @@ describe("ConteoScreen · sesión cerrada por el admin (F4-A1, doc 11 §5)", () 
       { retrasoSincronizacionMs: 10_000 },
     );
     repo.sembrarLinea("ses_1", lineaBase("cat_5000", "$5.000", 5000));
-    void repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 3 });
+    void repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "",
+      cantidad: 3,
+    });
     repo.sembrarSesion(sesionBase({ estado: "cerrada" }));
     renderConteoScreen(repo);
 

@@ -22,6 +22,8 @@ function usuarioFake(rol: "admin" | "cajero") {
 }
 
 function renderConteoScreen(repo: FakeConteoRepository, sesionId = "ses_1", onSalir = vi.fn()) {
+  // ADR-23: sin esto, ConteoScreen redirige a /preparar por falta de área activa.
+  localStorage.setItem(`areaActiva:${sesionId}`, "area_1");
   return render(
     <MemoryRouter initialEntries={[`/conteo/${sesionId}`]}>
       <ConteoRepositoryProvider repo={repo}>

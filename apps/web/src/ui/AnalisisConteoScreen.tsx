@@ -20,6 +20,7 @@ import {
   type FilaDimension,
 } from "@conteo/shared/services/calculadora-analisis.js";
 import { fecha, numero, porcentaje } from "../lib/formato.js";
+import { useAreasActivas } from "../state/useAreasActivas.js";
 import { useConteoRepository } from "../state/repositorio-contexto.js";
 import { useLineasSesion } from "../state/useLineasSesion.js";
 import { useSesion } from "../state/useSesion.js";
@@ -79,6 +80,7 @@ export function AnalisisConteoScreen({ onSalir }: AnalisisConteoScreenProps) {
 
   const lineas = useLineasSesion(sesionId);
   const sesion = useSesion(sesionId);
+  const [areasActivas] = useAreasActivas(repo);
 
   const equipo = totalUnidadesSesion(lineas);
   const tuAporte = lineas.reduce((total, l) => {
@@ -94,15 +96,19 @@ export function AnalisisConteoScreen({ onSalir }: AnalisisConteoScreenProps) {
   const pct = participacion(tuAporte, equipo);
 
   const nombresCajero = useMemo(() => new Map([[uid, "Tú"]]), [uid]);
+  // issue #86: sin esto, agruparPorDimension cae en `nombres.get(areaId) ??
+  // areaId` y el cajero ve el uuid crudo del área en vez de su nombre.
+  const nombresArea = useMemo(
+    () => new Map(areasActivas.map((area) => [area.areaId, area.nombre])),
+    [areasActivas],
+  );
   const filas = useMemo(() => {
-    const base = agruparPorDimension(
-      lineas,
-      dimension,
-      dimension === "cajero" ? nombresCajero : undefined,
-    );
+    const nombres =
+      dimension === "cajero" ? nombresCajero : dimension === "area" ? nombresArea : undefined;
+    const base = agruparPorDimension(lineas, dimension, nombres);
     const ordenadas = ordenarPorUnidades(base);
     return dimension === "cajero" ? anonimizarCompaneros(ordenadas) : ordenadas;
-  }, [lineas, dimension, nombresCajero]);
+  }, [lineas, dimension, nombresCajero, nombresArea]);
 
   if (sesion.estado === "sin-resolver") {
     return (

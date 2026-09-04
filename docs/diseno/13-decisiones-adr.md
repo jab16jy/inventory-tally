@@ -791,9 +791,24 @@ a la sesión**, no un dato que se descubre línea por línea:
   sentinel `SIN_AREA` se retiran en la unidad que introduce `porArea`: corregir una
   clasificación errónea pasa a ser cambiar de área activa y aportar de nuevo, no reescribir
   un campo congelado.
-- **`eliminarArea` bloquea también por conteos vivos**, no sólo por referencias del
-  catálogo: si alguna sesión abierta tiene `porArea[areaId] > 0`, el borrado se rechaza —
-  misma forma de guarda (`collectionGroup`) que ya usa `eliminarCategoria`.
+- **`eliminarArea` bloquea sólo por referencias del catálogo** (`categoriasValor.areaIds`),
+  igual que `eliminarCategoria` bloquea por `lineas.categoriaId`. **Corrección posterior
+  (issue #86, revisión del veredicto de Judgment Day):** la primera implementación
+  intentó bloquear además por conteos vivos consultando
+  `collectionGroup("lineas").where(\`porArea.${areaId}\`, ">", 0)` — una ruta de campo
+  **dinámica**, que Firestore no puede indexar (`fieldOverrides` cubre rutas fijas, no
+  una por cada área). La consulta fallaba en producción con "requires an index" para
+  *cualquier* área, usada o no. La alternativa correcta —un campo materializado
+  `areasPresentes: string[]` en cada línea, consultable con `array-contains`, mismo
+  patrón que `categoriaId`— se evaluó y se descartó: exige tocar el trigger
+  `onAporteEscrito`, `reconciliarLineas`, la siembra de `abrirSesion` y todo fixture
+  existente que construye un `LineaConteo` (26+ archivos, ninguno relacionado con
+  áreas), para proteger algo que `porArea` no fija de todas formas — a diferencia de
+  `valorUnitario`/`etiqueta` de `categoriaId` (protegidos por I-7), un `areaId` que pasa
+  a apuntar a un área borrada sólo degrada a mostrar el id crudo en pantalla (ya cubierto
+  por el fallback `?? areaId` en AnalisisConteoScreen/FinalizarScreen), nunca corrompe ni
+  pierde un conteo. Es la misma garantía por la que `eliminarCategoria` ya no compensa
+  sus propias referencias colgantes.
 
 Supersede **total** a [ADR-21](#adr-21) y [ADR-22](#adr-22): el sentinel `SIN_AREA`, el
 reetiquetado de línea y la condición dura "una categoría con `areaId` de admin es

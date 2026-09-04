@@ -124,12 +124,15 @@ export class FakeConteoRepository implements ConteoRepository {
   observarMiAporte(
     sesionId: string,
     categoriaId: string,
+    areaId: string,
     onChange: (aporte: Aporte | null) => void,
   ): Unsubscribe {
     const clave = `${sesionId}/${categoriaId}`;
     const listeners = this.listenersDe(this.listenersAporte, clave);
     listeners.add(onChange);
-    onChange(this.aportesDeLinea(sesionId, categoriaId).get(this.usuario.uid) ?? null);
+    onChange(
+      this.aportesDeLinea(sesionId, categoriaId).get(`${this.usuario.uid}__${areaId}`) ?? null,
+    );
     return () => listeners.delete(onChange);
   }
 
@@ -185,24 +188,30 @@ export class FakeConteoRepository implements ConteoRepository {
     return { items, siguienteCursor };
   }
 
-  async registrarAporte({ sesionId, categoriaId, cantidad }: RegistrarAporteInput): Promise<void> {
+  async registrarAporte({
+    sesionId,
+    categoriaId,
+    areaId,
+    cantidad,
+  }: RegistrarAporteInput): Promise<void> {
     if (cantidad < 0) throw new CantidadInvalidaError("La cantidad no puede ser negativa");
 
+    const claveAporte = `${this.usuario.uid}__${areaId}`;
     const aportesLinea = this.aportesDeLinea(sesionId, categoriaId);
-    const anterior = aportesLinea.get(this.usuario.uid);
+    const anterior = aportesLinea.get(claveAporte);
     const delta = cantidad - (anterior?.cantidad ?? 0);
     const eraNuevo = anterior === undefined;
 
     const aporte: Aporte = {
       uid: this.usuario.uid,
-      areaId: "area_default",
+      areaId,
       nombre: this.usuario.nombre,
       cantidad,
       registradoEn: new Date(),
       dispositivoId: "fake-device",
       version: (anterior?.version ?? 0) + 1,
     };
-    aportesLinea.set(this.usuario.uid, aporte);
+    aportesLinea.set(claveAporte, aporte);
     this.notificar(this.listenersAporte, `${sesionId}/${categoriaId}`, aporte);
 
     const lineas = this.lineasDeSesion(sesionId);
@@ -212,7 +221,9 @@ export class FakeConteoRepository implements ConteoRepository {
         ...linea,
         cantidadTotal: linea.cantidadTotal + delta,
         numAportantes: linea.numAportantes + (eraNuevo ? 1 : 0),
-        versiones: { ...linea.versiones, [this.usuario.uid]: aporte.version },
+        versiones: { ...linea.versiones, [claveAporte]: aporte.version },
+        // Mismo desglose que mantiene onAporteEscrito en producción (ADR-23).
+        porArea: { ...linea.porArea, [areaId]: (linea.porArea[areaId] ?? 0) + delta },
         actualizadaEn: aporte.registradoEn,
         actualizadaPor: this.usuario.uid,
       };

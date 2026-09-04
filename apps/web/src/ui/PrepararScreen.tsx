@@ -18,8 +18,11 @@
 // escalamiento real que queda.
 import type { Auth } from "firebase/auth";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAreaActiva } from "../state/useAreaActiva.js";
+import { useAreasActivas } from "../state/useAreasActivas.js";
 import { useAuthState } from "../state/useAuthState.js";
 import { useConexion } from "../state/useConexion.js";
+import { useConteoRepository } from "../state/repositorio-contexto.js";
 import { useLineasSesion } from "../state/useLineasSesion.js";
 import { usePendientes } from "../state/usePendientes.js";
 import { CabeceraCajero } from "./CabeceraCajero.js";
@@ -47,10 +50,16 @@ export function PrepararScreen({ auth, onSalir }: PrepararScreenProps) {
   // hooks de estado — la ruta siempre provee :sesionId al montar.
   const { sesionId = "" } = useParams<{ sesionId: string }>();
   const navigate = useNavigate();
+  const repo = useConteoRepository();
 
   const lineas = useLineasSesion(sesionId);
   const pendientes = usePendientes(sesionId);
   const enLinea = useConexion();
+  // Área activa obligatoria (ADR-23): el contador elige con qué área
+  // organiza su conteo antes de empezar. Persistida en localStorage por
+  // sesionId — ConteoScreen la lee de vuelta.
+  const [areasActivas, areasCargadas] = useAreasActivas(repo);
+  const [areaActiva, setAreaActiva] = useAreaActiva(sesionId);
   // Un admin que entró a contar desde /admin (PanelScreen "Contar →") no
   // tiene forma de volver salvo cerrar sesión — esAdmin es del usuario, no
   // de cómo navegó, así que funciona sin importar el punto de entrada.
@@ -113,6 +122,44 @@ export function PrepararScreen({ auth, onSalir }: PrepararScreenProps) {
         </li>
       </ul>
 
+      {!areasCargadas ? (
+        // issue #86 (revisión de resiliencia, ronda RDD 5): sin esto, un
+        // listener que nunca emite (permiso revocado a mitad de sesión, o
+        // carga fría sin red ni caché — ver el `ponytail:` de
+        // useAreasActivas.ts) dejaba el botón deshabilitado para siempre sin
+        // ninguna pista visual de que seguía "cargando". Mismo patrón que
+        // "Cargando catálogo…" arriba.
+        <p className="mt-5 text-base text-tenue">Cargando áreas…</p>
+      ) : areasActivas.length === 0 ? (
+        // issue #86 (revisión de resiliencia): infra/firestore.rules exige
+        // areaId.size() > 0 SIN excepción — con el catálogo vacío no hay
+        // ningún valor de área válido que dejar pasar. Fingir que "" sirve
+        // deja al cajero enviando conteos que el servidor rechaza para
+        // siempre, sin decirle por qué. Lo honesto es bloquear y explicar.
+        <p role="alert" className="mt-5 text-base text-tinta">
+          No hay áreas configuradas todavía. Pídele a un administrador que cree al menos una antes
+          de empezar a contar.
+        </p>
+      ) : (
+        <label className="mt-5 block">
+          <span className="mb-1 block text-micro font-semibold text-tenue uppercase">Tu área</span>
+          <select
+            value={areaActiva}
+            onChange={(e) => setAreaActiva(e.target.value)}
+            className="min-h-[var(--size-toque)] w-full rounded-placa border border-borde bg-fondo px-3 text-tinta focus:border-senal focus:outline-none"
+          >
+            <option value="" disabled>
+              Elige un área
+            </option>
+            {areasActivas.map((area) => (
+              <option key={area.areaId} value={area.areaId}>
+                {area.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
       <h2 className="mt-5 mb-2 text-micro font-semibold text-tenue uppercase">Cómo funciona</h2>
       {/* <ol> nativo: el orden SÍ importa (son pasos secuenciales), así que la
           numeración no es la decoración "01/02/03" que craft-floor.md
@@ -127,8 +174,14 @@ export function PrepararScreen({ auth, onSalir }: PrepararScreenProps) {
 
       <button
         type="button"
+        // issue #86 (revisión de resiliencia): siempre exige areaActiva, sin
+        // excepción para catálogo vacío — infra/firestore.rules rechaza
+        // areaId="" igual, así que no hay ningún caso en que dejar pasar sin
+        // área sirva de algo. `areasCargadas` evita habilitar el botón
+        // durante la ventana de carga, antes del primer snapshot.
+        disabled={!areasCargadas || !areaActiva}
         onClick={() => navigate(`/conteo/${sesionId}`)}
-        className="mt-6 min-h-[var(--size-toque)] w-full rounded-placa bg-senal font-semibold text-fondo transition-colors duration-150 ease-out active:bg-senal/85"
+        className="mt-6 min-h-[var(--size-toque)] w-full rounded-placa bg-senal font-semibold text-fondo transition-colors duration-150 ease-out disabled:border disabled:border-borde disabled:bg-transparent disabled:text-tenue active:enabled:bg-senal/85"
       >
         Empezar a contar
       </button>

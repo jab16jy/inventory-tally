@@ -27,7 +27,7 @@ function renderFila(repo: FakeConteoRepository, versiones: Record<string, number
   return render(
     <ConteoRepositoryProvider repo={repo}>
       <ul>
-        <FilaCategoria sesionId="ses_1" linea={linea} />
+        <FilaCategoria sesionId="ses_1" areaId="area_1" linea={linea} />
       </ul>
     </ConteoRepositoryProvider>,
   );
@@ -58,9 +58,14 @@ describe("FilaCategoria · estado de sincronización (RF-16)", () => {
       actualizadaEn: new Date(),
       actualizadaPor: "",
     });
-    await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 4 });
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 4,
+    });
 
-    renderFila(repo, { uid_ana: 1 });
+    renderFila(repo, { uid_ana__area_1: 1 });
 
     expect(await screen.findByText(/guardado/i)).toBeInTheDocument();
     expect(screen.queryByText(/sin enviar/i)).not.toBeInTheDocument();

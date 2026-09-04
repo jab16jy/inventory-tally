@@ -13,7 +13,7 @@ categoriasValor/{categoriaId}
 
 sesiones/{sesionId}
     lineas/{categoriaId}              ← unidades (visible al cajero)
-        aportes/{uid}
+        aportes/{uid}__{areaId}
     resumen/actual                    ← monetario (sólo admin)
     sincronizacion/estado             ← control de cierre (RF-16)
 
@@ -34,7 +34,7 @@ flowchart TD
     SE --> L["lineas/{categoriaId}<br/><b>derivado · unidades</b>"]
     SE --> RS["resumen/actual<br/><b>derivado · monetario</b>"]
     SE --> SY["sincronizacion/estado<br/><b>derivado</b>"]
-    L --> AP["aportes/{uid}<br/><b>único escrito por el cliente</b>"]
+    L --> AP["aportes/{uid}__{areaId}<br/><b>único escrito por el cliente</b>"]
 
     style AP fill:#1f6f3f,color:#fff
     style L fill:#334,color:#fff

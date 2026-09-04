@@ -74,12 +74,77 @@ describe("PrepararScreen (F3-B, doc 11 §3)", () => {
     expect(pasos).toHaveTextContent(/pulsa.*finalizar/i);
   });
 
-  it('"Empezar a contar" navega a la pantalla de conteo de esa misma sesión', async () => {
-    renderPantalla(new FakeConteoRepository(), "ses_9");
+  it('con un área elegida, "Empezar a contar" navega a la pantalla de conteo de esa misma sesión', async () => {
+    const repo = new FakeConteoRepository();
+    repo.sembrarArea({ areaId: "area_1", nombre: "Área 1", activa: true, creadaEn: new Date() });
+    renderPantalla(repo, "ses_9");
 
+    fireEvent.change(await screen.findByLabelText(/tu área/i), {
+      target: { value: "area_1" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /empezar a contar/i }));
 
     expect(await screen.findByText("Pantalla de conteo")).toBeInTheDocument();
+  });
+
+  it("issue #86 (RDD ronda 5): mientras el listener de áreas no emite, avisa que sigue cargando en vez de quedar mudo", () => {
+    const repo = new FakeConteoRepository();
+    // Simula el techo documentado en useAreasActivas.ts: un listener que
+    // jamás llama a `onChange` (permiso revocado, o carga fría sin red ni
+    // caché) — antes de este fix, el cajero sólo veía un botón deshabilitado
+    // sin ninguna pista de que seguía cargando.
+    repo.observarAreasActivas = () => () => {};
+
+    renderPantalla(repo, "ses_areas_colgadas");
+
+    expect(screen.getByText(/cargando áreas/i)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /empezar a contar/i })).toBeDisabled();
+  });
+
+  it("issue #86 (revisión de resiliencia): con el catálogo vacío, avisa y no deja entrar sin área", async () => {
+    // infra/firestore.rules exige areaId.size() > 0 sin excepción: con cero
+    // áreas configuradas no hay ningún valor válido que dejar pasar. La
+    // pantalla debe decirlo, no fingir que "" sirve.
+    renderPantalla(new FakeConteoRepository(), "ses_sin_areas");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/no hay áreas configuradas/i);
+    expect(screen.getByRole("button", { name: /empezar a contar/i })).toBeDisabled();
+  });
+
+  it("issue #83/ADR-23: con áreas activas, 'Empezar a contar' queda deshabilitado hasta elegir una", async () => {
+    const repo = new FakeConteoRepository();
+    repo.sembrarArea({
+      areaId: "area_bodega",
+      nombre: "Bodega",
+      activa: true,
+      creadaEn: new Date(),
+    });
+
+    renderPantalla(repo, "ses_area_1");
+
+    const boton = await screen.findByRole("button", { name: /empezar a contar/i });
+    expect(boton).toBeDisabled();
+
+    fireEvent.change(await screen.findByLabelText(/tu área/i), {
+      target: { value: "area_bodega" },
+    });
+    expect(boton).toBeEnabled();
+
+    fireEvent.click(boton);
+    expect(await screen.findByText("Pantalla de conteo")).toBeInTheDocument();
+  });
+
+  it("issue #83/ADR-23: el área elegida persiste en localStorage por sesionId", async () => {
+    const repo = new FakeConteoRepository();
+    repo.sembrarArea({ areaId: "area_aseo", nombre: "Aseo", activa: true, creadaEn: new Date() });
+
+    renderPantalla(repo, "ses_area_2");
+    fireEvent.change(await screen.findByLabelText(/tu área/i), {
+      target: { value: "area_aseo" },
+    });
+
+    expect(localStorage.getItem("areaActiva:ses_area_2")).toBe("area_aseo");
   });
 
   it("ofrece un control de salida visible que no se llama 'Cerrar sesión'", () => {

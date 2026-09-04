@@ -24,6 +24,9 @@ import { Placa } from "./primitivos/Placa.js";
 
 interface FilaCategoriaProps {
   readonly sesionId: string;
+  /** Área activa del contador (ADR-23) — decide con qué clave se lee/escribe
+   *  el aporte propio (`{uid}__{areaId}`). */
+  readonly areaId: string;
   readonly linea: LineaConteo;
   /** Abre la Hoja (teclado numérico) para esta categoría — el camino
    *  PRINCIPAL de captura es tocar la fila (doc 11 §158-166). */
@@ -34,12 +37,13 @@ interface FilaCategoriaProps {
 
 function FilaCategoriaBase({
   sesionId,
+  areaId,
   linea,
   onSeleccionar,
   onCantidadPropiaCambio,
 }: FilaCategoriaProps) {
   const repo = useConteoRepository();
-  const miAporte = useMiAporte(sesionId, linea.categoriaId);
+  const miAporte = useMiAporte(sesionId, linea.categoriaId, areaId);
   const miCantidad = miAporte?.cantidad ?? 0;
   const confirmado = aporteConfirmado(linea, miAporte);
 
@@ -51,6 +55,7 @@ function FilaCategoriaBase({
     void repo.registrarAporte({
       sesionId,
       categoriaId: linea.categoriaId,
+      areaId,
       cantidad: Math.max(0, cantidad),
     });
   }

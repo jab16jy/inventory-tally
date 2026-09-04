@@ -84,11 +84,23 @@ describe("AnalisisConteoScreen", () => {
   it("nunca muestra dinero (I-9/ADR-07/A-10), en ninguna de las tres dimensiones", async () => {
     const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana" });
     repo.sembrarSesion(crearSesion());
+    repo.sembrarArea({
+      areaId: "area_bodega",
+      nombre: "Bodega",
+      activa: true,
+      creadaEn: new Date(),
+    });
+    repo.sembrarArea({
+      areaId: "area_anaqueles",
+      nombre: "Anaqueles",
+      activa: true,
+      creadaEn: new Date(),
+    });
     repo.sembrarLinea(
       "ses_1",
       crearLinea({
         categoriaId: "c1",
-        porArea: { Bodega: 5 },
+        porArea: { area_bodega: 5 },
         cantidadTotal: 5,
         aplicados: { uid_ana: 5 },
       }),
@@ -97,7 +109,7 @@ describe("AnalisisConteoScreen", () => {
       "ses_1",
       crearLinea({
         categoriaId: "c2",
-        porArea: { Anaqueles: 20 },
+        porArea: { area_anaqueles: 20 },
         cantidadTotal: 20,
         aplicados: { uid_luis: 20 },
       }),
@@ -113,9 +125,24 @@ describe("AnalisisConteoScreen", () => {
     }
   });
 
-  it('dimensión "Área": agrupa por área y ordena por UNIDADES, no por dinero', async () => {
+  it('dimensión "Área": agrupa por área (resolviendo id → nombre real, issue #86) y ordena por UNIDADES, no por dinero', async () => {
     const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana" });
     repo.sembrarSesion(crearSesion());
+    // Ids opacos, no nombres legibles: con `porArea: { Bodega: 5 }` el test
+    // pasaría igual aunque la pantalla nunca resolviera el id a un nombre
+    // real (issue #86) — el id crudo YA se ve como el nombre esperado.
+    repo.sembrarArea({
+      areaId: "area_bodega",
+      nombre: "Bodega",
+      activa: true,
+      creadaEn: new Date(),
+    });
+    repo.sembrarArea({
+      areaId: "area_anaqueles",
+      nombre: "Anaqueles",
+      activa: true,
+      creadaEn: new Date(),
+    });
     // Bodega: 5 u × 100 = 500 de "valor"; Anaqueles: 20 u × 10 = 200 de
     // "valor". Por dinero Bodega gana (500 > 200); por unidades Anaqueles
     // gana (20 > 5) — órdenes opuestos, así el test distingue de verdad el
@@ -124,7 +151,7 @@ describe("AnalisisConteoScreen", () => {
       "ses_1",
       crearLinea({
         categoriaId: "c1",
-        porArea: { Bodega: 5 },
+        porArea: { area_bodega: 5 },
         valorUnitario: 100,
         cantidadTotal: 5,
       }),
@@ -133,7 +160,7 @@ describe("AnalisisConteoScreen", () => {
       "ses_1",
       crearLinea({
         categoriaId: "c2",
-        porArea: { Anaqueles: 20 },
+        porArea: { area_anaqueles: 20 },
         valorUnitario: 10,
         cantidadTotal: 20,
       }),

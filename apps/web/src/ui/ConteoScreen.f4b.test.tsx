@@ -57,6 +57,8 @@ function sesionBase(overrides: Partial<SesionConteo> = {}): SesionConteo {
 }
 
 function renderConteoScreen(repo: FakeConteoRepository, sesionId = "ses_1") {
+  // ADR-23: sin esto, ConteoScreen redirige a /preparar por falta de área activa.
+  localStorage.setItem(`areaActiva:${sesionId}`, "area_1");
   return render(
     <MemoryRouter initialEntries={[`/conteo/${sesionId}`]}>
       <ConteoRepositoryProvider repo={repo}>

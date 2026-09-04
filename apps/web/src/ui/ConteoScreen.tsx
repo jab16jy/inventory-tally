@@ -12,10 +12,10 @@ import {
   promedioCategoria,
   siguientePendiente,
   totalUnidadesSesion,
-  type Area,
 } from "@conteo/shared";
-import type { ConteoRepository } from "@conteo/data";
 import { datos } from "../lib/formato.js";
+import { useAreaActiva } from "../state/useAreaActiva.js";
+import { useAreasActivas } from "../state/useAreasActivas.js";
 import { useAuthState } from "../state/useAuthState.js";
 import { useConteoRepository } from "../state/repositorio-contexto.js";
 import { useConexion } from "../state/useConexion.js";
@@ -35,15 +35,6 @@ import { Deck } from "./primitivos/Deck.js";
 import { Hoja } from "./primitivos/Hoja.js";
 import { Icono } from "./primitivos/Icono.js";
 import { Placa } from "./primitivos/Placa.js";
-
-/** Áreas activas del catálogo, para preseleccionar una al crear un producto
- *  (HojaNuevoProducto). Hook local, no un archivo en `state/`: un solo
- *  consumidor (esta pantalla) y ~6 líneas. */
-function useAreasActivas(repo: ConteoRepository): Area[] {
-  const [areas, setAreas] = useState<Area[]>([]);
-  useEffect(() => repo.observarAreasActivas(setAreas), [repo]);
-  return areas;
-}
 
 export interface ConteoScreenProps {
   readonly auth: Auth;
@@ -65,6 +56,9 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
   const repo = useConteoRepository();
   const navigate = useNavigate();
   const uid = repo.uidActual();
+  // Área activa obligatoria (ADR-23): se elige en PrepararScreen y queda en
+  // localStorage por sesionId.
+  const [areaActiva] = useAreaActiva(sesionId);
 
   const lineas = useLineasSesion(sesionId);
   const escriturasPendientes = usePendientes(sesionId);
@@ -125,7 +119,20 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
   const [areaFiltro, setAreaFiltro] = useState("");
   const [categoriaEnEdicion, setCategoriaEnEdicion] = useState<string | null>(null);
   const [nuevoProductoAbierta, setNuevoProductoAbierta] = useState(false);
-  const areasActivas = useAreasActivas(repo);
+  const [areasActivas] = useAreasActivas(repo);
+  // issue #86 (revisión de resiliencia): un `areaId` vacío NUNCA es una
+  // escritura válida — infra/firestore.rules exige `areaId.size() > 0` sin
+  // excepción, ni siquiera con el catálogo vacío — así que dejar pasar sin
+  // redirigir atrapa al cajero en un "No se pudo enviar" que jamás se
+  // resuelve solo. Siempre que falte área activa se manda de vuelta a
+  // PrepararScreen, que ahora es quien decide qué mostrar (selector o el
+  // aviso de catálogo vacío) — no se distingue el caso aquí. `areasActivas`
+  // no hace falta como dependencia: sólo importa `areaActiva`.
+  useEffect(() => {
+    if (!areaActiva) {
+      navigate(`/conteo/${sesionId}/preparar`, { replace: true });
+    }
+  }, [areaActiva, sesionId, navigate]);
 
   // "Tu aporte" del Deck: cada fila YA tiene abierto useMiAporte para sí
   // misma (FilaCategoria) y sólo REPORTA su número hacia acá (ver el
@@ -150,7 +157,7 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
   const lineaEnEdicion = lineas.find((l) => l.categoriaId === categoriaEnEdicion) ?? null;
   // Única suscripción extra, y sólo mientras la Hoja está abierta: precarga
   // el teclado con lo que el cajero ya tenía registrado para esa categoría.
-  const miAporteEnEdicion = useMiAporte(sesionId, categoriaEnEdicion ?? "");
+  const miAporteEnEdicion = useMiAporte(sesionId, categoriaEnEdicion ?? "", areaActiva);
   // Estado 8 del plan (§5, doc 10 §10): 0 cuando no hay línea en edición o
   // todavía nadie aportó — `cantidadEsAbsurda` (dentro de Hoja) ya trata ese
   // 0 como "nunca absurdo", sin cálculo aparte aquí.
@@ -165,10 +172,15 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
     // pintura. Las reglas de Firestore son la última red; ésta evita la
     // escritura optimista que el cajero vería aplicada en local.
     if (sesionCerrada) return;
-    void repo.registrarAporte({ sesionId, categoriaId: categoriaEnEdicion, cantidad });
+    void repo.registrarAporte({
+      sesionId,
+      categoriaId: categoriaEnEdicion,
+      areaId: areaActiva,
+      cantidad,
+    });
     // Avanza sola a la siguiente pendiente (plan §5) — o cierra si el
     // cajero ya terminó el catálogo.
-    setCategoriaEnEdicion(siguientePendiente(lineas, uid, categoriaEnEdicion));
+    setCategoriaEnEdicion(siguientePendiente(lineas, uid, categoriaEnEdicion, areaActiva));
   }
 
   // Cierra la Hoja sólo tras confirmar la escritura (no en un `finally`):
@@ -180,7 +192,7 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
   }
 
   const total = lineas.length;
-  const contadas = lineas.filter((l) => !estaPendiente(l, uid)).length;
+  const contadas = lineas.filter((l) => !estaPendiente(l, uid, areaActiva)).length;
   const equipoTotal = totalUnidadesSesion(lineas);
 
   const estadoSync: "sincronizado" | "pendiente" | "sin-conexion" = !enLinea
@@ -200,7 +212,7 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
   const soloDigitos = consulta.replace(/\D/g, "");
   const lineasVisibles = lineas.filter((linea) => {
     if (areaFiltro && !(linea.porArea && linea.porArea[areaFiltro])) return false;
-    if (soloPendientes && !estaPendiente(linea, uid)) return false;
+    if (soloPendientes && !estaPendiente(linea, uid, areaActiva)) return false;
     if (!consulta) return true;
     return (
       linea.etiqueta.toLowerCase().includes(consulta) ||
@@ -341,6 +353,7 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
             <FilaCategoria
               key={linea.categoriaId}
               sesionId={sesionId}
+              areaId={areaActiva}
               linea={linea}
               onSeleccionar={abrirHoja}
               onCantidadPropiaCambio={manejarCantidadPropia}

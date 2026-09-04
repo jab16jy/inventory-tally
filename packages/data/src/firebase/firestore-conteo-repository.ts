@@ -84,6 +84,7 @@ export class FirestoreConteoRepository implements ConteoRepository {
   observarMiAporte(
     sesionId: string,
     categoriaId: string,
+    areaId: string,
     onChange: (aporte: Aporte | null) => void,
   ): Unsubscribe {
     const ref = doc(
@@ -93,7 +94,7 @@ export class FirestoreConteoRepository implements ConteoRepository {
       "lineas",
       categoriaId,
       "aportes",
-      this.usuario.obtenerUid(),
+      `${this.usuario.obtenerUid()}__${areaId}`,
     );
     return onSnapshot(ref, (snap) => {
       onChange(snap.exists() ? aporteDesdeDoc(snap.data() as never) : null);
@@ -220,13 +221,27 @@ export class FirestoreConteoRepository implements ConteoRepository {
     };
   }
 
-  async registrarAporte({ sesionId, categoriaId, cantidad }: RegistrarAporteInput): Promise<void> {
+  async registrarAporte({
+    sesionId,
+    categoriaId,
+    areaId,
+    cantidad,
+  }: RegistrarAporteInput): Promise<void> {
     if (cantidad < 0) throw new CantidadInvalidaError("La cantidad no puede ser negativa");
 
     const uid = this.usuario.obtenerUid();
-    const ref = doc(this.db, "sesiones", sesionId, "lineas", categoriaId, "aportes", uid);
+    const ref = doc(
+      this.db,
+      "sesiones",
+      sesionId,
+      "lineas",
+      categoriaId,
+      "aportes",
+      `${uid}__${areaId}`,
+    );
     const datos = {
       uid,
+      areaId,
       nombre: this.usuario.obtenerNombre() ?? "",
       cantidad,
       registradoEn: serverTimestamp(),
