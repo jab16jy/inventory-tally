@@ -112,6 +112,30 @@ describe("PrepararScreen (F3-B, doc 11 §3)", () => {
     expect(screen.getByRole("button", { name: /empezar a contar/i })).toBeDisabled();
   });
 
+  it("issue #86 (Judgment Day JD-002): un área huérfana en localStorage no habilita el botón si no está en el catálogo activo", async () => {
+    localStorage.setItem("areaActiva:ses_huerfana", "area_eliminada");
+    const repo = new FakeConteoRepository();
+    repo.sembrarArea({
+      areaId: "area_activa",
+      nombre: "Área Activa",
+      activa: true,
+      creadaEn: new Date(),
+    });
+
+    renderPantalla(repo, "ses_huerfana");
+
+    const boton = await screen.findByRole("button", { name: /empezar a contar/i });
+    expect(boton).toBeDisabled();
+  });
+
+  it("issue #86 (Judgment Day JD-002): con catálogo vacío y área huérfana en localStorage, el botón sigue deshabilitado", async () => {
+    localStorage.setItem("areaActiva:ses_vacia_huerfana", "area_eliminada");
+    renderPantalla(new FakeConteoRepository(), "ses_vacia_huerfana");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/no hay áreas configuradas/i);
+    expect(screen.getByRole("button", { name: /empezar a contar/i })).toBeDisabled();
+  });
+
   it("issue #83/ADR-23: con áreas activas, 'Empezar a contar' queda deshabilitado hasta elegir una", async () => {
     const repo = new FakeConteoRepository();
     repo.sembrarArea({

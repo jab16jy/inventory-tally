@@ -175,6 +175,36 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
     expect(recibidos.at(-1)).toEqual({ cantidad: 15, version: 2 });
   });
 
+  it("observarMiAporte aísla por areaId: registrar aporte en area_2 no notifica al listener de area_1", async () => {
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarLinea("ses_1", crearLinea());
+
+    const recibidosArea1: Array<{ cantidad: number; version: number } | null> = [];
+    repo.observarMiAporte("ses_1", "cat_5000", "area_1", (a) =>
+      recibidosArea1.push(a && { cantidad: a.cantidad, version: a.version }),
+    );
+    expect(recibidosArea1).toEqual([null]);
+
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_2",
+      cantidad: 10,
+    });
+
+    expect(recibidosArea1).toHaveLength(1);
+    expect(recibidosArea1[0]).toBeNull();
+
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 5,
+    });
+    expect(recibidosArea1).toHaveLength(2);
+    expect(recibidosArea1[1]).toEqual({ cantidad: 5, version: 1 });
+  });
+
   it("observarSesionAbierta emite la sesión sembrada para esa sucursal, o null si no hay", () => {
     const repo = new FakeConteoRepository();
     repo.sembrarSesionAbierta("suc_norte", crearSesion());

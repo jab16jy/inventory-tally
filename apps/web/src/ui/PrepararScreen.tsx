@@ -60,6 +60,7 @@ export function PrepararScreen({ auth, onSalir }: PrepararScreenProps) {
   // sesionId — ConteoScreen la lee de vuelta.
   const [areasActivas, areasCargadas] = useAreasActivas(repo);
   const [areaActiva, setAreaActiva] = useAreaActiva(sesionId);
+  const areaValida = areasActivas.some((a) => a.areaId === areaActiva);
   // Un admin que entró a contar desde /admin (PanelScreen "Contar →") no
   // tiene forma de volver salvo cerrar sesión — esAdmin es del usuario, no
   // de cómo navegó, así que funciona sin importar el punto de entrada.
@@ -144,7 +145,7 @@ export function PrepararScreen({ auth, onSalir }: PrepararScreenProps) {
         <label className="mt-5 block">
           <span className="mb-1 block text-micro font-semibold text-tenue uppercase">Tu área</span>
           <select
-            value={areaActiva}
+            value={areaValida ? areaActiva : ""}
             onChange={(e) => setAreaActiva(e.target.value)}
             className="min-h-[var(--size-toque)] w-full rounded-placa border border-borde bg-fondo px-3 text-tinta focus:border-senal focus:outline-none"
           >
@@ -174,12 +175,12 @@ export function PrepararScreen({ auth, onSalir }: PrepararScreenProps) {
 
       <button
         type="button"
-        // issue #86 (revisión de resiliencia): siempre exige areaActiva, sin
-        // excepción para catálogo vacío — infra/firestore.rules rechaza
-        // areaId="" igual, así que no hay ningún caso en que dejar pasar sin
-        // área sirva de algo. `areasCargadas` evita habilitar el botón
-        // durante la ventana de carga, antes del primer snapshot.
-        disabled={!areasCargadas || !areaActiva}
+        // issue #86 (revisión de resiliencia / Judgment Day JD-002): siempre exige
+        // `areaValida` presente en `areasActivas` — infra/firestore.rules rechaza
+        // areaId="" igual, y un id huérfano en localStorage (área eliminada o
+        // catálogo vacío) no debe dejar pasar al conteo. `areasCargadas` evita
+        // habilitar el botón durante la ventana de carga, antes del primer snapshot.
+        disabled={!areasCargadas || !areaValida}
         onClick={() => navigate(`/conteo/${sesionId}`)}
         className="mt-6 min-h-[var(--size-toque)] w-full rounded-placa bg-senal font-semibold text-fondo transition-colors duration-150 ease-out disabled:border disabled:border-borde disabled:bg-transparent disabled:text-tenue active:enabled:bg-senal/85"
       >

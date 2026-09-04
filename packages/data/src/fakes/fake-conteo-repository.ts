@@ -127,7 +127,7 @@ export class FakeConteoRepository implements ConteoRepository {
     areaId: string,
     onChange: (aporte: Aporte | null) => void,
   ): Unsubscribe {
-    const clave = `${sesionId}/${categoriaId}`;
+    const clave = `${sesionId}/${categoriaId}/${areaId}`;
     const listeners = this.listenersDe(this.listenersAporte, clave);
     listeners.add(onChange);
     onChange(
@@ -212,7 +212,7 @@ export class FakeConteoRepository implements ConteoRepository {
       version: (anterior?.version ?? 0) + 1,
     };
     aportesLinea.set(claveAporte, aporte);
-    this.notificar(this.listenersAporte, `${sesionId}/${categoriaId}`, aporte);
+    this.notificar(this.listenersAporte, `${sesionId}/${categoriaId}/${areaId}`, aporte);
 
     const lineas = this.lineasDeSesion(sesionId);
     const linea = lineas.get(categoriaId);
