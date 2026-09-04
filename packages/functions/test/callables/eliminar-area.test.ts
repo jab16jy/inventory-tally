@@ -133,7 +133,17 @@ describe("eliminarAreaImpl", () => {
     expect(area.exists).toBe(true);
   });
 
-  it("área con conteos activos (lineas.porArea > 0) · rechaza failed-precondition (issue #86)", async () => {
+  it("área presente en conteos activos (lineas.porArea > 0) · SÍ es eliminable (issue #86, decisión revisada)", async () => {
+    // Corrección del veredicto de Judgment Day (issue #86): la guarda
+    // original consultaba `porArea.${areaId}` — una ruta de campo dinámica
+    // que Firestore no puede indexar y que hacía fallar ESTA consulta en
+    // producción para CUALQUIER área, usada o no. La alternativa correcta
+    // (un campo materializado `areasPresentes` en cada línea) se evaluó y se
+    // descartó por costo desproporcionado frente a lo que protege — ver el
+    // comentario de `eliminarAreaImpl`. Un área usada en conteos activos
+    // ahora SÍ se puede eliminar; la línea que la referenciaba sigue
+    // sumando y renderizando correctamente (mismo argumento de I-7 que ya
+    // protege a `eliminarCategoriaImpl`).
     const areaId = await sembrarArea();
     const sucursalId = await sembrarSucursal();
     const sesionId = `ses_${randomUUID()}`;
@@ -143,26 +153,6 @@ describe("eliminarAreaImpl", () => {
     await db.doc(`sesiones/${sesionId}/lineas/${catId}`).set({
       porArea: { [areaId]: 5 },
       cantidadTotal: 5,
-    });
-
-    await expect(eliminarAreaImpl(db, "uid_admin", { areaId })).rejects.toThrow(
-      "No se puede eliminar: usada en conteos activos",
-    );
-
-    const area = await db.doc(`areas/${areaId}`).get();
-    expect(area.exists).toBe(true);
-  });
-
-  it("área presente en porArea con cantidad 0 · SÍ es eliminable (issue #86)", async () => {
-    const areaId = await sembrarArea();
-    const sucursalId = await sembrarSucursal();
-    const sesionId = `ses_${randomUUID()}`;
-    sesionesCreadas.push(sesionId);
-    await db.doc(`sesiones/${sesionId}`).set({ sucursalId, estado: "abierta" });
-    const catId = `cat_${randomUUID()}`;
-    await db.doc(`sesiones/${sesionId}/lineas/${catId}`).set({
-      porArea: { [areaId]: 0 },
-      cantidadTotal: 0,
     });
 
     const resultado = await eliminarAreaImpl(db, "uid_admin", { areaId });

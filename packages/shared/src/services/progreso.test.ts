@@ -28,6 +28,32 @@ describe("estaPendiente (doc 10 §2 — fuente única para progreso, filtro y av
   it("la versión de otro cajero no cuenta para el uid actual", () => {
     expect(estaPendiente(linea("cat_1", { uid_beto: 3 }), "uid_ana")).toBe(true);
   });
+
+  it("issue #83: con versión bajo la clave compuesta {uid}__{areaId}, ya no está pendiente", () => {
+    expect(estaPendiente(linea("cat_1", { uid_ana__area_1: 1 }), "uid_ana")).toBe(false);
+  });
+
+  it("issue #83: la clave compuesta de otro cajero no cuenta para el uid actual", () => {
+    expect(estaPendiente(linea("cat_1", { uid_beto__area_1: 1 }), "uid_ana")).toBe(true);
+  });
+
+  describe("con areaActiva (RDD ronda 4: progreso por área, no por cualquier área)", () => {
+    it("con aporte en la propia área activa, ya no está pendiente", () => {
+      expect(estaPendiente(linea("cat_1", { uid_ana__area_1: 1 }), "uid_ana", "area_1")).toBe(
+        false,
+      );
+    });
+
+    it("con aporte en OTRA área, sigue pendiente para el área activa", () => {
+      expect(estaPendiente(linea("cat_1", { uid_ana__area_2: 1 }), "uid_ana", "area_1")).toBe(
+        true,
+      );
+    });
+
+    it("el dato legado bajo la clave pelada cuenta para cualquier área activa", () => {
+      expect(estaPendiente(linea("cat_1", { uid_ana: 1 }), "uid_ana", "area_1")).toBe(false);
+    });
+  });
 });
 
 describe("siguientePendiente", () => {
@@ -65,5 +91,13 @@ describe("siguientePendiente", () => {
   it("null cuando no queda ninguna otra categoría pendiente", () => {
     const todasContadas = [linea("cat_1", { uid_ana: 1 }), linea("cat_2", { uid_ana: 1 })];
     expect(siguientePendiente(todasContadas, "uid_ana", "cat_1")).toBeNull();
+  });
+
+  it("con areaActiva, un aporte en otra área no cuenta como ya contada", () => {
+    const conOtraArea = [
+      linea("cat_1", { uid_ana: 1 }),
+      linea("cat_2", { uid_ana__area_2: 1 }), // aportada, pero en otra área
+    ];
+    expect(siguientePendiente(conOtraArea, "uid_ana", "cat_1", "area_1")).toBe("cat_2");
   });
 });

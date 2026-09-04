@@ -18,7 +18,7 @@
     "format": "prettier --write .",
     "emu": "firebase emulators:start",
     "seed": "npm run seed --workspace tools --if-present",
-    "test:rules": "firebase emulators:exec --project demo-conteo-eficiente --only firestore \"vitest run infra/test\"",
+    "test:rules": "firebase emulators:exec --project demo-conteo-eficiente --only firestore,auth \"vitest run infra/test\"",
     "test:e2e": "firebase emulators:exec --project demo-conteo-eficiente --only auth,firestore \"npm run seed --workspace tools && npm run test:e2e --workspace apps/web\""
   },
   "devDependencies": {
@@ -28,6 +28,8 @@
     "@stryker-mutator/vitest-runner": "^10.0.0",
     "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^9.0.0",
+    "firebase": "^11.10.0",
+    "firebase-admin": "^12.7.0",
     "firebase-tools": "^13.0.0",
     "globals": "^15.0.0",
     "prettier": "^3.0.0",

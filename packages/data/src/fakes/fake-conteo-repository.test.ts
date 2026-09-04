@@ -81,19 +81,52 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
     const recibidas: LineaConteo[][] = [];
     repo.observarLineas("ses_1", (lineas) => recibidas.push(lineas));
 
-    await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 12,
+    });
 
     const ultima = recibidas.at(-1);
     expect(ultima?.[0]?.cantidadTotal).toBe(12);
     expect(ultima?.[0]?.numAportantes).toBe(1);
   });
 
+  it("issue #83: registrarAporte usa la clave compuesta {uid}__{areaId} y actualiza porArea (ADR-23)", async () => {
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarLinea("ses_1", crearLinea());
+
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_bodega",
+      cantidad: 12,
+    });
+
+    const recibidas: LineaConteo[][] = [];
+    repo.observarLineas("ses_1", (lineas) => recibidas.push(lineas));
+    const linea = recibidas[0]?.[0];
+    expect(linea?.versiones).toEqual({ uid_ana__area_bodega: 1 });
+    expect(linea?.porArea).toEqual({ area_bodega: 12 });
+  });
+
   it("una segunda corrección del mismo cajero ajusta el delta, sin duplicar numAportantes", async () => {
     const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
     repo.sembrarLinea("ses_1", crearLinea());
 
-    await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
-    await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 8 });
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 12,
+    });
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 8,
+    });
 
     const recibidas: LineaConteo[][] = [];
     repo.observarLineas("ses_1", (lineas) => recibidas.push(lineas));
@@ -106,7 +139,12 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
     repo.sembrarLinea("ses_1", crearLinea());
 
     await expect(
-      repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: -1 }),
+      repo.registrarAporte({
+        sesionId: "ses_1",
+        categoriaId: "cat_5000",
+        areaId: "area_1",
+        cantidad: -1,
+      }),
     ).rejects.toBeInstanceOf(CantidadInvalidaError);
   });
 
@@ -115,15 +153,25 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
     repo.sembrarLinea("ses_1", crearLinea());
 
     const recibidos: Array<{ cantidad: number; version: number } | null> = [];
-    repo.observarMiAporte("ses_1", "cat_5000", (a) =>
+    repo.observarMiAporte("ses_1", "cat_5000", "area_1", (a) =>
       recibidos.push(a && { cantidad: a.cantidad, version: a.version }),
     );
     expect(recibidos[0]).toBeNull();
 
-    await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 12,
+    });
     expect(recibidos.at(-1)).toEqual({ cantidad: 12, version: 1 });
 
-    await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 15 });
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 15,
+    });
     expect(recibidos.at(-1)).toEqual({ cantidad: 15, version: 2 });
   });
 
@@ -212,6 +260,7 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
       const promesa = repo.registrarAporte({
         sesionId: "ses_1",
         categoriaId: "cat_5000",
+        areaId: "area_1",
         cantidad: 12,
       });
       // El registro local es instantáneo: la promesa resuelve sin esperar la
@@ -324,7 +373,12 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
         repo.observarEscriturasPendientes("ses_1", (n) => pendientes.push(n));
         repo.observarEscriturasConError("ses_1", (n) => errores.push(n));
 
-        await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+        await repo.registrarAporte({
+          sesionId: "ses_1",
+          categoriaId: "cat_5000",
+          areaId: "area_1",
+          cantidad: 12,
+        });
         expect(pendientes.at(-1)).toBe(1);
 
         await vi.advanceTimersByTimeAsync(0);
@@ -348,7 +402,12 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
         repo.observarEscriturasPendientes("ses_1", (n) => pendientes.push(n));
         repo.observarEscriturasConError("ses_1", (n) => errores.push(n));
 
-        await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+        await repo.registrarAporte({
+          sesionId: "ses_1",
+          categoriaId: "cat_5000",
+          areaId: "area_1",
+          cantidad: 12,
+        });
         await vi.advanceTimersByTimeAsync(0);
 
         expect(errores.at(-1)).toBe(1);
@@ -373,7 +432,12 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
         repo.observarEscriturasPendientes("ses_1", (n) => pendientes.push(n));
         repo.observarEscriturasConError("ses_1", (n) => errores.push(n));
 
-        await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+        await repo.registrarAporte({
+          sesionId: "ses_1",
+          categoriaId: "cat_5000",
+          areaId: "area_1",
+          cantidad: 12,
+        });
         await vi.advanceTimersByTimeAsync(0);
         expect(errores.at(-1)).toBe(1);
 

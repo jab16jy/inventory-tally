@@ -74,19 +74,32 @@ describe("FinalizarScreen (F3-B, doc 11 §6)", () => {
     expect(screen.getByText(/falta 1 categoría sin contar/i)).toBeInTheDocument();
   });
 
-  it("muestra el desglose de unidades por área, sumando categorías de distinto precio", () => {
+  it("muestra el desglose de unidades por área con el NOMBRE real, no el id crudo (issue #86)", () => {
     const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    // Ids opacos: con `porArea: { Aseo: 400 }` el id crudo ya coincide con el
+    // nombre esperado y el test pasaría aunque la pantalla nunca resolviera
+    // nada (issue #86).
+    repo.sembrarArea({ areaId: "area_aseo", nombre: "Aseo", activa: true, creadaEn: new Date() });
+    repo.sembrarArea({
+      areaId: "area_mercancia",
+      nombre: "Mercancía",
+      activa: true,
+      creadaEn: new Date(),
+    });
     repo.sembrarLinea(
       "ses_1",
-      lineaBase("cat_1000", "$1.000", 1000, { porArea: { Aseo: 400 }, cantidadTotal: 400 }),
+      lineaBase("cat_1000", "$1.000", 1000, { porArea: { area_aseo: 400 }, cantidadTotal: 400 }),
     );
     repo.sembrarLinea(
       "ses_1",
-      lineaBase("cat_2000", "$2.000", 2000, { porArea: { Aseo: 205 }, cantidadTotal: 205 }),
+      lineaBase("cat_2000", "$2.000", 2000, { porArea: { area_aseo: 205 }, cantidadTotal: 205 }),
     );
     repo.sembrarLinea(
       "ses_1",
-      lineaBase("cat_500", "$500", 500, { porArea: { Mercancía: 1300 }, cantidadTotal: 1300 }),
+      lineaBase("cat_500", "$500", 500, {
+        porArea: { area_mercancia: 1300 },
+        cantidadTotal: 1300,
+      }),
     );
 
     renderPantalla(repo);
@@ -101,7 +114,12 @@ describe("FinalizarScreen (F3-B, doc 11 §6)", () => {
       { retrasoSincronizacionMs: 10_000 },
     );
     repo.sembrarLinea("ses_1", lineaBase("cat_1000", "$1.000", 1000));
-    void repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_1000", cantidad: 3 });
+    void repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_1000",
+      areaId: "",
+      cantidad: 3,
+    });
 
     renderPantalla(repo);
 
@@ -173,7 +191,12 @@ describe("FinalizarScreen (F3-B, doc 11 §6)", () => {
     // MAX_REINTENTOS + 1 rechazos: agota los reintentos automáticos una sola
     // vez y no deja rechazos sembrados para el reintento manual siguiente.
     repo.sembrarRechazosAporte("ses_1", "cat_1000", 4);
-    void repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_1000", cantidad: 3 });
+    void repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_1000",
+      areaId: "",
+      cantidad: 3,
+    });
 
     renderPantalla(repo);
 

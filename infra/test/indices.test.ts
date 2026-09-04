@@ -21,9 +21,25 @@ interface Indice {
   readonly fields: readonly CampoIndice[];
 }
 
+interface FieldOverrideIndice {
+  readonly order?: "ASCENDING" | "DESCENDING";
+  readonly queryScope: "COLLECTION" | "COLLECTION_GROUP";
+}
+
+interface FieldOverride {
+  readonly collectionGroup: string;
+  readonly fieldPath: string;
+  readonly indexes: readonly FieldOverrideIndice[];
+}
+
 function leerIndices(): readonly Indice[] {
   const contenido = fs.readFileSync("infra/firestore.indexes.json", "utf8");
   return (JSON.parse(contenido) as { indexes: readonly Indice[] }).indexes;
+}
+
+function leerFieldOverrides(): readonly FieldOverride[] {
+  const contenido = fs.readFileSync("infra/firestore.indexes.json", "utf8");
+  return (JSON.parse(contenido) as { fieldOverrides: readonly FieldOverride[] }).fieldOverrides;
 }
 
 describe("infra/firestore.indexes.json — colección sesiones", () => {
@@ -69,5 +85,24 @@ describe("infra/firestore.indexes.json — colección sesiones", () => {
       { fieldPath: "estado", order: "ASCENDING" },
       { fieldPath: "abiertaEn", order: "DESCENDING" },
     ]);
+  });
+});
+
+describe("infra/firestore.indexes.json — fieldOverrides de lineas.categoriaId", () => {
+  // Causa raíz de issue #86 (eliminarArea): un fieldOverride sin AMBOS scopes
+  // pasa el emulador (no valida índices) y sólo falla en PRODUCCIÓN. Esta
+  // aserción es la red que habría atrapado ese defecto de haber existido —
+  // eliminarCategoriaImpl (packages/functions/src/callables/eliminar-categoria.ts)
+  // depende de este override exacto para su `collectionGroup("lineas")
+  // .where("categoriaId", "==", categoriaId)`.
+  it("declara COLLECTION y COLLECTION_GROUP para categoriaId en lineas", () => {
+    const overrides = leerFieldOverrides();
+    const override = overrides.find(
+      (o) => o.collectionGroup === "lineas" && o.fieldPath === "categoriaId",
+    );
+
+    expect(override).toBeDefined();
+    const scopes = override?.indexes.map((i) => i.queryScope).sort();
+    expect(scopes).toEqual(["COLLECTION", "COLLECTION_GROUP"]);
   });
 });

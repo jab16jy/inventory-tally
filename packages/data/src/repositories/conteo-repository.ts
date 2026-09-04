@@ -18,6 +18,9 @@ export type Unsubscribe = () => void;
 export interface RegistrarAporteInput {
   readonly sesionId: string;
   readonly categoriaId: string;
+  /** Área activa del contador al aportar (ADR-23) — parte de la clave del
+   *  documento (`{uid}__{areaId}`, infra/firestore.rules:74-80). */
+  readonly areaId: string;
   readonly cantidad: number;
 }
 
@@ -36,9 +39,13 @@ export interface CrearCategoriaEnSesionPayload {
 export interface ConteoRepository {
   observarLineas(sesionId: string, onChange: (lineas: LineaConteo[]) => void): Unsubscribe;
 
+  /** `areaId` es el área activa del contador (ADR-23): el documento vive en
+   *  `aportes/{uid}__{areaId}`, así que sin ella no hay id de documento que
+   *  observar. */
   observarMiAporte(
     sesionId: string,
     categoriaId: string,
+    areaId: string,
     onChange: (aporte: Aporte | null) => void,
   ): Unsubscribe;
 

@@ -21,6 +21,7 @@ import type { Auth } from "firebase/auth";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { estaPendiente, totalPorArea } from "@conteo/shared";
+import { useAreasActivas } from "../state/useAreasActivas.js";
 import { useAuthState } from "../state/useAuthState.js";
 import { useConteoRepository } from "../state/repositorio-contexto.js";
 import { useEscriturasConError } from "../state/useEscriturasConError.js";
@@ -50,6 +51,7 @@ export function FinalizarScreen({ auth, onSalir }: FinalizarScreenProps) {
   const lineas = useLineasSesion(sesionId);
   const pendientes = usePendientes(sesionId);
   const escriturasConError = useEscriturasConError(sesionId);
+  const [areasActivas] = useAreasActivas(repo);
 
   // ponytail: total PROPIO en CATEGORÍAS, no en unidades — el techo es la
   // falta de una vía de agregación en el repositorio (ver comentario de
@@ -112,11 +114,16 @@ export function FinalizarScreen({ auth, onSalir }: FinalizarScreenProps) {
 
       {porArea.length > 0 && (
         <ul className="mt-3 flex flex-col gap-0.5">
-          {porArea.map(({ areaId, cantidad }) => (
-            <li key={areaId} className="text-base text-tenue">
-              {areaId}: {cantidad} {cantidad === 1 ? "producto" : "productos"}
-            </li>
-          ))}
+          {porArea.map(({ areaId, cantidad }) => {
+            // issue #86: nombre real del área, no el id crudo — reutiliza
+            // useAreasActivas (mismo hook que ConteoScreen.tsx), sin nuevo hook.
+            const nombre = areasActivas.find((a) => a.areaId === areaId)?.nombre ?? areaId;
+            return (
+              <li key={areaId} className="text-base text-tenue">
+                {nombre}: {cantidad} {cantidad === 1 ? "producto" : "productos"}
+              </li>
+            );
+          })}
         </ul>
       )}
 

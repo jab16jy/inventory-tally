@@ -28,6 +28,8 @@ function lineaBase(categoriaId: string, etiqueta: string, valorUnitario: number,
 }
 
 function renderConteoScreen(repo: FakeConteoRepository, sesionId = "ses_1") {
+  // ADR-23: sin esto, ConteoScreen redirige a /preparar por falta de área activa.
+  localStorage.setItem(`areaActiva:${sesionId}`, "area_1");
   return render(
     <MemoryRouter initialEntries={[`/conteo/${sesionId}`]}>
       <ConteoRepositoryProvider repo={repo}>
@@ -153,7 +155,15 @@ describe("ConteoScreen · Hoja precargada (regresión R3-001)", () => {
     // teclea encima pisa su propio conteo.
     const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
     repo.sembrarLinea("ses_1", lineaBase("cat_5000", "$5.000", 5000));
-    await repo.registrarAporte({ sesionId: "ses_1", categoriaId: "cat_5000", cantidad: 12 });
+    // areaId: "area_1" — coincide con la área activa que renderConteoScreen
+    // siembra en localStorage; si no coincidieran, useMiAporte buscaría la
+    // clave compuesta equivocada y este aporte "desaparecería" de la Hoja.
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 12,
+    });
 
     renderConteoScreen(repo);
     fireEvent.click(screen.getByRole("button", { name: /contar \$5\.000/i }));

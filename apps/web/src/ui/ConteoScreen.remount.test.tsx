@@ -45,6 +45,10 @@ function repoConDosSesiones(): FakeConteoRepository {
 // `:sesionId` distinto, alcanzada por navegación de cliente (un <Link>, no
 // un remount completo de `<MemoryRouter>`).
 function renderConDosSesiones() {
+  // ADR-23: sin esto, ConteoScreen redirige a /preparar por falta de área
+  // activa — no hay ruta /preparar definida en este arnés mínimo.
+  localStorage.setItem("areaActiva:ses_a", "area_1");
+  localStorage.setItem("areaActiva:ses_b", "area_1");
   return render(
     <MemoryRouter initialEntries={["/conteo/ses_a"]}>
       <ConteoRepositoryProvider repo={repoConDosSesiones()}>
