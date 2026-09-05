@@ -113,23 +113,23 @@ listener local ya actualizó la pantalla. No lo "arregles".
 Esto es un **esqueleto caminante**, no el sistema completo: demuestra la cadena
 aporte → trigger → total en tiempo real, con offline, reglas reales y auditoría.
 
-| Implementado                                                 | Pendiente     |
-| --------------------------------------------------------------| ------------- |
-| Security Rules completas + 27 tests                          | App Check     |
-| `onAporteEscrito` idempotente y tolerante a reordenamiento   |               |
-| `abrirSesion` transaccional con rollback de siembra          |               |
-| PWA: login, conteo en tiempo real, banner de pendientes      |               |
-| Detección de degradación de persistencia                     |               |
-| CI por rutas afectadas, con E2E como requisito de deploy-dev |               |
-| `crearCajero`, `actualizarCajero`, `desactivarCajero`        |               |
-| `cerrarSesion` con verificación RF-16                        |               |
-| Crons: resúmenes, reconciliación, purga                      |               |
-| Panel de administrador, análisis mensual y por área          |               |
-| Pantallas `/preparar` y `/finalizar`                          |               |
-| Eliminar/reactivar categorías, áreas y cajeros (con guardas) |               |
-| Admin puede contar sesiones abiertas de cualquier sucursal   |               |
-| Control de versión mínima (bloquea clientes desactualizados) |               |
-| E2E con Playwright contra el Emulator Suite                  |               |
+| Implementado                                                 | Pendiente |
+| ------------------------------------------------------------ | --------- |
+| Security Rules completas + 27 tests                          | App Check |
+| `onAporteEscrito` idempotente y tolerante a reordenamiento   |           |
+| `abrirSesion` transaccional con rollback de siembra          |           |
+| PWA: login, conteo en tiempo real, banner de pendientes      |           |
+| Detección de degradación de persistencia                     |           |
+| CI por rutas afectadas, con E2E como requisito de deploy-dev |           |
+| `crearCajero`, `actualizarCajero`, `desactivarCajero`        |           |
+| `cerrarSesion` con verificación RF-16                        |           |
+| Crons: resúmenes, reconciliación, purga                      |           |
+| Panel de administrador, análisis mensual y por área          |           |
+| Pantallas `/preparar` y `/finalizar`                         |           |
+| Eliminar/reactivar categorías, áreas y cajeros (con guardas) |           |
+| Admin puede contar sesiones abiertas de cualquier sucursal   |           |
+| Control de versión mínima (bloquea clientes desactualizados) |           |
+| E2E con Playwright contra el Emulator Suite                  |           |
 
 También faltan los iconos de la PWA (`apps/web/public/icons/*.png`): el manifest
 los referencia pero no existen todavía.

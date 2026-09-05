@@ -40,7 +40,11 @@ async function crearAdmin(): Promise<void> {
 
   let usuario;
   try {
-    usuario = await auth.createUser({ email: correo, password: passwordTemporal, displayName: nombre });
+    usuario = await auth.createUser({
+      email: correo,
+      password: passwordTemporal,
+      displayName: nombre,
+    });
   } catch (error) {
     if ((error as { code?: string }).code === "auth/email-already-exists") {
       console.error(`Ya existe un usuario con el correo ${correo} en ${proyecto}.`);
@@ -63,7 +67,9 @@ async function crearAdmin(): Promise<void> {
   console.log(`Admin creado en ${proyecto}.`);
   console.log(`  Correo:     ${correo}`);
   console.log(`  Contraseña: ${passwordTemporal}`);
-  console.log("Guárdala ahora — Firebase Auth no la vuelve a mostrar. Cámbiala en el primer login.");
+  console.log(
+    "Guárdala ahora — Firebase Auth no la vuelve a mostrar. Cámbiala en el primer login.",
+  );
 }
 
 await crearAdmin();

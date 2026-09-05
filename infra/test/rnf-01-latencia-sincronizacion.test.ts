@@ -41,6 +41,12 @@ type DocRef = firebase.firestore.DocumentReference<firebase.firestore.DocumentDa
 const ITERACIONES = 8;
 const UMBRAL_MS = 3000; // RNF-01
 
+// ponytail: 90s de margen del TEST, no del umbral RNF-01 (que sigue en
+// UMBRAL_MS=3000). El emulador arranca en frío en CI (runner compartido) y las
+// 8 rondas secuenciales agotaban los 30s originales sin completar ni una.
+// Subir si vuelve a agotarse.
+const TIMEOUT_TEST_MS = 90_000;
+
 let testEnv: RulesTestEnvironment;
 
 beforeAll(async () => {
@@ -124,34 +130,34 @@ function medirUnaRonda(
 }
 
 describe("RNF-01 · latencia de sincronización entre dos dispositivos (issue #62)", () => {
-  it(`propaga un aporte real de un cajero a otro dispositivo (p95 < ${UMBRAL_MS} ms)`, async () => {
-    const clienteA = cajero("uid_ana").firestore();
-    const clienteB = cajero("uid_luis").firestore();
-    const refEscritura = clienteA.doc(
-      "sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1",
-    ) as unknown as DocRef;
-    const refLectura = clienteB.doc(
-      "sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1",
-    ) as unknown as DocRef;
+  it(
+    `propaga un aporte real de un cajero a otro dispositivo (p95 < ${UMBRAL_MS} ms)`,
+    async () => {
+      const clienteA = cajero("uid_ana").firestore();
+      const clienteB = cajero("uid_luis").firestore();
+      const refEscritura = clienteA.doc(
+        "sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1",
+      ) as unknown as DocRef;
+      const refLectura = clienteB.doc(
+        "sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1",
+      ) as unknown as DocRef;
 
-    const muestras: number[] = [];
-    for (let i = 0; i < ITERACIONES; i++) {
-      muestras.push(await medirUnaRonda(refEscritura, refLectura, i + 1));
-    }
+      const muestras: number[] = [];
+      for (let i = 0; i < ITERACIONES; i++) {
+        muestras.push(await medirUnaRonda(refEscritura, refLectura, i + 1));
+      }
 
-    const resumen = resumenLatencias(muestras);
-    // Entregable central del ticket #62: la cifra real, no sólo un
-    // pass/fail silencioso (issue: "registrar el resultado real").
-    console.log(
-      `RNF-01 · latencia onSnapshot emulador (n=${ITERACIONES}): ` +
-        `promedio=${resumen.promedio.toFixed(1)}ms p50=${resumen.p50.toFixed(1)}ms ` +
-        `p95=${resumen.p95.toFixed(1)}ms max=${resumen.maximo.toFixed(1)}ms`,
-    );
+      const resumen = resumenLatencias(muestras);
+      // Entregable central del ticket #62: la cifra real, no sólo un
+      // pass/fail silencioso (issue: "registrar el resultado real").
+      console.log(
+        `RNF-01 · latencia onSnapshot emulador (n=${ITERACIONES}): ` +
+          `promedio=${resumen.promedio.toFixed(1)}ms p50=${resumen.p50.toFixed(1)}ms ` +
+          `p95=${resumen.p95.toFixed(1)}ms max=${resumen.maximo.toFixed(1)}ms`,
+      );
 
-    expect(resumen.p95).toBeLessThan(UMBRAL_MS);
-  }, // ponytail: 90s de margen de test (no del umbral RNF-01, que sigue en
-  // UMBRAL_MS=3000) porque el emulador arranca en frío en CI (runner
-  // compartido) y las 8 rondas secuenciales agotaban los 30s originales
-  // sin completar ni una. Subir si vuelve a agotarse.
-  90_000);
+      expect(resumen.p95).toBeLessThan(UMBRAL_MS);
+    },
+    TIMEOUT_TEST_MS,
+  );
 });

@@ -61,7 +61,11 @@ async function sembrarCajero(nombre: string, correo: string): Promise<void> {
   const passwordTemporal = randomBytes(9).toString("base64url");
   let usuario;
   try {
-    usuario = await auth.createUser({ email: correo, password: passwordTemporal, displayName: nombre });
+    usuario = await auth.createUser({
+      email: correo,
+      password: passwordTemporal,
+      displayName: nombre,
+    });
   } catch (error) {
     if ((error as { code?: string }).code === "auth/email-already-exists") {
       console.log(`Ya existe ${correo}, se omite.`);

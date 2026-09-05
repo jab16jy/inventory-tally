@@ -45,9 +45,7 @@ describe("estaPendiente (doc 10 §2 — fuente única para progreso, filtro y av
     });
 
     it("con aporte en OTRA área, sigue pendiente para el área activa", () => {
-      expect(estaPendiente(linea("cat_1", { uid_ana__area_2: 1 }), "uid_ana", "area_1")).toBe(
-        true,
-      );
+      expect(estaPendiente(linea("cat_1", { uid_ana__area_2: 1 }), "uid_ana", "area_1")).toBe(true);
     });
 
     it("el dato legado bajo la clave pelada cuenta para cualquier área activa", () => {

@@ -24,18 +24,18 @@ with three operations survives; the rest becomes schema.
 
 ### In scope (the change)
 
-| # | Item | Source |
-|---|---|---|
-| 1 | Postgres schema: 10 tables, 2 admin-only views, partial unique index (I-1), sync trigger for `lineas`, audit triggers, generated `sincronizado`, Realtime publication | #23 D1-D9, #27 D2/D6 |
-| 2 | Auth on `perfiles`/`perfil_sucursales` — no `custom_access_token_hook`; `private.es_admin()`/`tiene_sucursal()`/`sesion_abierta()` `SECURITY DEFINER` in an unexposed schema (`ctx7-supabase-rls.md:136`) | #24 D1-D4 |
-| 3 | `GRANT` = verb, RLS = rows; default-deny built from revoke + `ENABLE RLS` + a `pg_class` test (`ctx7-supabase-rls.md:174`); views `security_invoker = true` + `WHERE private.es_admin()` (`:160`) | #28 D1-D5 |
-| 4 | Server ops: 1 Edge Function (3 ops), 3 RPCs, 4 direct PostgREST writes, `pg_cron` purge | #27 D1/D3/D7 |
-| 5 | Realtime: `postgres_changes` only, ~4-5 channels (one per screen) | #25 D1-D5 |
-| 6 | `indexedDB` pending-write queue replacing Firestore's offline cache; `persistencia-monitor.ts` (44 lines) and its canary test are deleted | #26 D1-D5 |
-| 7 | **Carve-out A — `LineaConteo.versiones[uid]` replacement.** Folded in as an **addendum to the consolidated data model, not new scope.** | below |
-| 8 | **Carve-out B — the migration seam.** | below |
-| 9 | Doc corrections mandated by `openspec/config.yaml` `rules.proposal` | below |
-| 10 | Deletion: `packages/functions`, 7 of 9 `contracts/schemas`, `infra/firestore.rules` + `infra/test/reglas.test.ts`, `tools/seed.ts` Firebase-admin path | #27 D5, #28 |
+| #   | Item                                                                                                                                                                                                      | Source               |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| 1   | Postgres schema: 10 tables, 2 admin-only views, partial unique index (I-1), sync trigger for `lineas`, audit triggers, generated `sincronizado`, Realtime publication                                     | #23 D1-D9, #27 D2/D6 |
+| 2   | Auth on `perfiles`/`perfil_sucursales` — no `custom_access_token_hook`; `private.es_admin()`/`tiene_sucursal()`/`sesion_abierta()` `SECURITY DEFINER` in an unexposed schema (`ctx7-supabase-rls.md:136`) | #24 D1-D4            |
+| 3   | `GRANT` = verb, RLS = rows; default-deny built from revoke + `ENABLE RLS` + a `pg_class` test (`ctx7-supabase-rls.md:174`); views `security_invoker = true` + `WHERE private.es_admin()` (`:160`)         | #28 D1-D5            |
+| 4   | Server ops: 1 Edge Function (3 ops), 3 RPCs, 4 direct PostgREST writes, `pg_cron` purge                                                                                                                   | #27 D1/D3/D7         |
+| 5   | Realtime: `postgres_changes` only, ~4-5 channels (one per screen)                                                                                                                                         | #25 D1-D5            |
+| 6   | `indexedDB` pending-write queue replacing Firestore's offline cache; `persistencia-monitor.ts` (44 lines) and its canary test are deleted                                                                 | #26 D1-D5            |
+| 7   | **Carve-out A — `LineaConteo.versiones[uid]` replacement.** Folded in as an **addendum to the consolidated data model, not new scope.**                                                                   | below                |
+| 8   | **Carve-out B — the migration seam.**                                                                                                                                                                     | below                |
+| 9   | Doc corrections mandated by `openspec/config.yaml` `rules.proposal`                                                                                                                                       | below                |
+| 10  | Deletion: `packages/functions`, 7 of 9 `contracts/schemas`, `infra/firestore.rules` + `infra/test/reglas.test.ts`, `tools/seed.ts` Firebase-admin path                                                    | #27 D5, #28          |
 
 ### Out of scope
 
@@ -46,7 +46,7 @@ with three operations survives; the rest becomes schema.
   so none blocks schema/RLS/RPC authoring.
 - **Password rotation** — deliberate parity gap (#24 D5). **A-8/A-9 stay unmitigated** (#28 D4).
 - **Bulk Firebase→Supabase rewrite of the 13 `docs/diseno/*` docs** — post-implementation work
-  per #22. Only the docs this change's decisions *contradict* are corrected (item 9).
+  per #22. Only the docs this change's decisions _contradict_ are corrected (item 9).
 - Firebase Storage (unused), non-Firebase client observability.
 
 ## Carve-out A — `versiones[uid]` replacement
@@ -54,12 +54,12 @@ with three operations survives; the rest becomes schema.
 #23 D2 deletes `lineas.versiones` as Firestore idempotency plumbing. It is also the **sole**
 data source for four live behaviours no closed ticket owns:
 
-| Consumer | Location |
-|---|---|
-| `estaPendiente` — "sólo pendientes" filter | `packages/shared/src/services/progreso.ts:18-19` |
-| `siguientePendiente` — keyboard auto-advance | `packages/shared/src/services/progreso.ts:30-40` |
-| Progress bar "47/60" | `apps/web/src/ui/primitivos/BarraProgreso.tsx:5` |
-| `aporteConfirmado` — RF-16 cross-device | `packages/shared/src/services/sincronizacion.ts:18-21` |
+| Consumer                                     | Location                                               |
+| -------------------------------------------- | ------------------------------------------------------ |
+| `estaPendiente` — "sólo pendientes" filter   | `packages/shared/src/services/progreso.ts:18-19`       |
+| `siguientePendiente` — keyboard auto-advance | `packages/shared/src/services/progreso.ts:30-40`       |
+| Progress bar "47/60"                         | `apps/web/src/ui/primitivos/BarraProgreso.tsx:5`       |
+| `aporteConfirmado` — RF-16 cross-device      | `packages/shared/src/services/sincronizacion.ts:18-21` |
 
 **Ruling: addendum, in scope, no new schema presumed.** The raw signal already survives —
 `aportes` keyed `(sesion_id, categoria_id, uid)` (#23), the client's own-aporte channel (#25 D5),
@@ -123,19 +123,19 @@ Order: schema → authorization → triggers/views → RPCs/Edge Function → `p
 
 ## Affected areas
 
-| Area | Impact | What |
-|---|---|---|
-| `supabase/migrations/` | New | All SQL: tables, RLS, triggers, RPCs, `pg_cron` |
-| `supabase/functions/` | New | One Edge Function, 3 operations |
-| `packages/data/src/supabase/` | New | Adapters + `indexedDB` queue |
-| `packages/data/src/firebase/` | Removed | 4 files + 4 test files (853 lines) |
-| `packages/functions/` | Removed | Whole package, 1292 lines / 20 files, 19 test files |
-| `infra/firestore.rules` + `infra/test/` | Removed | 144 + 359 lines (**29** `it()` blocks, not 27) |
-| `contracts/schemas/` | Modified | 7 of 9 schemas + their tests removed |
-| `apps/web/src/lib`, `src/state`, 4 `ui/admin` files | Modified | Client init, auth state, error shapes |
-| `packages/shared/src/services/` | Modified | `progreso.ts`, `sincronizacion.ts` (carve-out A) |
-| `docs/diseno/09`, `AGENTS.md`, `openspec/config.yaml`, `eslint.config.js` | Modified | Carve-out B + item 9 |
-| `apps/web/src/state/useConexion.ts`, `packages/data/src/fakes/` | Unaffected | Verified: no SDK import |
+| Area                                                                      | Impact     | What                                                |
+| ------------------------------------------------------------------------- | ---------- | --------------------------------------------------- |
+| `supabase/migrations/`                                                    | New        | All SQL: tables, RLS, triggers, RPCs, `pg_cron`     |
+| `supabase/functions/`                                                     | New        | One Edge Function, 3 operations                     |
+| `packages/data/src/supabase/`                                             | New        | Adapters + `indexedDB` queue                        |
+| `packages/data/src/firebase/`                                             | Removed    | 4 files + 4 test files (853 lines)                  |
+| `packages/functions/`                                                     | Removed    | Whole package, 1292 lines / 20 files, 19 test files |
+| `infra/firestore.rules` + `infra/test/`                                   | Removed    | 144 + 359 lines (**29** `it()` blocks, not 27)      |
+| `contracts/schemas/`                                                      | Modified   | 7 of 9 schemas + their tests removed                |
+| `apps/web/src/lib`, `src/state`, 4 `ui/admin` files                       | Modified   | Client init, auth state, error shapes               |
+| `packages/shared/src/services/`                                           | Modified   | `progreso.ts`, `sincronizacion.ts` (carve-out A)    |
+| `docs/diseno/09`, `AGENTS.md`, `openspec/config.yaml`, `eslint.config.js` | Modified   | Carve-out B + item 9                                |
+| `apps/web/src/state/useConexion.ts`, `packages/data/src/fakes/`           | Unaffected | Verified: no SDK import                             |
 
 ## Preconditions and assumptions
 
@@ -168,7 +168,7 @@ cutover is #32 and is **out of scope for this change**. No data migration, no ba
 
 ## Success criteria (this round)
 
-- [ ] Specs exist for all 5 new + 4 modified capabilities, with affirmative *and* negative
+- [ ] Specs exist for all 5 new + 4 modified capabilities, with affirmative _and_ negative
       scenarios for every threat A-1…A-11 (#28 D6 — negative-only would go green on a schema
       nobody can use).
 - [ ] Design resolves carve-out A without inventing a column the three surviving signals cover.
