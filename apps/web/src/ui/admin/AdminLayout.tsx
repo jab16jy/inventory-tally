@@ -31,10 +31,10 @@ interface Destino {
 }
 
 // Siete destinos de primer nivel (doc plan §1 + agrupación por área). Áreas
-// se fusionó dentro de Categorías como pestaña (CatalogoScreen) — no
-// merecía su propia entrada de nav por ser casi idéntica a Categorías.
-// Análisis y Cerrar se alcanzan DESDE Panel/Sesiones — no son nav de primer
-// nivel (F4/F5).
+// y Categorías viven juntas en CatalogoScreen (D-10): son los dos sentidos
+// de la misma relación N:M, y separarlas obligaría a elegir de antemano el
+// sentido de asignación. Análisis y Cerrar se alcanzan DESDE Panel/Sesiones
+// — no son nav de primer nivel (F4/F5).
 const DESTINOS: readonly Destino[] = [
   { ruta: "/admin", etiqueta: "Panel", icono: "panel", fin: true },
   { ruta: "/admin/cajeros", etiqueta: "Cajeros", icono: "usuarios" },
