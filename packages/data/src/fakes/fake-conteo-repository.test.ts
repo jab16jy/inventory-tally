@@ -522,4 +522,23 @@ describe("FakeConteoRepository — catálogo-en-conteo (vincular área / crear c
       }),
     );
   });
+
+  it("crearCategoriaEnSesion con areaId siembra la línea con areaIds; sin areaId no la expone (D-1)", async () => {
+    const repo = new FakeConteoRepository();
+
+    const sinArea = await repo.crearCategoriaEnSesion({ sesionId: "ses_1", etiqueta: "$7.000" });
+    const conArea = await repo.crearCategoriaEnSesion({
+      sesionId: "ses_1",
+      etiqueta: "$8.000",
+      areaId: "area_bodega",
+    });
+
+    const lineas: LineaConteo[] = [];
+    repo.observarLineas("ses_1", (l) => lineas.push(...l));
+
+    expect(lineas.find((l) => l.categoriaId === sinArea.categoriaId)).not.toHaveProperty("areaIds");
+    expect(lineas.find((l) => l.categoriaId === conArea.categoriaId)?.areaIds).toEqual([
+      "area_bodega",
+    ]);
+  });
 });

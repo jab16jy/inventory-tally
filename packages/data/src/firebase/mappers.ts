@@ -44,6 +44,7 @@ interface LineaConteoDoc {
   readonly actualizadaEn: Timestamp;
   readonly actualizadaPor: string;
   readonly aplicados?: Record<string, number>;
+  readonly areaIds?: readonly string[];
 }
 
 export function lineaConteoDesdeDoc(categoriaId: string, data: LineaConteoDoc): LineaConteo {
@@ -58,6 +59,7 @@ export function lineaConteoDesdeDoc(categoriaId: string, data: LineaConteoDoc): 
     actualizadaEn: data.actualizadaEn.toDate(),
     actualizadaPor: data.actualizadaPor,
     aplicados: data.aplicados,
+    areaIds: data.areaIds,
   };
 }
 

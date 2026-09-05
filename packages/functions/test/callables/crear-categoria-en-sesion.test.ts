@@ -125,6 +125,29 @@ describe("crearCategoriaEnSesionImpl (I-9/ADR-07, ADR-21)", () => {
     expect(lineaConArea.data()).not.toHaveProperty("area");
   });
 
+  it("D-1 · la línea sembrada copia areaIds cuando se elige área, y no la expone sin área", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const sesionId = await crearSesion(sucursalId);
+
+    const sinArea = await crearCategoriaEnSesionImpl(db, admin, {
+      sesionId,
+      etiqueta: `Producto ${randomUUID()}`,
+    });
+    registrarCategoria(sinArea.categoriaId);
+    const lineaSinArea = await db.doc(`sesiones/${sesionId}/lineas/${sinArea.categoriaId}`).get();
+    expect(lineaSinArea.data()).not.toHaveProperty("areaIds");
+
+    const areaId = await crearArea("Bodega");
+    const conArea = await crearCategoriaEnSesionImpl(db, admin, {
+      sesionId,
+      etiqueta: `Producto ${randomUUID()}`,
+      areaId,
+    });
+    registrarCategoria(conArea.categoriaId);
+    const lineaConArea = await db.doc(`sesiones/${sesionId}/lineas/${conArea.categoriaId}`).get();
+    expect(lineaConArea.get("areaIds")).toEqual([areaId]);
+  });
+
   it("cajero SIN la sucursal de la sesión → permission-denied", async () => {
     const sucursalId = `suc_${randomUUID()}`;
     const sesionId = await crearSesion(sucursalId);
