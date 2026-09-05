@@ -244,9 +244,10 @@ export function agruparPorDimension(
     } else {
       const aplicados = linea.aplicados ?? {};
       let unidadesAplicadas = 0;
-      for (const [uid, unidades] of Object.entries(aplicados)) {
+      for (const [claveAporte, unidades] of Object.entries(aplicados)) {
         unidadesAplicadas += unidades;
-        acumular(uid, nombres.get(uid) ?? uid, unidades, unidades * linea.valorUnitario);
+        const [uid] = claveAporte.split("__");
+        acumular(uid!, nombres.get(uid!) ?? uid!, unidades, unidades * linea.valorUnitario);
       }
       const resto = linea.cantidadTotal - unidadesAplicadas;
       if (resto !== 0) {
