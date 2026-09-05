@@ -21,7 +21,9 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 const [, , proyecto, sucursalId] = process.argv;
 
 if (!proyecto || !sucursalId) {
-  console.error("Uso: node --experimental-strip-types tools/abrir-conteo.ts <proyecto> <sucursalId>");
+  console.error(
+    "Uso: node --experimental-strip-types tools/abrir-conteo.ts <proyecto> <sucursalId>",
+  );
   process.exit(1);
 }
 

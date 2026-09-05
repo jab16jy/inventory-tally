@@ -29,11 +29,11 @@ affordable at 3 sucursales and ~6 sesiones/month.
 
 Three places where the seam **cannot** survive unchanged, stated explicitly:
 
-| Where | What changes | Why it is unavoidable |
-|---|---|---|
-| `LineaConteo.versiones` (`packages/shared/src/models/linea-conteo.ts:14`) | → `contadaPorMi: boolean` | The per-uid map was a Firestore document-shipping artifact. See D-2. |
-| `Aporte.version` (`packages/shared/src/models/aporte.ts:12`) | → `pendiente: boolean` | The monotonic counter existed only for at-least-once trigger idempotency (#23 H2). See D-2. |
-| `Pagina.siguienteCursor` (`admin-repository.ts:27-30`) | opacity survives, concrete value changes | It hides a `QueryDocumentSnapshot` today; PostgREST has no snapshot. See D-8. |
+| Where                                                                     | What changes                             | Why it is unavoidable                                                                       |
+| ------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `LineaConteo.versiones` (`packages/shared/src/models/linea-conteo.ts:14`) | → `contadaPorMi: boolean`                | The per-uid map was a Firestore document-shipping artifact. See D-2.                        |
+| `Aporte.version` (`packages/shared/src/models/aporte.ts:12`)              | → `pendiente: boolean`                   | The monotonic counter existed only for at-least-once trigger idempotency (#23 H2). See D-2. |
+| `Pagina.siguienteCursor` (`admin-repository.ts:27-30`)                    | opacity survives, concrete value changes | It hides a `QueryDocumentSnapshot` today; PostgREST has no snapshot. See D-8.               |
 
 Everything else is adapter-internal. Direction of the change is **deletion**: 1292 measured
 lines across 20 files in `packages/functions/src/**` (re-measured; #27's own text says
@@ -44,8 +44,8 @@ lines across 20 files in `packages/functions/src/**` (re-measured; #27's own tex
 ## Architecture Decisions
 
 Format follows `docs/diseno/13-decisiones-adr.md`: context, decision, rejected alternatives
-with the reason, and declared consequences. *"Una decisión sin costo declarado suele ser una
-decisión no examinada."*
+with the reason, and declared consequences. _"Una decisión sin costo declarado suele ser una
+decisión no examinada."_
 
 ### D-1 · `lineas` is maintained by a full re-aggregate trigger, not a delta
 
@@ -70,11 +70,11 @@ update public.lineas l
 -- + the same shape for sesiones.total_unidades and an upsert into sesion_participantes
 ```
 
-| Alternativa | Por qué se descartó |
-|---|---|
-| Delta con `OLD`/`NEW` | Needs a per-uid applied baseline to be correct under correction; that baseline is `aplicados`, which #23 D2 deletes. Re-introducing it re-introduces the bug the migration removes. |
-| Vista materializada con refresh | Not transactional — the exact defect #23 D2 eliminates — and cannot be published to Realtime. |
-| Vista + agregación en cliente | Forces a rewrite of `ConteoScreen`, `AnalisisScreen` and `CierreScreen` to save one table (#23 D2 (a)). |
+| Alternativa                     | Por qué se descartó                                                                                                                                                                 |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Delta con `OLD`/`NEW`           | Needs a per-uid applied baseline to be correct under correction; that baseline is `aplicados`, which #23 D2 deletes. Re-introducing it re-introduces the bug the migration removes. |
+| Vista materializada con refresh | Not transactional — the exact defect #23 D2 eliminates — and cannot be published to Realtime.                                                                                       |
+| Vista + agregación en cliente   | Forces a rewrite of `ConteoScreen`, `AnalisisScreen` and `CierreScreen` to save one table (#23 D2 (a)).                                                                             |
 
 **Ticket detail corrected.** #23's disappearance inventory lists `lineas.numAportantes`, but
 D2's own body says it "pasa a `count(*)`" and `packages/shared/src/services/riesgo.ts:18-20`
@@ -108,10 +108,10 @@ consumed at `apps/web/src/ui/FilaCategoria.tsx:44`). No closed ticket owns its r
 
 The field answers **two different questions** that Firestore happened to fuse into one map:
 
-| Question | Consumer | Signal that already survives |
-|---|---|---|
-| "Have I counted this categoría at all?" | `estaPendiente`, `siguientePendiente`, progress bar | An `aportes` row exists for `(sesion_id, categoria_id, uid)` (#23) |
-| "Has my last keystroke reached the server?" | `aporteConfirmado` (RF-16 per line) | No entry for `(sesionId, categoriaId)` in the local write queue (#26 D1/D5) |
+| Question                                    | Consumer                                            | Signal that already survives                                                |
+| ------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------- |
+| "Have I counted this categoría at all?"     | `estaPendiente`, `siguientePendiente`, progress bar | An `aportes` row exists for `(sesion_id, categoria_id, uid)` (#23)          |
+| "Has my last keystroke reached the server?" | `aporteConfirmado` (RF-16 per line)                 | No entry for `(sesionId, categoriaId)` in the local write queue (#26 D1/D5) |
 
 **Decisión.** Add **no column, no table, no repository method.** Two model fields change shape
 inside `packages/shared`, and the composition happens inside the adapter:
@@ -128,7 +128,8 @@ readonly pendiente: boolean;      // this value is still in the local queue, una
 // packages/shared/src/services/progreso.ts       (uid parameter becomes redundant)
 export const estaPendiente = (linea: LineaConteo): boolean => !linea.contadaPorMi;
 // packages/shared/src/services/sincronizacion.ts (linea parameter becomes redundant)
-export const aporteConfirmado = (aporte: Aporte | null): boolean => aporte != null && !aporte.pendiente;
+export const aporteConfirmado = (aporte: Aporte | null): boolean =>
+  aporte != null && !aporte.pendiente;
 ```
 
 `SupabaseConteoRepository.observarLineas` composes the `lineas` Realtime stream with the
@@ -137,13 +138,13 @@ current user's own-aporte set — seeded once at subscribe time by
 by the own-aporte channel #25 D5 already mandates. `observarMiAporte` emits the queue value in
 preference to the Realtime value (#26 D3), so it already knows which one it emitted.
 
-| Alternativa | Por qué se descartó |
-|---|---|
-| New `lineas.contada_por` array/jsonb column | Reproduces the deleted map under a new name; the data is already in `aportes`, which the client already streams. |
-| New `ConteoRepository.observarMisCategorias(...)` | An 11th interface member, a second stream for `ConteoScreen` to merge, and a matching fake — to deliver a fact `observarLineas` can carry for free. Shallower interface, more code. |
-| Keep a monotonic `version` for the cross-device `>=` | The `>=` (`sincronizacion.ts:20`) existed to avoid a false *negative* when the same cajero advanced the line from another device. The queue is per-device: this device's send either got a 2xx (confirmed) or did not. Last-write-wins across devices is already declared domain behaviour (`docs/diseno/05-concurrencia-offline-tiempo-real.md:218`, #26 closing note). |
+| Alternativa                                          | Por qué se descartó                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| New `lineas.contada_por` array/jsonb column          | Reproduces the deleted map under a new name; the data is already in `aportes`, which the client already streams.                                                                                                                                                                                                                                                         |
+| New `ConteoRepository.observarMisCategorias(...)`    | An 11th interface member, a second stream for `ConteoScreen` to merge, and a matching fake — to deliver a fact `observarLineas` can carry for free. Shallower interface, more code.                                                                                                                                                                                      |
+| Keep a monotonic `version` for the cross-device `>=` | The `>=` (`sincronizacion.ts:20`) existed to avoid a false _negative_ when the same cajero advanced the line from another device. The queue is per-device: this device's send either got a 2xx (confirmed) or did not. Last-write-wins across devices is already declared domain behaviour (`docs/diseno/05-concurrencia-offline-tiempo-real.md:218`, #26 closing note). |
 
-**Why this is strictly better than what it replaces.** Today `aporteConfirmado` *infers* server
+**Why this is strictly better than what it replaces.** Today `aporteConfirmado` _infers_ server
 acknowledgement from a document field because the write is deliberately un-awaited
 (`packages/data/src/firebase/firestore-conteo-repository.ts:167-171`). With supabase-js the
 HTTP response **is** the acknowledgement, so the inference disappears. `pendientes` (RF-16
@@ -162,18 +163,18 @@ Domain vocabulary survives into table and column names (`openspec/config.yaml:36
 `snake_case` because it is Postgres; the adapter maps to the existing camelCase models
 exactly where `packages/data/src/firebase/mappers.ts:38-51` does today.
 
-| Table | PK | Load-bearing detail |
-|---|---|---|
-| `perfiles` | `id uuid` → `auth.users(id) on delete cascade` | `rol text check (rol in ('admin','cajero'))`, `activo bool not null default true` (#23 D3) |
-| `perfil_sucursales` | `(perfil_id, sucursal_id)` | Both FKs real — this is the table that governs access (#23 D3) |
-| `sucursales` | `id text` | Slug preserved (`suc_norte`). **No** `sesion_abierta_id` (#23 D8) |
-| `categorias` | `id text` | `valor int not null check (valor > 0)`, immutable — no `actualizarCategoria` exists (#23 H4) |
-| `sesiones` | `id uuid default gen_random_uuid()` | `create unique index on sesiones (sucursal_id) where estado = 'abierta'` — I-1 becomes unviolatable (#23 D8) |
-| `lineas` | `(sesion_id, categoria_id)` | `etiqueta`, `valor_unitario` frozen at seeding (I-7); `cantidad_total`, `num_aportantes` trigger-written only |
-| `aportes` | `(sesion_id, categoria_id, uid)` | FK `(sesion_id, categoria_id) → lineas`; `check (cantidad >= 0 and cantidad <= 100000)` (A-7, #28 D3) |
-| `sesion_participantes` | `(sesion_id, uid)` | `nombre` denormalized frozen (#25 D4); `sincronizado` generated (#27 D6) |
-| `auditoria` | `id bigint generated always as identity` | Indexed columns + `detalle jsonb` (#23 D5) |
-| `config` | `id text check (id = 'app')` | Single row enforced by the PK's CHECK — a constraint, not a trigger |
+| Table                  | PK                                             | Load-bearing detail                                                                                           |
+| ---------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `perfiles`             | `id uuid` → `auth.users(id) on delete cascade` | `rol text check (rol in ('admin','cajero'))`, `activo bool not null default true` (#23 D3)                    |
+| `perfil_sucursales`    | `(perfil_id, sucursal_id)`                     | Both FKs real — this is the table that governs access (#23 D3)                                                |
+| `sucursales`           | `id text`                                      | Slug preserved (`suc_norte`). **No** `sesion_abierta_id` (#23 D8)                                             |
+| `categorias`           | `id text`                                      | `valor int not null check (valor > 0)`, immutable — no `actualizarCategoria` exists (#23 H4)                  |
+| `sesiones`             | `id uuid default gen_random_uuid()`            | `create unique index on sesiones (sucursal_id) where estado = 'abierta'` — I-1 becomes unviolatable (#23 D8)  |
+| `lineas`               | `(sesion_id, categoria_id)`                    | `etiqueta`, `valor_unitario` frozen at seeding (I-7); `cantidad_total`, `num_aportantes` trigger-written only |
+| `aportes`              | `(sesion_id, categoria_id, uid)`               | FK `(sesion_id, categoria_id) → lineas`; `check (cantidad >= 0 and cantidad <= 100000)` (A-7, #28 D3)         |
+| `sesion_participantes` | `(sesion_id, uid)`                             | `nombre` denormalized frozen (#25 D4); `sincronizado` generated (#27 D6)                                      |
+| `auditoria`            | `id bigint generated always as identity`       | Indexed columns + `detalle jsonb` (#23 D5)                                                                    |
+| `config`               | `id text check (id = 'app')`                   | Single row enforced by the PK's CHECK — a constraint, not a trigger                                           |
 
 ```sql
 -- #27 D6, verbatim shape: both operands in the same row, comparison immutable
@@ -202,7 +203,7 @@ Realtime publication (`alter publication supabase_realtime add table …`,
 `specs/esquema-postgres/spec.md:116-120` reproduces #23's list as a literal "no more, no less"
 requirement and **is being corrected** to include `aportes`.
 
-**#25 H4 corrected.** H4 says *"RLS NO se aplica a eventos DELETE"*. The docs show the
+**#25 H4 corrected.** H4 says _"RLS NO se aplica a eventos DELETE"_. The docs show the
 opposite: RLS **is** applied, and it degrades the `DELETE` payload to primary-key columns only
 even under `REPLICA IDENTITY FULL` — `and (not is_rls_enabled or (c).is_pkey)`
 (`ctx7-supabase-realtime.md:45-64`). Materially irrelevant here because no table grants
@@ -239,13 +240,13 @@ Policies call helpers wrapped as `(select private.es_admin())` — the same `(se
 the official policies use for `auth.uid()` (`ctx7-supabase-rls.md:48,51,201-202`), which makes
 the subquery an InitPlan evaluated once per query rather than once per row (#24 D1).
 
-| Aspect | Firebase (today) | Supabase (decided) |
-|---|---|---|
-| UI reads `rol`/`sucursales` | `getIdTokenResult().claims` (`apps/web/src/state/useAuthState.ts:31,35-36`) | one nested `select` on `perfiles` (#24 D1) |
-| Defensive normalization | `normalizarSucursales` (`useAuthState.ts:17-20`) | **deleted** — an FK-backed column cannot arrive malformed |
-| Alta | `auth.createUser` + `setCustomUserClaims` | `auth.admin.createUser({email, password, email_confirm:true})`, no SMTP (#24 D2/H2) |
-| Baja | `disabled` + `revokeRefreshTokens` + `activo:false` | `ban_duration` **then** `activo:false`, same order (#24 D3) |
-| Password rotation | none | none — **deliberate parity gap** (#24 D5) |
+| Aspect                      | Firebase (today)                                                            | Supabase (decided)                                                                  |
+| --------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| UI reads `rol`/`sucursales` | `getIdTokenResult().claims` (`apps/web/src/state/useAuthState.ts:31,35-36`) | one nested `select` on `perfiles` (#24 D1)                                          |
+| Defensive normalization     | `normalizarSucursales` (`useAuthState.ts:17-20`)                            | **deleted** — an FK-backed column cannot arrive malformed                           |
+| Alta                        | `auth.createUser` + `setCustomUserClaims`                                   | `auth.admin.createUser({email, password, email_confirm:true})`, no SMTP (#24 D2/H2) |
+| Baja                        | `disabled` + `revokeRefreshTokens` + `activo:false`                         | `ban_duration` **then** `activo:false`, same order (#24 D3)                         |
+| Password rotation           | none                                                                        | none — **deliberate parity gap** (#24 D5)                                           |
 
 The deactivation **ordering is load-bearing and is preserved**: writing the profile last makes
 `activo:false` a conservative signal — an interruption leaves the cajero locked out of Auth but
@@ -273,18 +274,18 @@ alter table public.<each> enable row level security;   -- every table, no except
 it would break the `SECURITY DEFINER` helpers (D-4) and the RPCs (D-7), which run as owner, and
 the client never connects as owner (#28 D2/H3).
 
-| Table | `authenticated` GRANT | SELECT policy | Write policy |
-|---|---|---|---|
-| `perfiles` | `select` | `id = (select auth.uid()) or private.es_admin()` | — (RPC/owner) · A-5 |
-| `perfil_sucursales` | `select` | `perfil_id = (select auth.uid()) or private.es_admin()` | — (RPC/owner) |
-| `sucursales` | `select, insert, update` | `es_admin() or tiene_sucursal(id)` | `with check (private.es_admin())` |
-| `categorias` | `select, insert, update` | `true` | `with check (private.es_admin())` |
-| `sesiones` | `select` | `private.puede_ver_sesion(id)` | — (RPC/owner) |
-| `lineas` | `select` | `private.puede_ver_sesion(sesion_id)` | — (trigger only) · A-1 |
-| `aportes` | `select`, **`insert (…)`/`update (…)` per column** | `private.puede_ver_sesion(sesion_id)` | `with check (uid = (select auth.uid()) and private.puede_ver_sesion(sesion_id) and private.sesion_abierta(sesion_id))` · A-3/A-4 · **no DELETE** |
-| `sesion_participantes` | `select`, `update (confirmado_en)` | `private.puede_ver_sesion(sesion_id)` | `for update using (uid = (select auth.uid())) with check (uid = (select auth.uid()))` · A-11 |
-| `auditoria` | `select` | `private.es_admin()` | — (triggers + `pg_cron`) · A-2 |
-| `config` | `select` | `true` | — |
+| Table                  | `authenticated` GRANT                              | SELECT policy                                           | Write policy                                                                                                                                     |
+| ---------------------- | -------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `perfiles`             | `select`                                           | `id = (select auth.uid()) or private.es_admin()`        | — (RPC/owner) · A-5                                                                                                                              |
+| `perfil_sucursales`    | `select`                                           | `perfil_id = (select auth.uid()) or private.es_admin()` | — (RPC/owner)                                                                                                                                    |
+| `sucursales`           | `select, insert, update`                           | `es_admin() or tiene_sucursal(id)`                      | `with check (private.es_admin())`                                                                                                                |
+| `categorias`           | `select, insert, update`                           | `true`                                                  | `with check (private.es_admin())`                                                                                                                |
+| `sesiones`             | `select`                                           | `private.puede_ver_sesion(id)`                          | — (RPC/owner)                                                                                                                                    |
+| `lineas`               | `select`                                           | `private.puede_ver_sesion(sesion_id)`                   | — (trigger only) · A-1                                                                                                                           |
+| `aportes`              | `select`, **`insert (…)`/`update (…)` per column** | `private.puede_ver_sesion(sesion_id)`                   | `with check (uid = (select auth.uid()) and private.puede_ver_sesion(sesion_id) and private.sesion_abierta(sesion_id))` · A-3/A-4 · **no DELETE** |
+| `sesion_participantes` | `select`, `update (confirmado_en)`                 | `private.puede_ver_sesion(sesion_id)`                   | `for update using (uid = (select auth.uid())) with check (uid = (select auth.uid()))` · A-11                                                     |
+| `auditoria`            | `select`                                           | `private.es_admin()`                                    | — (triggers + `pg_cron`) · A-2                                                                                                                   |
+| `config`               | `select`                                           | `true`                                                  | —                                                                                                                                                |
 
 ```sql
 -- #28 D3: hasOnly is a permission, not a value check — a CHECK cannot see which columns
@@ -319,14 +320,14 @@ Same information exposed, different response shape.
 
 ### D-6 · Function redistribution — by real need, not 1:1
 
-| Destination | Operations | Only reason |
-|---|---|---|
-| Trigger (synchronous) | `onAporteEscrito` | #23 D2 · D-1 above |
-| PostgREST + RLS | `crearSucursal`, `actualizarSucursal`, `crearCategoria`, `desactivarCategoria` | Single-row write; RLS + CHECK + audit trigger cover everything the callable added (#27 D1) |
-| RPC `SECURITY DEFINER` | `abrirSesion`, `cerrarSesion`, `actualizarCajero` | Multi-table, needs a transaction with a named contract (#27 D1) |
-| Edge Function (one, 3 ops) | `crearCajero`, `desactivarCajero`, `reactivarCajero` | The `service_role` key cannot reach the client (#27 D1) |
-| `pg_cron` | `purgarAuditoria` | One statement (#27 D3) |
-| Deleted | `recalcularResumenes`, `reconciliarLineas`, `calcularResumen`, `verificarSincronizacion`, `exigirAdmin`, `validar`, 7 zod schemas | #23 D2/D6, #27 D5/D6/D7 |
+| Destination                | Operations                                                                                                                        | Only reason                                                                                |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Trigger (synchronous)      | `onAporteEscrito`                                                                                                                 | #23 D2 · D-1 above                                                                         |
+| PostgREST + RLS            | `crearSucursal`, `actualizarSucursal`, `crearCategoria`, `desactivarCategoria`                                                    | Single-row write; RLS + CHECK + audit trigger cover everything the callable added (#27 D1) |
+| RPC `SECURITY DEFINER`     | `abrirSesion`, `cerrarSesion`, `actualizarCajero`                                                                                 | Multi-table, needs a transaction with a named contract (#27 D1)                            |
+| Edge Function (one, 3 ops) | `crearCajero`, `desactivarCajero`, `reactivarCajero`                                                                              | The `service_role` key cannot reach the client (#27 D1)                                    |
+| `pg_cron`                  | `purgarAuditoria`                                                                                                                 | One statement (#27 D3)                                                                     |
+| Deleted                    | `recalcularResumenes`, `reconciliarLineas`, `calcularResumen`, `verificarSincronizacion`, `exigirAdmin`, `validar`, 7 zod schemas | #23 D2/D6, #27 D5/D6/D7                                                                    |
 
 **`abrirSesion` seeding is in the same transaction** — `insert into sesiones …` then
 `insert into lineas select … from categorias where activa` (#27 D4). The unique partial index
@@ -362,18 +363,18 @@ only non-idempotent step in the whole system, because it consumes an email addre
 
 ### D-7 · Client seam — what actually changes in `apps/web`
 
-| File | Action | Detail |
-|---|---|---|
-| `apps/web/src/lib/firebase.ts` | Replace | One `createClient()`. `persistentLocalCache`/`persistentMultipleTabManager` have no equivalent — that absence is why #26 exists. |
-| `apps/web/src/lib/funciones.ts` (14 lines) | Delete | `getFunctions` disappears. |
-| `apps/web/src/lib/version-minima.ts` | Create | See below. |
-| `apps/web/src/lib/router.tsx:8` | Modify | `signInWithPassword`/`signOut`, 1:1. |
-| `apps/web/src/state/useAuthState.ts` (44 lines) | Rewrite | `onAuthStateChange` → one nested select `perfiles(nombre, rol, perfil_sucursales(sucursal_id))`. `normalizarSucursales` deleted. |
-| `apps/web/src/state/useVersionMinima.ts:8,10,53` | Modify | Imports `leerVersionMinima()`; no SDK import remains. |
-| `apps/web/src/lib/persistencia-monitor.ts` (44 lines) + its canary test | Delete | It monkey-patches `console.warn` to detect a Firestore-SDK-internal fallback string. Meaningless without that SDK. |
-| `apps/web/src/state/usePendientes.ts` (13 lines) | **Unchanged** | Same interface; only the backing count moves from `hasPendingWrites` to the queue (#26 D5). |
-| `apps/web/src/state/useConexion.ts` (26 lines) | **Unchanged** | `navigator.onLine` only — verified, no Firebase import. |
-| `CajerosScreen.tsx:8`, `CierreScreen.tsx:15`, `SucursalesAdminScreen.tsx:9` (+3 tests) | Modify | `FirebaseError` → `PostgrestError` (`.code`), `AuthError`, `FunctionsHttpError`. |
+| File                                                                                   | Action        | Detail                                                                                                                           |
+| -------------------------------------------------------------------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/lib/firebase.ts`                                                         | Replace       | One `createClient()`. `persistentLocalCache`/`persistentMultipleTabManager` have no equivalent — that absence is why #26 exists. |
+| `apps/web/src/lib/funciones.ts` (14 lines)                                             | Delete        | `getFunctions` disappears.                                                                                                       |
+| `apps/web/src/lib/version-minima.ts`                                                   | Create        | See below.                                                                                                                       |
+| `apps/web/src/lib/router.tsx:8`                                                        | Modify        | `signInWithPassword`/`signOut`, 1:1.                                                                                             |
+| `apps/web/src/state/useAuthState.ts` (44 lines)                                        | Rewrite       | `onAuthStateChange` → one nested select `perfiles(nombre, rol, perfil_sucursales(sucursal_id))`. `normalizarSucursales` deleted. |
+| `apps/web/src/state/useVersionMinima.ts:8,10,53`                                       | Modify        | Imports `leerVersionMinima()`; no SDK import remains.                                                                            |
+| `apps/web/src/lib/persistencia-monitor.ts` (44 lines) + its canary test                | Delete        | It monkey-patches `console.warn` to detect a Firestore-SDK-internal fallback string. Meaningless without that SDK.               |
+| `apps/web/src/state/usePendientes.ts` (13 lines)                                       | **Unchanged** | Same interface; only the backing count moves from `hasPendingWrites` to the queue (#26 D5).                                      |
+| `apps/web/src/state/useConexion.ts` (26 lines)                                         | **Unchanged** | `navigator.onLine` only — verified, no Firebase import.                                                                          |
+| `CajerosScreen.tsx:8`, `CierreScreen.tsx:15`, `SucursalesAdminScreen.tsx:9` (+3 tests) | Modify        | `FirebaseError` → `PostgrestError` (`.code`), `AuthError`, `FunctionsHttpError`.                                                 |
 
 **`firestore-admin-repository.ts:289-293` is the real shape change.** One private `llamar()`
 that routed all 10 writes through `httpsCallable` becomes **three** call shapes:
@@ -400,13 +401,13 @@ the adapter's error mapping triples. `AdminRepository`'s 20 members are unaffect
 
 **`useVersionMinima` — the undecided call, decided: it stays direct, behind `apps/web/src/lib/`.**
 
-| Option | Verdict |
-|---|---|
-| Route through `AdminRepository` | **Rejected.** The hook runs at router level for *every* user; `AdminRepository` is admin-only by name and by where it is constructed. A cajero-path read on the admin repository is a lie about the boundary. |
-| A new one-method repository | **Rejected — fails the deletion test.** Delete it and complexity reappears in exactly one caller. That is a pass-through, not a seam. `config` SELECT is `true for authenticated` (#28) — nothing varies across the seam. |
-| Stay direct, but move the SDK call into `apps/web/src/lib/version-minima.ts` | **CHOSEN.** |
+| Option                                                                       | Verdict                                                                                                                                                                                                                   |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Route through `AdminRepository`                                              | **Rejected.** The hook runs at router level for _every_ user; `AdminRepository` is admin-only by name and by where it is constructed. A cajero-path read on the admin repository is a lie about the boundary.             |
+| A new one-method repository                                                  | **Rejected — fails the deletion test.** Delete it and complexity reappears in exactly one caller. That is a pass-through, not a seam. `config` SELECT is `true for authenticated` (#28) — nothing varies across the seam. |
+| Stay direct, but move the SDK call into `apps/web/src/lib/version-minima.ts` | **CHOSEN.**                                                                                                                                                                                                               |
 
-The actual defect is *the SDK in `src/state`*, not *the read bypassing a repository*.
+The actual defect is _the SDK in `src/state`_, not _the read bypassing a repository_.
 `apps/web/src/lib/` is already the legitimate DI construction point and the seam's other end;
 `router.tsx` and `useAuthState` sit outside the repository seam by the same deliberate rule
 (`conteo-repository.ts:43-51`). A one-line
@@ -422,7 +423,7 @@ matters.
 "only `packages/data` touches the SDK". **False.** `eslint.config.js` restricts Firebase imports
 in exactly two places: `packages/shared/**` (`:31-59`) and `apps/web/src/ui/primitivos/**`
 (`:67-96`). No other rule; no `dependency-cruiser` config exists. The leak at
-`useVersionMinima.ts:8,10,53` was introduced *under* that unenforced rule, in the most recent
+`useVersionMinima.ts:8,10,53` was introduced _under_ that unenforced rule, in the most recent
 commit.
 
 **Decisión.** Extend the existing `no-restricted-imports` blocks. Flat config is
@@ -451,9 +452,9 @@ whole reason this is in scope.
 #33 is OPEN and owns the final choice. Both documented options are confirmed current CLI
 surface.
 
-| Option | Strength | Cost |
-|---|---|---|
-| **pgTAP** via `supabase test db [--local\|--linked]` (`ctx7-supabase-cli-testing.md:17-34`) | Runs in-database, so it can `set local role` / set JWT claims per case **and read the catalog** — the only way to assert `pg_class.relrowsecurity` (#28 D2 piece 3) and the views' `security_invoker` reloption. | A second language and runner in a repo that is 100% vitest; no fixture sharing with existing suites. |
+| Option                                                                                                          | Strength                                                                                                                                                                                                                                                              | Cost                                                                                                                                                                   |
+| --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **pgTAP** via `supabase test db [--local\|--linked]` (`ctx7-supabase-cli-testing.md:17-34`)                     | Runs in-database, so it can `set local role` / set JWT claims per case **and read the catalog** — the only way to assert `pg_class.relrowsecurity` (#28 D2 piece 3) and the views' `security_invoker` reloption.                                                      | A second language and runner in a repo that is 100% vitest; no fixture sharing with existing suites.                                                                   |
 | **supabase-js integration** against the local stack (`supabase db reset`, `ctx7-supabase-cli-testing.md:77-97`) | Stays in vitest. Exercises the real PostgREST path, so one test covers GRANT + RLS + policy + adapter together. The 29 re-measured `it()` blocks in `infra/test/reglas.test.ts` (359 lines) translate close to 1:1 — the existing per-role client shape is identical. | Cannot reach `pg_catalog`: PostgREST does not expose it, so the default-deny assertion would need a purpose-built RPC — a production artifact created only for a test. |
 
 **Recommendation to #33 (not a decision): both, weighted to the second.** The 29 threat cases
@@ -464,15 +465,15 @@ single file that never grows.
 
 **TDD is satisfiable red-first at every layer** (`AGENTS.md` §2, non-negotiable):
 
-| Layer | Red-first mechanism |
-|---|---|
-| Schema/constraint | Insert violating data before the CHECK exists → passes; add CHECK → fails. Test asserts the rejection. |
-| RLS/GRANT | Per-role client asserts allow **and** deny before the policy exists. |
-| Trigger (D-1) | Assert `lineas.cantidad_total` after an aporte; red until the trigger exists. |
-| RPC | Assert the multi-table post-state; red until the function exists. |
-| Realtime publication | Subscribe, write, assert the event arrives; red until `alter publication` runs. |
-| Generated column (#27 D6) | Assert `sincronizado` transitions; red until the column exists. |
-| Adapter (`packages/data`) | Same `vi.mock` pattern the 4 existing Firebase adapter test files (853 lines) already use. |
+| Layer                     | Red-first mechanism                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Schema/constraint         | Insert violating data before the CHECK exists → passes; add CHECK → fails. Test asserts the rejection. |
+| RLS/GRANT                 | Per-role client asserts allow **and** deny before the policy exists.                                   |
+| Trigger (D-1)             | Assert `lineas.cantidad_total` after an aporte; red until the trigger exists.                          |
+| RPC                       | Assert the multi-table post-state; red until the function exists.                                      |
+| Realtime publication      | Subscribe, write, assert the event arrives; red until `alter publication` runs.                        |
+| Generated column (#27 D6) | Assert `sincronizado` transitions; red until the column exists.                                        |
+| Adapter (`packages/data`) | Same `vi.mock` pattern the 4 existing Firebase adapter test files (853 lines) already use.             |
 
 ---
 
@@ -559,28 +560,28 @@ sequenceDiagram
 
 ## File Changes (summary — `sdd-tasks` owns the per-slice breakdown)
 
-| Path | Action | Note |
-|---|---|---|
-| `supabase/migrations/**` | Create | Tables, indexes, CHECKs, helpers, GRANT/RLS, views, triggers, publication, `pg_cron` |
-| `supabase/functions/gestion-cajeros/**` | Create | One function, three operations (D-6) |
-| `packages/data/src/supabase/**` | Create | Two adapters + `indexedDB` queue + mappers |
-| `packages/data/src/firebase/**` | Delete | 4 source + 4 test files, 853 lines |
-| `packages/functions/**` | Delete | Whole package: 1292 lines / 20 files (re-measured), 19 test files |
-| `infra/firestore.rules` + `infra/test/reglas.test.ts` | Delete | 144 + 359 lines; **29** `it()` blocks (re-measured, not 27) |
-| `contracts/schemas/**` | Modify | 7 of 9 schemas + 7 tests removed; `crear-cajero`, `desactivar-cajero` survive (#27 D5) |
-| `packages/shared/src/models/{linea-conteo,aporte}.ts` + `services/{progreso,sincronizacion}.ts` | Modify | D-2; `participanteSincronizado` deleted (#27 D6) |
-| `apps/web/src/{lib,state}/**`, 4 `ui/admin` files | Modify | D-7 |
-| `eslint.config.js`, `AGENTS.md:111`, `openspec/config.yaml:23` | Modify | D-8 |
-| `docs/diseno/09-seguridad-y-auditoria.md` | Modify | See below |
-| `tools/seed.ts:14-16` | Modify | Supabase-admin equivalent |
+| Path                                                                                            | Action | Note                                                                                   |
+| ----------------------------------------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------- |
+| `supabase/migrations/**`                                                                        | Create | Tables, indexes, CHECKs, helpers, GRANT/RLS, views, triggers, publication, `pg_cron`   |
+| `supabase/functions/gestion-cajeros/**`                                                         | Create | One function, three operations (D-6)                                                   |
+| `packages/data/src/supabase/**`                                                                 | Create | Two adapters + `indexedDB` queue + mappers                                             |
+| `packages/data/src/firebase/**`                                                                 | Delete | 4 source + 4 test files, 853 lines                                                     |
+| `packages/functions/**`                                                                         | Delete | Whole package: 1292 lines / 20 files (re-measured), 19 test files                      |
+| `infra/firestore.rules` + `infra/test/reglas.test.ts`                                           | Delete | 144 + 359 lines; **29** `it()` blocks (re-measured, not 27)                            |
+| `contracts/schemas/**`                                                                          | Modify | 7 of 9 schemas + 7 tests removed; `crear-cajero`, `desactivar-cajero` survive (#27 D5) |
+| `packages/shared/src/models/{linea-conteo,aporte}.ts` + `services/{progreso,sincronizacion}.ts` | Modify | D-2; `participanteSincronizado` deleted (#27 D6)                                       |
+| `apps/web/src/{lib,state}/**`, 4 `ui/admin` files                                               | Modify | D-7                                                                                    |
+| `eslint.config.js`, `AGENTS.md:111`, `openspec/config.yaml:23`                                  | Modify | D-8                                                                                    |
+| `docs/diseno/09-seguridad-y-auditoria.md`                                                       | Modify | See below                                                                              |
+| `tools/seed.ts:14-16`                                                                           | Modify | Supabase-admin equivalent                                                              |
 
 **Doc corrections (only CONTRADICTED docs — bulk rewrite is out of scope per #22):**
 
-| Location | Correction |
-|---|---|
+| Location                                        | Correction                                                                                                                                                                                                                     |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `docs/diseno/09-seguridad-y-auditoria.md:27-28` | A-8/A-9 mitigation column says "App Check", never implemented (`README.md:112`, Pendiente) → **"sin mitigar"**, leaning on Supabase Auth rate limits (#28 D4). A threat model that lies is worse than one with a visible hole. |
-| `docs/diseno/09-seguridad-y-auditoria.md:67` | "cambio obligatorio en el primer ingreso" — flow does not exist (#24 H4) → removed, replaced by an explicit declared gap (#24 D5). |
-| `docs/diseno/09-seguridad-y-auditoria.md:70-74` | App Check subsection → removed with A-8/A-9. |
+| `docs/diseno/09-seguridad-y-auditoria.md:67`    | "cambio obligatorio en el primer ingreso" — flow does not exist (#24 H4) → removed, replaced by an explicit declared gap (#24 D5).                                                                                             |
+| `docs/diseno/09-seguridad-y-auditoria.md:70-74` | App Check subsection → removed with A-8/A-9.                                                                                                                                                                                   |
 
 ---
 
@@ -590,7 +591,7 @@ sequenceDiagram
 executable-file classification, or process-integration boundary. It is database schema,
 authorization policy, and a client adapter.
 
-The security surface that *is* touched maps to doc 09's existing A-1…A-11 model with no new
+The security surface that _is_ touched maps to doc 09's existing A-1…A-11 model with no new
 threat class; the per-threat mechanism table is fixed by #28 and reproduced in D-5's GRANT/RLS
 table. **A-8 and A-9 migrate unmitigated and are declared as such** — they are unmitigated
 today (#28 H2). No fix is designed here (#24 D5, #28 D4).
@@ -612,8 +613,8 @@ paused (#27 D3).
 ## Open Questions
 
 - [ ] **OQ-1 (blocks "done", not authoring) — #33 is OPEN.** D-9 recommends but does not
-      decide. Strict TDD (`AGENTS.md` §2) means schema/RLS/RPC/trigger work can be *authored*
-      but not *closed* until #33 picks the apparatus. This is the real gate on `sdd-apply`,
+      decide. Strict TDD (`AGENTS.md` §2) means schema/RLS/RPC/trigger work can be _authored_
+      but not _closed_ until #33 picks the apparatus. This is the real gate on `sdd-apply`,
       not the four closed core tickets.
 - [ ] **OQ-2 (non-blocking)** — `postgres_changes` multi-column filters (`sesion_id=eq.X,uid=eq.Y`)
       are asserted by #25 H3 but are **not** confirmed by the fetched docs

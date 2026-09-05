@@ -141,9 +141,9 @@ catch-all). `FORCE ROW LEVEL SECURITY` MUST NOT be used — it would break the
 `WITH CHECK (uid = auth.uid() AND private.tiene_sucursal(...) AND
 private.sesion_abierta(sesion_id))` MUST gate `aportes` writes (A-3, A-4). `GRANT
 INSERT/UPDATE` MUST be column-scoped to the writable set only, translating
-Firestore's `hasOnly` as a permission, not a value check (#28 D3). `CHECK (cantidad
->= 0 AND cantidad <= 100000)` MUST enforce the value range (A-7). `aportes` MUST
-have no `GRANT DELETE` for `authenticated`.
+Firestore's `hasOnly` as a permission, not a value check (#28 D3).
+`CHECK (cantidad >= 0 AND cantidad <= 100000)` MUST enforce the value range (A-7).
+`aportes` MUST have no `GRANT DELETE` for `authenticated`.
 
 #### Scenario: Aporte to own sucursal, open sesion, in range — accepted (affirmative)
 
