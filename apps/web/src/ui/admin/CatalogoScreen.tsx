@@ -58,7 +58,11 @@ export function CatalogoScreen() {
         aria-labelledby={`pestana-${pestana}`}
         tabIndex={0}
       >
-        {pestana === "categorias" ? <CategoriasScreen /> : <AreasScreen />}
+        {pestana === "categorias" ? (
+          <CategoriasScreen />
+        ) : (
+          <AreasScreen onIrACategorias={() => setPestana("categorias")} />
+        )}
       </div>
     </div>
   );

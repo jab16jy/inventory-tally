@@ -48,4 +48,27 @@ describe("CatalogoScreen", () => {
     expect(pestana).toHaveAttribute("aria-controls", panel.id);
     expect(panel).toHaveAttribute("aria-labelledby", pestana.id);
   });
+
+  it("permite volver a Categorías desde el aviso de sin-área en Áreas", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarCategoria({
+      categoriaId: "cat_1",
+      etiqueta: "$1.000",
+      valor: 1000,
+      activa: true,
+      orden: 1,
+      creadaEn: new Date(),
+    });
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Áreas" }));
+    expect(screen.getByRole("tab", { name: "Áreas" })).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: /ver categorías/i }));
+    expect(screen.getByRole("tab", { name: "Categorías" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("heading", { name: "Categorías" })).toBeInTheDocument();
+  });
 });

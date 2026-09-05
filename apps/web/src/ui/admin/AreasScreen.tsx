@@ -4,7 +4,12 @@
 // CategoriasScreen.tsx.
 import { useEffect, useId, useState, type FormEvent } from "react";
 import type { Area } from "@conteo/shared/models/area.js";
-import type { ActualizarAreaPayload, CrearAreaPayload } from "@conteo/data";
+import type { CategoriaValor } from "@conteo/shared/models/categoria-valor.js";
+import type {
+  ActualizarAreaPayload,
+  ActualizarCategoriaPayload,
+  CrearAreaPayload,
+} from "@conteo/data";
 import { useAdminRepository } from "../../state/admin-contexto.js";
 import { Icono } from "../primitivos/Icono.js";
 import { Spinner } from "../primitivos/Spinner.js";
@@ -31,12 +36,34 @@ function useAreas(): { areas: Area[]; cargando: boolean } {
   return { areas, cargando };
 }
 
-type EstadoFormulario =
-  { readonly modo: "crear" } | { readonly modo: "editar"; readonly area: Area };
+function useCategorias(): { categorias: CategoriaValor[]; cargando: boolean } {
+  const repo = useAdminRepository();
+  const [categorias, setCategorias] = useState<CategoriaValor[]>([]);
+  const [cargando, setCargando] = useState(true);
+  useEffect(
+    () =>
+      repo.observarCategorias((c) => {
+        setCategorias(c);
+        setCargando(false);
+      }),
+    [repo],
+  );
+  return { categorias, cargando };
+}
 
-export function AreasScreen() {
+type EstadoFormulario =
+  | { readonly modo: "crear" }
+  | { readonly modo: "editar"; readonly area: Area }
+  | { readonly modo: "asignar"; readonly area: Area };
+
+export interface AreasScreenProps {
+  readonly onIrACategorias?: () => void;
+}
+
+export function AreasScreen({ onIrACategorias }: AreasScreenProps = {}) {
   const repo = useAdminRepository();
   const { areas, cargando } = useAreas();
+  const { categorias, cargando: cargandoCategorias } = useCategorias();
 
   const [formulario, setFormulario] = useState<EstadoFormulario | null>(null);
   const [errorFormulario, setErrorFormulario] = useState<string | null>(null);
@@ -61,6 +88,11 @@ export function AreasScreen() {
 
   function abrirEdicion(area: Area): void {
     setFormulario({ modo: "editar", area });
+    setErrorFormulario(null);
+  }
+
+  function abrirAsignacion(area: Area): void {
+    setFormulario({ modo: "asignar", area });
     setErrorFormulario(null);
   }
 
@@ -139,6 +171,15 @@ export function AreasScreen() {
       valorOrden: (a) => a.nombre,
     },
     {
+      clave: "categorias",
+      etiqueta: "Categorías",
+      render: (a) => {
+        const conteo = categorias.filter((c) => c.activa && c.areaIds?.includes(a.areaId)).length;
+        return conteo === 0 ? <span className="text-tenue">0</span> : conteo;
+      },
+      valorOrden: (a) => categorias.filter((c) => c.activa && c.areaIds?.includes(a.areaId)).length,
+    },
+    {
       clave: "activa",
       etiqueta: "Activa",
       render: (a) => (a.activa ? "Sí" : "No"),
@@ -149,6 +190,14 @@ export function AreasScreen() {
       etiqueta: "Acciones",
       render: (a) => (
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => abrirAsignacion(a)}
+            aria-label={`Asignar categorías a ${a.nombre}`}
+            className="rounded-placa border border-borde px-2.5 py-1.5 text-micro text-tinta hover:border-senal hover:text-senal"
+          >
+            Asignar
+          </button>
           <button
             type="button"
             onClick={() => abrirEdicion(a)}
@@ -223,6 +272,10 @@ export function AreasScreen() {
     },
   ];
 
+  const categoriasSinArea = categorias.filter(
+    (c) => c.activa && (!c.areaIds || c.areaIds.length === 0),
+  );
+
   return (
     <section className="p-6">
       <header className="flex items-center justify-between pb-4">
@@ -245,7 +298,15 @@ export function AreasScreen() {
         </p>
       )}
 
-      {formulario && (
+      {formulario && formulario.modo === "asignar" ? (
+        <FormularioAsignacion
+          area={formulario.area}
+          categorias={categorias}
+          cargandoCategorias={cargandoCategorias}
+          onCancelar={cerrarFormulario}
+          onExito={cerrarFormulario}
+        />
+      ) : formulario ? (
         <FormularioArea
           modo={formulario.modo}
           area={formulario.modo === "editar" ? formulario.area : undefined}
@@ -254,6 +315,27 @@ export function AreasScreen() {
           onCrear={crear}
           onEditar={editar}
         />
+      ) : null}
+
+      {categoriasSinArea.length > 0 && (
+        <div
+          role="status"
+          className="mb-4 flex items-center justify-between gap-2 rounded-placa border border-borde bg-placa px-3 py-2 text-micro text-tenue"
+        >
+          <span>
+            {categoriasSinArea.length} categorías sin área. Se ven en todas las áreas mientras
+            tanto.
+          </span>
+          {onIrACategorias && (
+            <button
+              type="button"
+              onClick={onIrACategorias}
+              className="shrink-0 rounded-placa border border-borde px-2.5 py-1 text-micro text-tinta hover:border-senal hover:text-senal"
+            >
+              Ver categorías
+            </button>
+          )}
+        </div>
       )}
 
       <Tabla
@@ -340,6 +422,223 @@ function FormularioArea({ modo, area, error, onCancelar, onCrear, onEditar }: Fo
           type="button"
           onClick={onCancelar}
           className="rounded-placa border border-borde px-4 py-2 text-micro text-tenue hover:text-tinta"
+        >
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
+interface FormularioAsignacionProps {
+  readonly area: Area;
+  readonly categorias: readonly CategoriaValor[];
+  readonly cargandoCategorias: boolean;
+  readonly onCancelar: () => void;
+  readonly onExito: () => void;
+}
+
+function FormularioAsignacion({
+  area,
+  categorias,
+  cargandoCategorias,
+  onCancelar,
+  onExito,
+}: FormularioAsignacionProps) {
+  const repo = useAdminRepository();
+  const [seleccionadas, setSeleccionadas] = useState<Set<string>>(() => {
+    return new Set(
+      categorias.filter((c) => c.areaIds?.includes(area.areaId)).map((c) => c.categoriaId),
+    );
+  });
+  const [busqueda, setBusqueda] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const categoriasActivas = categorias.filter((c) => c.activa);
+
+  function alternarCategoria(categoriaId: string): void {
+    setSeleccionadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(categoriaId)) {
+        next.delete(categoriaId);
+      } else {
+        next.add(categoriaId);
+      }
+      return next;
+    });
+  }
+
+  function marcarTodas(): void {
+    setSeleccionadas(new Set(categoriasActivas.map((c) => c.categoriaId)));
+  }
+
+  function desmarcarTodas(): void {
+    setSeleccionadas(new Set());
+  }
+
+  async function manejarEnvio(evento: FormEvent<HTMLFormElement>): Promise<void> {
+    evento.preventDefault();
+    setGuardando(true);
+    setError(null);
+
+    try {
+      const pendientes = categoriasActivas.filter((c) => {
+        const tieneArea = Boolean(c.areaIds?.includes(area.areaId));
+        const debeTener = seleccionadas.has(c.categoriaId);
+        return tieneArea !== debeTener;
+      });
+
+      let guardadas = 0;
+      for (const cat of pendientes) {
+        // Preserva campos vivos de observarCategorias para mitigar pisado por concurrencia (D-11)
+        const catViva = categorias.find((c) => c.categoriaId === cat.categoriaId) ?? cat;
+        const debeTener = seleccionadas.has(catViva.categoriaId);
+        const areaIdsActuales = catViva.areaIds ?? [];
+        const nuevosAreaIds = debeTener
+          ? [...new Set([...areaIdsActuales, area.areaId])]
+          : areaIdsActuales.filter((id) => id !== area.areaId);
+
+        const payload: ActualizarCategoriaPayload = {
+          categoriaId: catViva.categoriaId,
+          etiqueta: catViva.etiqueta,
+          valor: catViva.valor,
+          orden: catViva.orden,
+          ...(nuevosAreaIds.length > 0 ? { areaIds: nuevosAreaIds } : {}),
+          ...(catViva.sucursalesAsignadas && catViva.sucursalesAsignadas.length > 0
+            ? { sucursalesAsignadas: catViva.sucursalesAsignadas }
+            : {}),
+        };
+
+        try {
+          await repo.actualizarCategoria(payload);
+          guardadas++;
+        } catch {
+          if (guardadas > 0) {
+            setError(
+              `Se guardaron ${guardadas} de ${pendientes.length} categorías. Vuelve a intentar con las que faltaron.`,
+            );
+          } else {
+            setError("No se pudo guardar la asignación. Intenta de nuevo.");
+          }
+          return;
+        }
+      }
+
+      onExito();
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  const consulta = busqueda.trim().toLowerCase();
+  const categoriasVisibles = consulta
+    ? categoriasActivas.filter((c) => c.etiqueta.toLowerCase().includes(consulta))
+    : categoriasActivas;
+
+  return (
+    <form
+      onSubmit={(evento) => void manejarEnvio(evento)}
+      className="mb-6 flex flex-col gap-4 rounded-placa border border-borde bg-placa p-4"
+    >
+      <header className="flex items-center justify-between">
+        <h2 className="text-micro font-semibold text-tinta">Categorías de {area.nombre}</h2>
+      </header>
+
+      {cargandoCategorias ? (
+        <div className="flex items-center gap-2 text-micro text-tenue">
+          <Spinner className="size-3.5 shrink-0" /> Cargando categorías…
+        </div>
+      ) : categoriasActivas.length === 0 ? (
+        <p className="text-micro text-tenue">No hay categorías activas todavía.</p>
+      ) : (
+        <fieldset>
+          <legend className="mb-1.5 block text-micro text-tenue">Categorías activas</legend>
+
+          {categoriasActivas.length > 20 && (
+            <label className="relative mb-3 block">
+              <span className="sr-only">Buscar categoría</span>
+              <Icono
+                nombre="buscar"
+                className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-tenue"
+              />
+              <input
+                type="search"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Buscar categoría…"
+                className="min-h-[var(--size-toque)] w-full rounded-placa border border-borde bg-fondo py-2 pr-3 pl-9 text-tinta placeholder:text-tenue focus:border-senal focus:outline-none"
+              />
+            </label>
+          )}
+
+          <div className="mb-2 flex items-center gap-3 text-micro">
+            <button
+              type="button"
+              onClick={marcarTodas}
+              disabled={guardando}
+              className="text-tenue hover:text-tinta disabled:opacity-40"
+            >
+              Marcar todas
+            </button>
+            <span className="text-borde" aria-hidden="true">
+              ·
+            </span>
+            <button
+              type="button"
+              onClick={desmarcarTodas}
+              disabled={guardando}
+              className="text-tenue hover:text-tinta disabled:opacity-40"
+            >
+              Desmarcar todas
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            {categoriasVisibles.map((cat) => (
+              <label
+                key={cat.categoriaId}
+                className="flex items-center gap-1.5 text-micro text-tinta"
+              >
+                <input
+                  type="checkbox"
+                  checked={seleccionadas.has(cat.categoriaId)}
+                  onChange={() => alternarCategoria(cat.categoriaId)}
+                  disabled={guardando}
+                />
+                {cat.etiqueta}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+
+      {error && (
+        <p
+          role="alert"
+          className="rounded-placa border border-riesgo bg-riesgo-placa px-3 py-2 text-micro text-tinta"
+        >
+          {error}
+        </p>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={guardando}
+          className={
+            "inline-flex items-center gap-1.5 rounded-placa px-4 py-2 text-micro font-semibold transition-colors duration-150 ease-out " +
+            (guardando ? "bg-senal/40 text-fondo/70" : "bg-senal text-fondo hover:bg-senal/85")
+          }
+        >
+          {guardando && <Spinner className="size-3.5 shrink-0" />}
+          Guardar asignación
+        </button>
+        <button
+          type="button"
+          onClick={onCancelar}
+          disabled={guardando}
+          className="rounded-placa border border-borde px-4 py-2 text-micro text-tenue hover:text-tinta disabled:opacity-40"
         >
           Cancelar
         </button>
