@@ -82,6 +82,24 @@ describe("crearCategoriaEnSesionImpl (I-9/ADR-07, ADR-21)", () => {
     expect(categoria.get("sucursalesAsignadas")).toEqual([sucursalId]);
   });
 
+  it("con `valor` en el input, crea la categoría y siembra la línea con ese valorUnitario (ADR-23)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const sesionId = await crearSesion(sucursalId);
+    const etiqueta = `Producto ${randomUUID()}`;
+
+    const resultado = await crearCategoriaEnSesionImpl(db, admin, {
+      sesionId,
+      etiqueta,
+      valor: 5000,
+    });
+    registrarCategoria(resultado.categoriaId);
+
+    const categoria = await db.doc(`categoriasValor/${resultado.categoriaId}`).get();
+    expect(categoria.get("valor")).toBe(5000);
+    const linea = await db.doc(`sesiones/${sesionId}/lineas/${resultado.categoriaId}`).get();
+    expect(linea.get("valorUnitario")).toBe(5000);
+  });
+
   it("siembra la línea en la sesión con valorUnitario: 0 y cantidadTotal: 0", async () => {
     const sucursalId = `suc_${randomUUID()}`;
     const sesionId = await crearSesion(sucursalId);

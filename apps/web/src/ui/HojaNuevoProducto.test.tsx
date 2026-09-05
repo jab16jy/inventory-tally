@@ -69,7 +69,39 @@ describe("HojaNuevoProducto (ADR-21, doc 11 §10)", () => {
     fireEvent.click(screen.getByRole("button", { name: /sí, crear/i }));
 
     expect(onCrear).toHaveBeenCalledTimes(1);
-    expect(onCrear).toHaveBeenCalledWith("Bolsas", "area_aseo");
+    expect(onCrear).toHaveBeenCalledWith("Bolsas", "area_aseo", undefined);
+  });
+
+  it('"Sí, crear" llama a onCrear con el precio cuando el cajero lo escribe (D-9, ADR-23)', async () => {
+    const onCrear = vi.fn().mockResolvedValue(undefined);
+    render(
+      <HojaNuevoProducto
+        abierta={true}
+        areas={[crearArea()]}
+        onCrear={onCrear}
+        onVolver={() => {}}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Bolsas" } });
+    fireEvent.change(screen.getByLabelText(/precio/i), { target: { value: "5000" } });
+    fireEvent.change(screen.getByLabelText(/área/i), { target: { value: "area_aseo" } });
+    fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
+    fireEvent.click(screen.getByRole("button", { name: /sí, crear/i }));
+
+    expect(onCrear).toHaveBeenCalledWith("Bolsas", "area_aseo", 5000);
+  });
+
+  it("un precio negativo o decimal NO se envía (D-9): el payload OMITE `valor`", async () => {
+    const onCrear = vi.fn().mockResolvedValue(undefined);
+    render(<HojaNuevoProducto abierta={true} areas={[]} onCrear={onCrear} onVolver={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Bolsas" } });
+    fireEvent.change(screen.getByLabelText(/precio/i), { target: { value: "-5" } });
+    fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
+    fireEvent.click(screen.getByRole("button", { name: /sí, crear/i }));
+
+    expect(onCrear).toHaveBeenCalledWith("Bolsas", undefined, undefined);
   });
 
   it("mientras la escritura está en vuelo muestra el spinner sin ocultar el texto del botón", async () => {

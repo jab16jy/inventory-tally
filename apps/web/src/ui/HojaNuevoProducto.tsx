@@ -1,6 +1,7 @@
 // apps/web/src/ui/HojaNuevoProducto.tsx — ADR-21: el cajero puede dar de
-// alta un producto nuevo dentro de su propia sesión (crearCategoriaEnSesion
-// nunca fija valorUnitario, eso lo hace el admin después).
+// alta un producto nuevo dentro de su propia sesión. El precio es opcional
+// (D-9, ADR-23): si el cajero lo conoce lo escribe; si no, crearCategoriaEnSesion
+// sigue escribiendo `valorUnitario: 0` y el admin lo precia después.
 //
 // <dialog> nativo con DOS VISTAS DENTRO DEL MISMO DIÁLOGO — precedente
 // documentado en Hoja.tsx (F4-A1, confirmación suave de cantidad absurda):
@@ -41,8 +42,19 @@ function mensajeDeError(error: unknown): string {
 export interface HojaNuevoProductoProps {
   readonly abierta: boolean;
   readonly areas: readonly Area[];
-  readonly onCrear: (etiqueta: string, areaId?: string) => Promise<void>;
+  readonly onCrear: (etiqueta: string, areaId?: string, valor?: number) => Promise<void>;
   readonly onVolver: () => void;
+}
+
+/**
+ * valorAEnviar — D-9 (docs/diseno/etapa-3-ui.md): vacío o no numérico ⇒
+ * `undefined`, así que el payload OMITE `valor` y el default `0` sigue
+ * viviendo sólo en el servidor. `/^\d+$/` ya excluye negativos y decimales
+ * sin parseo adicional.
+ */
+function valorAEnviar(precio: string): number | undefined {
+  const texto = precio.trim();
+  return /^\d+$/.test(texto) ? Number(texto) : undefined;
 }
 
 const CAMPO =
@@ -53,10 +65,12 @@ export function HojaNuevoProducto({ abierta, areas, onCrear, onVolver }: HojaNue
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [etiqueta, setEtiqueta] = useState("");
   const [areaId, setAreaId] = useState("");
+  const [precio, setPrecio] = useState("");
   const [confirmando, setConfirmando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const idEtiqueta = useId();
+  const idPrecio = useId();
   const idArea = useId();
 
   useEffect(() => {
@@ -74,6 +88,7 @@ export function HojaNuevoProducto({ abierta, areas, onCrear, onVolver }: HojaNue
     if (abierta) {
       setEtiqueta("");
       setAreaId("");
+      setPrecio("");
       setConfirmando(false);
       setEnviando(false);
       setError(null);
@@ -96,7 +111,7 @@ export function HojaNuevoProducto({ abierta, areas, onCrear, onVolver }: HojaNue
     setEnviando(true);
     setError(null);
     try {
-      await onCrear(etiqueta.trim(), areaId || undefined);
+      await onCrear(etiqueta.trim(), areaId || undefined, valorAEnviar(precio));
       // Sin cerrar aquí: quien nos monta decide (cambia `abierta` a false),
       // igual que Hoja.tsx delega el avance a quien la monta.
     } catch (error) {
@@ -164,6 +179,23 @@ export function HojaNuevoProducto({ abierta, areas, onCrear, onVolver }: HojaNue
               placeholder="p. ej. Bolsas"
               className={CAMPO}
             />
+          </div>
+
+          <div>
+            <label htmlFor={idPrecio} className="mb-1.5 block text-micro text-tenue">
+              Precio (opcional)
+            </label>
+            <input
+              id={idPrecio}
+              inputMode="numeric"
+              value={precio}
+              onChange={(e) => setPrecio(e.target.value)}
+              placeholder="Ej. 5000"
+              className={CAMPO}
+            />
+            <p className="mt-1.5 text-micro text-tenue">
+              Si no lo sabes, déjalo vacío y el administrador lo completa después.
+            </p>
           </div>
 
           <div>

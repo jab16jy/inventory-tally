@@ -1,10 +1,13 @@
 // apps/web/src/ui/primitivos/Deck.tsx
 //
-// El tercio inferior fijo del plan §5: totales de unidades, nunca dinero
-// (I-9 — la separación de datos ni siquiera le da al cliente el
-// valorUnitario agregado), y el botón que lleva a terminar. "Siempre bajo
-// el pulgar": sticky al fondo del contenedor de la pantalla de conteo, no
-// del documento — vive dentro de la misma <section>, no en un portal.
+// El tercio inferior fijo del plan §5: totales de unidades, nunca dinero.
+// Lo que no se muestra aquí es el CONSOLIDADO de sesión que ADR-07 protege
+// (`resumen`, `historicos`, admin-only) — no un veto general al
+// valorUnitario, que I-9 nunca impuso (ver D-7, docs/diseno/etapa-3-ui.md, y
+// ADR-23 §"El cajero no ve dinero por convención de UI, no por seguridad").
+// El botón lleva a terminar. "Siempre bajo el pulgar": sticky al fondo del
+// contenedor de la pantalla de conteo, no del documento — vive dentro de la
+// misma <section>, no en un portal.
 //
 // Deliberadamente "Tu aporte"/"Equipo" sin los dos puntos de la fila
 // ("Tú: N"): ConteoScreen.test.tsx busca /tú: 1/i y /equipo: 1/i, y con

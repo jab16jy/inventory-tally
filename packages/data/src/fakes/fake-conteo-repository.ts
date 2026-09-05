@@ -282,16 +282,19 @@ export class FakeConteoRepository implements ConteoRepository {
     sesionId,
     etiqueta,
     areaId,
+    valor,
   }: CrearCategoriaEnSesionPayload): Promise<{ categoriaId: string }> {
     const categoriaId = `cat_fake_${++this.contadorCategoriaId}`;
     this.llamadas.push({
       metodo: "crearCategoriaEnSesion",
-      payload: { sesionId, etiqueta, areaId },
+      payload: { sesionId, etiqueta, areaId, valor },
     });
 
     const linea: LineaConteo = {
       categoriaId,
-      valorUnitario: 0,
+      // D-9/ADR-23: mismo default que crearCategoriaEnSesionImpl — sin
+      // `valor` explícito, la línea nace en 0 y el admin la precia después.
+      valorUnitario: valor ?? 0,
       etiqueta,
       porArea: {},
       cantidadTotal: 0,

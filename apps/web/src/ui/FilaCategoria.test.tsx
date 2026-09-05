@@ -8,6 +8,7 @@ import { FakeConteoRepository } from "@conteo/data";
 import type { LineaConteo } from "@conteo/shared";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { moneda } from "../lib/formato.js";
 import { ConteoRepositoryProvider } from "../state/repositorio-contexto.js";
 import { FilaCategoria } from "./FilaCategoria.js";
 
@@ -131,5 +132,177 @@ describe("FilaCategoria · desglose de otras áreas (D-4)", () => {
     renderFilaConDesglose(true, { area_activa: 3 });
 
     expect(screen.queryByText(/otras áreas/i)).not.toBeInTheDocument();
+  });
+});
+
+// D-6 (docs/diseno/etapa-3-ui.md): dinero de la línea propia (#85, ADR-23).
+// Comparación EXACTA contra moneda(), nunca un parseo de la etiqueta.
+//
+// moneda() usa un espacio irrompible (U+00A0) entre "$" y la cifra; el
+// normalizador por defecto de Testing Library lo colapsa a un espacio normal
+// al leer el DOM, así que el texto esperado debe pasar por el mismo
+// reemplazo o nunca calzará.
+const sinEspacioIrrompible = (texto: string) => texto.replace(/\u00a0/g, " ");
+
+describe("FilaCategoria · precio unitario y subtotal propios (D-6)", () => {
+  function renderFilaConValor(linea: LineaConteo, miCantidadInicial = 0) {
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarLinea("ses_1", linea);
+    if (miCantidadInicial > 0) {
+      repo.registrarAporte({
+        sesionId: "ses_1",
+        categoriaId: linea.categoriaId,
+        areaId: "area_1",
+        cantidad: miCantidadInicial,
+      });
+    }
+    return render(
+      <ConteoRepositoryProvider repo={repo}>
+        <ul>
+          <FilaCategoria sesionId="ses_1" areaId="area_1" linea={linea} />
+        </ul>
+      </ConteoRepositoryProvider>,
+    );
+  }
+
+  it("NO pinta el precio unitario cuando la etiqueta ya es el precio formateado", () => {
+    const valorUnitario = 5000;
+    renderFilaConValor({
+      categoriaId: "cat_valor",
+      valorUnitario,
+      etiqueta: moneda(valorUnitario),
+      porArea: {},
+      cantidadTotal: 0,
+      numAportantes: 0,
+      versiones: {},
+      actualizadaEn: new Date(),
+      actualizadaPor: "",
+    });
+
+    expect(screen.queryByText(/c\/u/i)).not.toBeInTheDocument();
+  });
+
+  it("fix(RDD R3-001) · NO pinta ni precio unitario ni subtotal cuando valorUnitario es 0 (aún sin precificar), aunque miCantidad > 0", async () => {
+    renderFilaConValor(
+      {
+        categoriaId: "cat_sin_precio",
+        valorUnitario: 0,
+        etiqueta: "Bolsas de basura",
+        porArea: {},
+        cantidadTotal: 2,
+        numAportantes: 1,
+        versiones: {},
+        actualizadaEn: new Date(),
+        actualizadaPor: "",
+      },
+      2,
+    );
+
+    // await a que useMiAporte refleje el aporte sembrado antes de afirmar la
+    // ausencia — si no, el test pasaría igual con la fila aún en cantidad 0.
+    await screen.findByText("Tú: 2");
+    expect(screen.queryByText(/c\/u/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/subtotal/i)).not.toBeInTheDocument();
+  });
+
+  it("SÍ pinta el precio unitario cuando la etiqueta es un nombre de producto (D1)", () => {
+    const valorUnitario = 5000;
+    renderFilaConValor({
+      categoriaId: "cat_nombrado",
+      valorUnitario,
+      etiqueta: "Bolsas de basura",
+      porArea: {},
+      cantidadTotal: 0,
+      numAportantes: 0,
+      versiones: {},
+      actualizadaEn: new Date(),
+      actualizadaPor: "",
+    });
+
+    expect(
+      screen.getByText(sinEspacioIrrompible(`${moneda(valorUnitario)} c/u`)),
+    ).toBeInTheDocument();
+  });
+
+  it("SÍ pinta el subtotal cuando miCantidad > 0, y NO cuando es 0", async () => {
+    const valorUnitario = 5000;
+    renderFilaConValor(
+      {
+        categoriaId: "cat_nombrado",
+        valorUnitario,
+        etiqueta: "Bolsas de basura",
+        porArea: {},
+        cantidadTotal: 3,
+        numAportantes: 1,
+        versiones: {},
+        actualizadaEn: new Date(),
+        actualizadaPor: "",
+      },
+      3,
+    );
+
+    expect(
+      await screen.findByText(sinEspacioIrrompible(`Subtotal ${moneda(3 * valorUnitario)}`)),
+    ).toBeInTheDocument();
+  });
+
+  it("NO pinta el subtotal cuando miCantidad es 0", () => {
+    renderFilaConValor({
+      categoriaId: "cat_nombrado",
+      valorUnitario: 5000,
+      etiqueta: "Bolsas de basura",
+      porArea: {},
+      cantidadTotal: 0,
+      numAportantes: 0,
+      versiones: {},
+      actualizadaEn: new Date(),
+      actualizadaPor: "",
+    });
+
+    expect(screen.queryByText(/subtotal/i)).not.toBeInTheDocument();
+  });
+
+  it("el aria-label de la fila gana ', subtotal …' sólo cuando el subtotal se pinta", async () => {
+    const valorUnitario = 5000;
+    renderFilaConValor(
+      {
+        categoriaId: "cat_nombrado",
+        valorUnitario,
+        etiqueta: "Bolsas de basura",
+        porArea: {},
+        cantidadTotal: 2,
+        numAportantes: 1,
+        versiones: {},
+        actualizadaEn: new Date(),
+        actualizadaPor: "",
+      },
+      2,
+    );
+
+    expect(
+      await screen.findByLabelText(
+        sinEspacioIrrompible(
+          `Valor Bolsas de basura, tu aporte 2, total del equipo 2, subtotal ${moneda(2 * valorUnitario)}`,
+        ),
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("el aria-label NO gana el subtotal cuando miCantidad es 0", () => {
+    renderFilaConValor({
+      categoriaId: "cat_nombrado",
+      valorUnitario: 5000,
+      etiqueta: "Bolsas de basura",
+      porArea: {},
+      cantidadTotal: 0,
+      numAportantes: 0,
+      versiones: {},
+      actualizadaEn: new Date(),
+      actualizadaPor: "",
+    });
+
+    expect(
+      screen.getByLabelText("Valor Bolsas de basura, tu aporte 0, total del equipo 0"),
+    ).toBeInTheDocument();
   });
 });
