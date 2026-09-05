@@ -66,4 +66,15 @@ describe("lineaSembrada (I-7, ADR-23)", () => {
     });
     expect(linea).not.toHaveProperty("areaIds");
   });
+
+  it("no expone areaIds cuando la categoría trae un arreglo vacío explícito (D-1, sin área)", () => {
+    const linea = lineaSembrada({
+      categoriaId: "cat_1",
+      valorUnitario: 5000,
+      etiqueta: "$5.000",
+      actualizadaPor: "uid_admin",
+      areaIds: [],
+    });
+    expect(linea).not.toHaveProperty("areaIds");
+  });
 });

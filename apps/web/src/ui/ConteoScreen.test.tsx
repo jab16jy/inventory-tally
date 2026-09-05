@@ -210,6 +210,42 @@ describe("ConteoScreen (doc 11 §4)", () => {
     expect(screen.getByRole("button", { name: /sumar \$3\.000/i })).toBeInTheDocument();
   });
 
+  // Gemelo del test D-1 en linea-sembrada.test.ts: `areaIds: []` explícito
+  // debe tratarse igual que el campo ausente ("sin área"), visible por
+  // defecto sin necesidad de "Ver todo".
+  it("D-2: 'areaIds: []' explícito se trata igual que 'sin área' (campo ausente)", async () => {
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarLinea("ses_1", {
+      categoriaId: "cat_bodega",
+      valorUnitario: 1000,
+      etiqueta: "$1.000",
+      areaIds: ["area_bodega"],
+      porArea: {},
+      cantidadTotal: 0,
+      numAportantes: 0,
+      versiones: {},
+      actualizadaEn: new Date(),
+      actualizadaPor: "",
+    });
+    repo.sembrarLinea("ses_1", {
+      categoriaId: "cat_sin_area_explicito",
+      valorUnitario: 3000,
+      etiqueta: "$3.000",
+      areaIds: [],
+      porArea: {},
+      cantidadTotal: 0,
+      numAportantes: 0,
+      versiones: {},
+      actualizadaEn: new Date(),
+      actualizadaPor: "",
+    });
+
+    renderConteoScreen(repo, "ses_1", vi.fn(), "area_bodega");
+
+    expect(await screen.findByRole("button", { name: /sumar \$1\.000/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /sumar \$3\.000/i })).toBeInTheDocument();
+  });
+
   it("D-5: muestra el área activa en la cabecera, resuelta a su nombre", async () => {
     const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
     repo.sembrarArea({ areaId: "area_1", nombre: "Bodega", activa: true, creadaEn: new Date() });
