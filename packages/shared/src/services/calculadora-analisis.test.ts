@@ -294,6 +294,34 @@ describe("agruparPorDimension", () => {
     expect(filaB?.valor).toBe(20);
   });
 
+  it("consolida aportes de un mismo cajero con claves compuestas en distintas áreas y resuelve su nombre por uid", () => {
+    const linea = crearLineaAgrupable({
+      cantidadTotal: 10,
+      valorUnitario: 10,
+      aplicados: { "uidA__area1": 8, "uidA__area2": 2 },
+    });
+    const nombres = new Map([["uidA", "Ana Ramírez"]]);
+    const filas = agruparPorDimension([linea], "cajero", nombres);
+
+    expect(filas).toEqual([
+      { clave: "uidA", etiqueta: "Ana Ramírez", unidades: 10, valor: 100 },
+    ]);
+  });
+
+  it("mantiene compatibilidad con claves simples de cajero (sin sufijo de área)", () => {
+    const linea = crearLineaAgrupable({
+      cantidadTotal: 5,
+      valorUnitario: 10,
+      aplicados: { uidB: 5 },
+    });
+    const nombres = new Map([["uidB", "Carlos Gómez"]]);
+    const filas = agruparPorDimension([linea], "cajero", nombres);
+
+    expect(filas).toEqual([
+      { clave: "uidB", etiqueta: "Carlos Gómez", unidades: 5, valor: 50 },
+    ]);
+  });
+
   it("un uid sin entrada en nombres cae al propio uid, nunca a cadena vacía", () => {
     const linea = crearLineaAgrupable({ cantidadTotal: 3, aplicados: { "uid-sin-nombre": 3 } });
     const filas = agruparPorDimension([linea], "cajero", new Map([["otro-uid", "Otro"]]));
