@@ -33,6 +33,10 @@ interface FilaCategoriaProps {
   readonly onSeleccionar?: (categoriaId: string) => void;
   /** Reporta el aporte propio actual, para el total del Deck. */
   readonly onCantidadPropiaCambio?: (categoriaId: string, cantidad: number) => void;
+  /** Modo "ver todo" de ConteoScreen (D-3/D-4, docs/diseno/etapa-3-ui.md):
+   *  activa el desglose "Otras áreas: N" de abajo. No se suscribe nada
+   *  nuevo — `porArea` ya viaja en `linea`. */
+  readonly mostrarOtrasAreas?: boolean;
 }
 
 function FilaCategoriaBase({
@@ -41,11 +45,19 @@ function FilaCategoriaBase({
   linea,
   onSeleccionar,
   onCantidadPropiaCambio,
+  mostrarOtrasAreas,
 }: FilaCategoriaProps) {
   const repo = useConteoRepository();
   const miAporte = useMiAporte(sesionId, linea.categoriaId, areaId);
   const miCantidad = miAporte?.cantidad ?? 0;
   const confirmado = aporteConfirmado(linea, miAporte);
+  // D-4: desglose "Otras áreas", nunca una fila por (categoría, área) — ver
+  // la enmienda del issue #84 y DESIGN.md §Don'ts (suscripción de
+  // useMiAporte aislada por fila).
+  const otrasAreas = Object.entries(linea.porArea).reduce(
+    (total, [area, cantidad]) => (area === areaId ? total : total + cantidad),
+    0,
+  );
 
   useEffect(() => {
     onCantidadPropiaCambio?.(linea.categoriaId, miCantidad);
@@ -98,6 +110,7 @@ function FilaCategoriaBase({
             <span className="mt-1 flex gap-3 text-micro text-tenue">
               <span>Tú: {miAporte ? miCantidad : "—"}</span>
               <span>Equipo: {linea.cantidadTotal}</span>
+              {mostrarOtrasAreas && otrasAreas > 0 && <span>Otras áreas: {otrasAreas}</span>}
               {/* La regla de tinta dice esto mismo en color, y el color no
                   llega a un lector de pantalla. Visualmente sobra —repetir
                   "Guardado" en 60 filas es ruido— así que va sólo para

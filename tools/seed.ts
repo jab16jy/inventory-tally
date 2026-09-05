@@ -23,6 +23,7 @@ const auth = getAuth();
 const db = getFirestore();
 
 const SUCURSAL_ID = "suc_norte";
+const AREA_ID = "area_general";
 const NUM_CATEGORIAS = 60;
 const PASSWORD_TEMPORAL = "Temp2026#";
 // Id fijo (no randomUUID, a diferencia de abrirSesionImpl/abrir-conteo.ts):
@@ -53,6 +54,21 @@ async function crearUsuario(
     creadoPor: "seed",
   });
   return usuario.uid;
+}
+
+/**
+ * sembrarArea — desde D-1/PrepararScreen (docs/diseno/etapa-3-ui.md, ADR-23)
+ * el área activa es obligatoria para entrar a contar: sin al menos un
+ * documento en `areas`, `flujo-conteo.spec.ts` se queda bloqueado en "No hay
+ * áreas configuradas todavía". Una sola área basta para este E2E — no
+ * ejercita el filtro D-2 (eso lo cubren los tests de `apps/web`).
+ */
+async function sembrarArea(): Promise<void> {
+  await db.doc(`areas/${AREA_ID}`).set({
+    nombre: "General",
+    activa: true,
+    creadaEn: FieldValue.serverTimestamp(),
+  });
 }
 
 async function sembrarSucursal(): Promise<void> {
@@ -105,10 +121,13 @@ async function sembrarSesionAbierta(anaUid: string): Promise<void> {
     actualizadoEn: FieldValue.serverTimestamp(),
   });
 
-  // ponytail: sin colección `areas` sembrada (no la pide ningún E2E de esta
-  // ola) — "General" fija en vez de sacarla de `nombresPorArea` como hace
-  // abrirSesionImpl. Ruta de escalamiento: sembrar `areas` el día que un test
-  // necesite el selector de área de ConteoScreen (sólo aparece con 2+ áreas).
+  // ponytail: las 60 líneas se siembran sin `areaIds` (D-1,
+  // docs/diseno/etapa-3-ui.md) — "sin área", visibles para cualquier área
+  // activa (D-2). Con una sola área sembrada (sembrarArea) el interruptor
+  // "Ver todo" nunca se pinta aquí (no oculta nada); ese camino lo cubren los
+  // tests de `apps/web`, no este E2E. Ruta de escalamiento: asignar
+  // `areaIds` a un subconjunto de líneas el día que un E2E necesite
+  // ejercitar el filtro D-2/D-3.
   const lote = db.batch();
   for (let i = 1; i <= NUM_CATEGORIAS; i++) {
     const valor = i * 500;
@@ -144,6 +163,7 @@ async function sembrarCategorias(): Promise<void> {
 
 async function sembrar(): Promise<void> {
   await sembrarSucursal();
+  await sembrarArea();
   await crearUsuario("Admin Principal", "admin@negocio.com", "admin", []);
   const anaUid = await crearUsuario("Ana Ramírez", "ana@negocio.com", "cajero", [SUCURSAL_ID]);
   await crearUsuario("Luis Pérez", "luis@negocio.com", "cajero", [SUCURSAL_ID]);
@@ -151,8 +171,8 @@ async function sembrar(): Promise<void> {
   await sembrarSesionAbierta(anaUid);
 
   console.log(
-    `Seed completo: 1 sucursal (${SUCURSAL_ID}), 1 admin, 2 cajeros, ${NUM_CATEGORIAS} categoriasValor, ` +
-      `1 sesión abierta (${SESION_ID}).`,
+    `Seed completo: 1 sucursal (${SUCURSAL_ID}), 1 área (${AREA_ID}), 1 admin, 2 cajeros, ` +
+      `${NUM_CATEGORIAS} categoriasValor, 1 sesión abierta (${SESION_ID}).`,
   );
 }
 
