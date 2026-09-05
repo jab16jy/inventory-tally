@@ -543,8 +543,14 @@ describe("AnalisisScreen (rediseño)", () => {
   it("dimensión Área suma varias líneas que comparten área en una sola fila", async () => {
     const repo = new FakeAdminRepository();
     repo.sembrarSesion(sesionBase());
-    repo.sembrarLinea("ses_1", lineaBase("cat_a", 2000, 100, { porArea: { Bodega: 100 } })); // 200.000
-    repo.sembrarLinea("ses_1", lineaBase("cat_b", 3000, 50, { porArea: { Bodega: 50 } })); // 150.000
+    repo.sembrarArea({
+      areaId: "area_bodega",
+      nombre: "Bodega",
+      activa: true,
+      creadaEn: new Date(),
+    });
+    repo.sembrarLinea("ses_1", lineaBase("cat_a", 2000, 100, { porArea: { area_bodega: 100 } })); // 200.000
+    repo.sembrarLinea("ses_1", lineaBase("cat_b", 3000, 50, { porArea: { area_bodega: 50 } })); // 150.000
     repo.sembrarSincronizacion("ses_1", todosSincronizados());
 
     renderPantalla(repo);
@@ -559,8 +565,14 @@ describe("AnalisisScreen (rediseño)", () => {
     const repo = new FakeAdminRepository();
     repo.sembrarSesion(sesionBase());
     repo.sembrarUsuario(usuarioBase({ uid: "uid_ana", nombre: "Ana Ramírez" }));
-    repo.sembrarLinea("ses_1", lineaBase("cat_a", 2000, 10, { aplicados: { uid_ana: 10 } })); // 20.000
-    repo.sembrarLinea("ses_1", lineaBase("cat_b", 3000, 5, { aplicados: { uid_ana: 5 } })); // 15.000
+    repo.sembrarLinea(
+      "ses_1",
+      lineaBase("cat_a", 2000, 10, { aplicados: { uid_ana__area_1: 10 } }),
+    ); // 20.000
+    repo.sembrarLinea(
+      "ses_1",
+      lineaBase("cat_b", 3000, 5, { aplicados: { uid_ana__area_2: 5 } }),
+    ); // 15.000
     repo.sembrarSincronizacion("ses_1", todosSincronizados());
 
     renderPantalla(repo);

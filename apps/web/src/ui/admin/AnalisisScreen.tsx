@@ -16,6 +16,7 @@
 // un cron refresca y puede quedar `dirty` indefinidamente.
 import { useEffect, useId, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import type { Area } from "@conteo/shared/models/area.js";
 import type { Historico } from "@conteo/shared/models/historico.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
@@ -88,6 +89,14 @@ function useUsuarios(): ReadonlyMap<string, string> {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   useEffect(() => repo.observarUsuarios(setUsuarios), [repo]);
   return useMemo(() => new Map(usuarios.map((u) => [u.uid, u.nombre])), [usuarios]);
+}
+
+/** Nombres por areaId para la dimensión "area" de la tabla. */
+function useAreas(): ReadonlyMap<string, string> {
+  const repo = useAdminRepository();
+  const [areas, setAreas] = useState<Area[]>([]);
+  useEffect(() => repo.observarAreas(setAreas), [repo]);
+  return useMemo(() => new Map(areas.map((a) => [a.areaId, a.nombre])), [areas]);
 }
 
 /** Serie para "Valor contado por cierre" (doc 10 §5-6): consulta puntual, no
@@ -252,6 +261,7 @@ export function AnalisisScreen() {
   const hayReconciliacion = useHayReconciliacion(sesionId);
   const historicos = useHistoricosRecientes(sesion?.sucursalId ?? "");
   const nombresPorUid = useUsuarios();
+  const nombresPorArea = useAreas();
 
   const [dimension, setDimension] = useState<DimensionAnalisis>("categoria");
   const [compararActivo, setCompararActivo] = useState(true);
@@ -316,7 +326,9 @@ export function AnalisisScreen() {
   // % salen de `distribuirRedondeo` sobre el `valor` de TODAS las filas —
   // nunca se suman los floats resultantes contra 100, el invariante vive en
   // las décimas enteras (ver doc-comment de la función).
-  const base = agruparPorDimension(lineas, dimension, nombresPorUid);
+  const nombres =
+    dimension === "cajero" ? nombresPorUid : dimension === "area" ? nombresPorArea : undefined;
+  const base = agruparPorDimension(lineas, dimension, nombres);
   const pcts = distribuirRedondeo(base.map((f) => f.valor));
   const filas: FilaConPct[] = base.map((f, i) => ({ ...f, pct: pcts[i]! }));
   const filaTotal: FilaConPct = {

@@ -187,11 +187,11 @@ describe("AnalisisConteoScreen", () => {
     repo.sembrarSesion(crearSesion());
     repo.sembrarLinea(
       "ses_1",
-      crearLinea({ categoriaId: "c1", cantidadTotal: 4, aplicados: { uid_ana: 4 } }),
+      crearLinea({ categoriaId: "c1", cantidadTotal: 4, aplicados: { uid_ana__area_1: 4 } }),
     );
     repo.sembrarLinea(
       "ses_1",
-      crearLinea({ categoriaId: "c2", cantidadTotal: 6, aplicados: { uid_luis: 6 } }),
+      crearLinea({ categoriaId: "c2", cantidadTotal: 6, aplicados: { uid_luis__area_1: 6 } }),
     );
 
     const { container } = renderPantalla(repo);
