@@ -116,7 +116,10 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
 
   const [busqueda, setBusqueda] = useState("");
   const [soloPendientes, setSoloPendientes] = useState(false);
-  const [areaFiltro, setAreaFiltro] = useState("");
+  // D-3 (docs/diseno/etapa-3-ui.md): interruptor "Ver todo", no un <select>
+  // — con el área activa obligatoria ya no hay una dimensión libre que
+  // elegir, sólo "lo mío" y "todo".
+  const [verTodo, setVerTodo] = useState(false);
   const [categoriaEnEdicion, setCategoriaEnEdicion] = useState<string | null>(null);
   const [nuevoProductoAbierta, setNuevoProductoAbierta] = useState(false);
   const [areasActivas] = useAreasActivas(repo);
@@ -201,17 +204,25 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
       ? "pendiente"
       : "sincronizado";
 
-  // Opciones del selector: cero lecturas nuevas, salen de `lineas` ya
-  // suscritas. ponytail: filtro de VISTA únicamente — `contadas`/`total`
-  // de arriba (BarraProgreso, progreso del EQUIPO, doc 10 §2) y
-  // `siguientePendiente` (línea ~150) siguen leyendo `lineas` completas,
-  // nunca `lineasVisibles`; este filtro no los toca.
-  const areas = [...new Set(lineas.flatMap((l) => Object.keys(l.porArea ?? {})))].sort();
+  // D-2 (docs/diseno/etapa-3-ui.md): "mi área" son las líneas cuyo `areaIds`
+  // incluye la activa, MÁS las que no tienen área asignada — "sin área"
+  // avisa, nunca bloquea (grilling Q, ADR-23), así que esconderla la
+  // volvería invisible para todos los contadores a la vez. `areaIds` sale
+  // de la línea (denormalizado al sembrar, D-1): cero lecturas nuevas.
+  // ponytail: filtro de VISTA únicamente — `contadas`/`total` de arriba
+  // (BarraProgreso, progreso del EQUIPO, doc 10 §2) y `siguientePendiente`
+  // (línea ~150) siguen leyendo `lineas` completas, nunca `lineasVisibles`;
+  // este filtro no los toca.
+  const lineasDeMiArea = lineas.filter(
+    (linea) => !linea.areaIds || linea.areaIds.length === 0 || linea.areaIds.includes(areaActiva),
+  );
+  // Guarda de visibilidad del interruptor (D-3): sólo se pinta si de verdad
+  // hay algo que ocultar.
+  const mostrarInterruptorVerTodo = lineasDeMiArea.length < lineas.length;
 
   const consulta = busqueda.trim().toLowerCase();
   const soloDigitos = consulta.replace(/\D/g, "");
-  const lineasVisibles = lineas.filter((linea) => {
-    if (areaFiltro && !(linea.porArea && linea.porArea[areaFiltro])) return false;
+  const lineasVisibles = (verTodo ? lineas : lineasDeMiArea).filter((linea) => {
     if (soloPendientes && !estaPendiente(linea, uid, areaActiva)) return false;
     if (!consulta) return true;
     return (
@@ -219,6 +230,11 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
       (soloDigitos !== "" && String(linea.valorUnitario).includes(soloDigitos))
     );
   });
+  // D-5: nombre resuelto contra `useAreasActivas` (ya consumido más arriba
+  // para "+ Producto"); fallback al id crudo si no resuelve — sin aviso,
+  // PrepararScreen ya redirige y explica cuando falta área (ver el efecto
+  // de arriba).
+  const nombreAreaActiva = areasActivas.find((a) => a.areaId === areaActiva)?.nombre ?? areaActiva;
 
   return (
     <section className="mx-auto flex min-h-dvh max-w-md flex-col px-3 pt-3">
@@ -278,42 +294,43 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
           <BotonSalir onSalir={onSalir} />
         </div>
 
-        {/* Fila propia: no cabe apretada junto a búsqueda+Pendientes+Salir
-            sin bajar del objetivo táctil mínimo (--size-toque). Con menos de
-            dos áreas el selector no filtraría nada, pero "+ Producto"
-            (ADR-21) no depende del número de áreas, sólo de que la sesión
-            siga abierta. */}
-        {(areas.length > 1 || !sesionCerrada) && (
-          <div className="flex items-center gap-2">
-            {areas.length > 1 && (
-              <label className="relative min-w-0 flex-1">
-                <span className="sr-only">Filtrar por área</span>
-                <select
-                  value={areaFiltro}
-                  onChange={(e) => setAreaFiltro(e.target.value)}
-                  className="min-h-[var(--size-toque)] w-full rounded-placa border border-borde bg-fondo px-3 text-tinta focus:border-senal focus:outline-none"
-                >
-                  <option value="">Todas las áreas</option>
-                  {areas.map((area) => (
-                    <option key={area} value={area}>
-                      {area}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
+        {/* Fila propia (D-5/D-3, docs/diseno/etapa-3-ui.md): no cabe
+            apretada junto a búsqueda+Pendientes+Salir sin bajar del objetivo
+            táctil mínimo (--size-toque). El área activa vive aquí SIEMPRE
+            (nunca escondida en un dropdown); el interruptor "Ver todo" sólo
+            cuando de verdad oculta algo; "+ Producto" (ADR-21) no depende
+            del número de áreas, sólo de que la sesión siga abierta. */}
+        <div className="flex items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-micro">
+            <span className="text-tenue">Área: </span>
+            <span className="text-tinta">{nombreAreaActiva}</span>
+          </span>
 
-            {!sesionCerrada && (
-              <button
-                type="button"
-                onClick={() => setNuevoProductoAbierta(true)}
-                className="min-h-[var(--size-toque)] shrink-0 rounded-placa border border-borde px-3 text-micro font-semibold text-tenue"
-              >
-                + Producto
-              </button>
-            )}
-          </div>
-        )}
+          {mostrarInterruptorVerTodo && (
+            <button
+              type="button"
+              aria-pressed={verTodo}
+              onClick={() => setVerTodo((v) => !v)}
+              className={
+                "flex min-h-[var(--size-toque)] shrink-0 items-center gap-1.5 rounded-placa border px-3 text-micro font-semibold " +
+                (verTodo ? "border-senal text-senal" : "border-borde text-tenue")
+              }
+            >
+              <Icono nombre="filtro" className="size-4" />
+              Ver todo
+            </button>
+          )}
+
+          {!sesionCerrada && (
+            <button
+              type="button"
+              onClick={() => setNuevoProductoAbierta(true)}
+              className="min-h-[var(--size-toque)] shrink-0 rounded-placa border border-borde px-3 text-micro font-semibold text-tenue"
+            >
+              + Producto
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Con la sesión cerrada NO se montan las filas. Los +/- que escriben
@@ -347,6 +364,23 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
             </li>
           ))}
         </ul>
+      ) : !sesionCerrada && !verTodo && lineasDeMiArea.length === 0 && lineas.length > 0 ? (
+        // Aviso de área vacía (docs/diseno/etapa-3-ui.md §3.1): el modo de
+        // fallo que #84 nombra — si el admin llenó mal `areaIds`, hay
+        // producto físicamente presente que no aparece. role="status", NUNCA
+        // "alert": no es un error, es una vista vacía recuperable, y
+        // DESIGN.md §Don'ts sólo permite un role="alert" a la vez (lo tiene
+        // BannerPendientes).
+        //
+        // Se compara contra `lineasDeMiArea` (antes de búsqueda/"sólo
+        // pendientes"), no contra `lineasVisibles`: si el área SÍ tiene
+        // categorías pero una búsqueda o el filtro de pendientes vació la
+        // lista, el diagnóstico correcto es "no hay resultados", no "tu área
+        // está vacía" — y "Ver todo" no arregla una búsqueda obsoleta.
+        <p role="status" className="mt-5 text-base text-tenue">
+          No hay categorías asignadas a tu área. Usa &quot;Ver todo&quot; para ver el catálogo
+          completo.
+        </p>
       ) : (
         <ul className="mt-1 flex flex-1 flex-col gap-2 overflow-y-auto pb-4">
           {(sesionCerrada ? [] : lineasVisibles).map((linea) => (
@@ -357,6 +391,7 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
               linea={linea}
               onSeleccionar={abrirHoja}
               onCantidadPropiaCambio={manejarCantidadPropia}
+              mostrarOtrasAreas={verTodo}
             />
           ))}
         </ul>

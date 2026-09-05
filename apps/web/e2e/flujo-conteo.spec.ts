@@ -28,6 +28,10 @@ test.describe("flujo de conteo del cajero", () => {
     await page.getByRole("button", { name: /Sucursal Norte/ }).click();
 
     await expect(page).toHaveURL(/\/conteo\/.+\/preparar$/);
+    // ADR-23/D-1 (docs/diseno/etapa-3-ui.md): área activa obligatoria — el
+    // ticket #84 lo rompe porque "Empezar a contar" queda deshabilitado
+    // hasta elegir una. `tools/seed.ts` siembra una sola área ("General").
+    await page.getByLabel("Tu área").selectOption({ label: "General" });
     await page.getByRole("button", { name: "Empezar a contar" }).click();
 
     await expect(page).toHaveURL(/\/conteo\/[^/]+$/);
