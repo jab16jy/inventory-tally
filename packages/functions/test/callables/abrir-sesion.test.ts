@@ -151,6 +151,23 @@ describe("abrirSesionImpl", () => {
     expect(linea.exists).toBe(true);
   });
 
+  it("D-1 · siembra la línea con las areaIds de la categoría (docs/diseno/etapa-3-ui.md)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const catConAreaId = `cat_${randomUUID()}`;
+    const catSinAreaId = `cat_${randomUUID()}`;
+    await crearSucursal(sucursalId);
+    await crearCategoria(catConAreaId, 5000, true, undefined, ["area_bodega"]);
+    await crearCategoria(catSinAreaId, 7000, true, undefined, undefined);
+
+    const { sesionId } = await abrirSesionImpl(db, "uid_admin", { sucursalId });
+
+    const lineaConArea = await db.doc(`sesiones/${sesionId}/lineas/${catConAreaId}`).get();
+    expect(lineaConArea.get("areaIds")).toEqual(["area_bodega"]);
+
+    const lineaSinArea = await db.doc(`sesiones/${sesionId}/lineas/${catSinAreaId}`).get();
+    expect(lineaSinArea.data()).not.toHaveProperty("areaIds");
+  });
+
   it("D4/D6 · siembra una categoría con sucursalesAsignadas sólo en las sucursales incluidas", async () => {
     const sucursalDentro = `suc_${randomUUID()}`;
     const sucursalFuera = `suc_${randomUUID()}`;

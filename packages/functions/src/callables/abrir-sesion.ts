@@ -54,6 +54,9 @@ async function sembrarLineas(
           valorUnitario: categoria.get("valor"),
           etiqueta: categoria.get("etiqueta"),
           actualizadaPor: ejecutadoPor,
+          // D-1 (docs/diseno/etapa-3-ui.md): ya se leyó el documento completo
+          // arriba para `sucursalesAsignadas` — `areaIds` sale gratis.
+          areaIds: categoria.get("areaIds") as readonly string[] | undefined,
         }),
       );
     }

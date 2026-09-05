@@ -299,6 +299,9 @@ export class FakeConteoRepository implements ConteoRepository {
       versiones: {},
       actualizadaEn: new Date(),
       actualizadaPor: this.usuario.uid,
+      // Mismo criterio que crearCategoriaEnSesionImpl (D-1): la línea copia
+      // areaIds del área elegida, ausente si no se eligió ninguna.
+      ...(areaId && { areaIds: [areaId] }),
     };
     const lineas = this.lineasDeSesion(sesionId);
     lineas.set(categoriaId, linea);

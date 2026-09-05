@@ -111,6 +111,39 @@ describe("lineaConteoDesdeDoc (doc 04 §3)", () => {
 
     expect(linea.aplicados).toBeUndefined();
   });
+
+  it("mapea areaIds cuando el doc lo trae (D-1, docs/diseno/etapa-3-ui.md)", () => {
+    const actualizadaEn = Timestamp.fromDate(new Date("2026-08-02T09:14:33Z"));
+    const linea = lineaConteoDesdeDoc("cat_5000", {
+      valorUnitario: 5000,
+      etiqueta: "$5.000",
+      porArea: {},
+      cantidadTotal: 0,
+      numAportantes: 0,
+      versiones: {},
+      actualizadaEn,
+      actualizadaPor: "uid_admin",
+      areaIds: ["area_bodega"],
+    });
+
+    expect(linea.areaIds).toEqual(["area_bodega"]);
+  });
+
+  it("deja areaIds en undefined cuando el doc no lo trae (sin área, D-2)", () => {
+    const actualizadaEn = Timestamp.fromDate(new Date("2026-08-02T09:14:33Z"));
+    const linea = lineaConteoDesdeDoc("cat_5000", {
+      valorUnitario: 5000,
+      etiqueta: "$5.000",
+      porArea: {},
+      cantidadTotal: 0,
+      numAportantes: 0,
+      versiones: {},
+      actualizadaEn,
+      actualizadaPor: "uid_admin",
+    });
+
+    expect(linea.areaIds).toBeUndefined();
+  });
 });
 
 describe("sesionConteoDesdeDoc (doc 04 §3)", () => {

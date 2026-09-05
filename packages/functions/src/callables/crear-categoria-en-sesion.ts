@@ -72,6 +72,9 @@ export async function crearCategoriaEnSesionImpl(
         valorUnitario: 0,
         etiqueta,
         actualizadaPor: auth.uid,
+        // D-1 (docs/diseno/etapa-3-ui.md): misma areaIds que se acaba de
+        // escribir en la categoría, arriba.
+        areaIds: areaId ? [areaId] : undefined,
       }),
     );
 

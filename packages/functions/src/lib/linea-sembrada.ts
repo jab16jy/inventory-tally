@@ -9,6 +9,10 @@ export function lineaSembrada(input: {
   valorUnitario: number;
   etiqueta: string;
   actualizadaPor: string;
+  /** `CategoriaValor.areaIds` (D-1, docs/diseno/etapa-3-ui.md) — copiado y
+   *  congelado igual que `valorUnitario`. Ausente o vacío omite el campo:
+   *  significa "sin área", el mismo default que ya rige en `CategoriaValor`. */
+  areaIds?: readonly string[];
 }): DocumentData {
   return {
     categoriaId: input.categoriaId,
@@ -20,5 +24,6 @@ export function lineaSembrada(input: {
     versiones: {},
     actualizadaEn: FieldValue.serverTimestamp(),
     actualizadaPor: input.actualizadaPor,
+    ...(input.areaIds && input.areaIds.length > 0 && { areaIds: input.areaIds }),
   };
 }

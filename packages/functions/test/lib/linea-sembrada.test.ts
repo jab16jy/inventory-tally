@@ -45,4 +45,25 @@ describe("lineaSembrada (I-7, ADR-23)", () => {
     expect(linea).not.toHaveProperty("area");
     expect(linea).not.toHaveProperty("areaFijaPorAdmin");
   });
+
+  it("copia areaIds cuando la categoría trae áreas asignadas (D-1)", () => {
+    const linea = lineaSembrada({
+      categoriaId: "cat_1",
+      valorUnitario: 5000,
+      etiqueta: "$5.000",
+      actualizadaPor: "uid_admin",
+      areaIds: ["area_bodega", "area_anaqueles"],
+    });
+    expect(linea.areaIds).toEqual(["area_bodega", "area_anaqueles"]);
+  });
+
+  it("no expone areaIds cuando la categoría no trae áreas asignadas (D-1, sin área)", () => {
+    const linea = lineaSembrada({
+      categoriaId: "cat_1",
+      valorUnitario: 5000,
+      etiqueta: "$5.000",
+      actualizadaPor: "uid_admin",
+    });
+    expect(linea).not.toHaveProperty("areaIds");
+  });
 });
