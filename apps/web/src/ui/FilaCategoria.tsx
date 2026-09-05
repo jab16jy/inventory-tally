@@ -15,7 +15,8 @@
 // una segunda suscripción por categoría (doc 10 §2, "cero lecturas
 // adicionales" — aquí, cero suscripciones adicionales).
 import { memo, useEffect } from "react";
-import { aporteConfirmado, type LineaConteo } from "@conteo/shared";
+import { aporteConfirmado, subtotal, type LineaConteo } from "@conteo/shared";
+import { moneda } from "../lib/formato.js";
 import { useConteoRepository } from "../state/repositorio-contexto.js";
 import { useMiAporte } from "../state/useMiAporte.js";
 import { BotonPaso } from "./primitivos/BotonPaso.js";
@@ -59,6 +60,27 @@ function FilaCategoriaBase({
     0,
   );
 
+  // D-6 (docs/diseno/etapa-3-ui.md): el precio unitario sólo se pinta cuando
+  // la etiqueta NO es ya el precio formateado — para una categoría de valor
+  // (etiqueta "$5.000") repetirlo es ruido; para un "producto nombrado"
+  // (ticket #39) es información nueva. Comparación EXACTA contra moneda(),
+  // nunca un parseo. subtotal() se reusa con miCantidad en vez de
+  // cantidadTotal: es la misma multiplicación pura de calculadora.ts.
+  //
+  // fix(RDD R3-001): `valorUnitario === 0` NO es "el precio real es cero" —
+  // es el default de "el admin todavía no lo precia" (D-9/ADR-23, un
+  // producto nombrado nace con valor 0 si el cajero no lo escribió). Sin
+  // esta guarda, "$0 c/u" y "Subtotal $0" son dinero FABRICADO, justo lo que
+  // I-9 nunca permitió. `> 0` en ambas, no sólo en el precio unitario: un
+  // subtotal calculado sobre un precio inexistente es la misma mentira.
+  const tienePrecioReal = linea.valorUnitario > 0;
+  const mostrarPrecioUnitario = tienePrecioReal && moneda(linea.valorUnitario) !== linea.etiqueta;
+  const mostrarSubtotal = tienePrecioReal && miCantidad > 0;
+  const subtotalPropio = subtotal({
+    cantidadTotal: miCantidad,
+    valorUnitario: linea.valorUnitario,
+  });
+
   useEffect(() => {
     onCantidadPropiaCambio?.(linea.categoriaId, miCantidad);
   }, [linea.categoriaId, miCantidad, onCantidadPropiaCambio]);
@@ -74,7 +96,10 @@ function FilaCategoriaBase({
 
   return (
     <li
-      aria-label={`Valor ${linea.etiqueta}, tu aporte ${miCantidad}, total del equipo ${linea.cantidadTotal}`}
+      aria-label={
+        `Valor ${linea.etiqueta}, tu aporte ${miCantidad}, total del equipo ${linea.cantidadTotal}` +
+        (mostrarSubtotal ? `, subtotal ${moneda(subtotalPropio)}` : "")
+      }
       // Virtualización nativa (decisión del plan §3): el navegador se salta
       // el layout de las filas fuera de pantalla y `contain-intrinsic-size`
       // le da la altura que debe reservar para que la barra de scroll no
@@ -110,6 +135,10 @@ function FilaCategoriaBase({
             <span className="mt-1 flex gap-3 text-micro text-tenue">
               <span>Tú: {miAporte ? miCantidad : "—"}</span>
               <span>Equipo: {linea.cantidadTotal}</span>
+              {mostrarPrecioUnitario && <span>{moneda(linea.valorUnitario)} c/u</span>}
+              {mostrarSubtotal && (
+                <span className="text-tinta">Subtotal {moneda(subtotalPropio)}</span>
+              )}
               {mostrarOtrasAreas && otrasAreas > 0 && <span>Otras áreas: {otrasAreas}</span>}
               {/* La regla de tinta dice esto mismo en color, y el color no
                   llega a un lector de pantalla. Visualmente sobra —repetir

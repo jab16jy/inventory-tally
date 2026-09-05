@@ -1,5 +1,6 @@
 // apps/web/src/ui/ConteoScreen.tsx (doc 11 §4) — la pantalla crítica del
-// sistema: sin importes, sólo unidades (I-9).
+// sistema. El cajero ve precio y subtotal de SU propia línea (D-6, ADR-23);
+// lo que sigue fuera es el consolidado de sesión que ADR-07 protege.
 //
 // F2 (plan §7) completa la cabecera (progreso + ChipEstado), la búsqueda,
 // el filtro "sólo pendientes" (doc 10 §2, "la función más útil del
@@ -189,8 +190,8 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
   // Cierra la Hoja sólo tras confirmar la escritura (no en un `finally`):
   // si `crearCategoriaEnSesion` rechaza, HojaNuevoProducto se queda abierta
   // mostrando el error y el nombre tecleado sigue ahí para reintentar.
-  async function crearProducto(etiqueta: string, areaId?: string): Promise<void> {
-    await repo.crearCategoriaEnSesion({ sesionId, etiqueta, areaId });
+  async function crearProducto(etiqueta: string, areaId?: string, valor?: number): Promise<void> {
+    await repo.crearCategoriaEnSesion({ sesionId, etiqueta, areaId, valor });
     setNuevoProductoAbierta(false);
   }
 

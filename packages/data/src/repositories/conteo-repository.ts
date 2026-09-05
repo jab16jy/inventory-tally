@@ -34,6 +34,9 @@ export interface CrearCategoriaEnSesionPayload {
   readonly sesionId: string;
   readonly etiqueta: string;
   readonly areaId?: string;
+  /** Precio opcional que el cajero conoce al crear el producto (D-9, ADR-23).
+   *  Sin él, el servidor sigue escribiendo `valor: 0`. */
+  readonly valor?: number;
 }
 
 export interface ConteoRepository {

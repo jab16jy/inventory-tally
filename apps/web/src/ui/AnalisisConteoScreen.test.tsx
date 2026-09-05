@@ -1,7 +1,10 @@
 // apps/web/src/ui/AnalisisConteoScreen.test.tsx — dashboard de análisis del
 // cajero para UN conteo (RF-14: "Dashboard operativo para el cajero, sin
-// información monetaria"). El eje de todos estos tests es la invariante I-9
-// (el cajero NUNCA ve dinero): cada uno afirma unidades, nunca `$`.
+// información monetaria"). El eje de todos estos tests es el CONSOLIDADO de
+// sesión que ADR-07 protege (nunca I-9 como veto general al valorUnitario de
+// una línea, ver D-7/D-6 en docs/diseno/etapa-3-ui.md): esta pantalla sigue
+// sin dinero porque agrega la sesión entera, no porque el cajero no pueda
+// ver precios — cada test afirma unidades, nunca `$`.
 import { FakeConteoRepository } from "@conteo/data";
 import type { LineaConteo, SesionConteo } from "@conteo/shared";
 import { fireEvent, render, screen } from "@testing-library/react";

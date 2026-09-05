@@ -10,7 +10,7 @@ web
 
 Dos roles, sin un tercero (`docs/diseno/01-requisitos-y-alcance.md#2-actores`):
 
-- **Cajero** — el usuario de este documento y del alcance actual. Está de pie en una bodega con poca luz, sostiene el teléfono en una mano a unos 40 cm de la cara y a veces lleva guantes. Cuenta durante 2 a 4 horas seguidas, la misma acción repetida decenas de veces. Usa la app **una vez cada quince o treinta días**, así que no recuerda el flujo de una sesión a la siguiente. La conectividad es mixta: WiFi en algunas sucursales, datos móviles en otras, y a veces se pierde señal a mitad del conteo. El cajero puede tener varias sucursales asignadas, pero cuenta **una sucursal a la vez**. No ve valores monetarios: sólo unidades.
+- **Cajero** — el usuario de este documento y del alcance actual. Está de pie en una bodega con poca luz, sostiene el teléfono en una mano a unos 40 cm de la cara y a veces lleva guantes. Cuenta durante 2 a 4 horas seguidas, la misma acción repetida decenas de veces. Usa la app **una vez cada quince o treinta días**, así que no recuerda el flujo de una sesión a la siguiente. La conectividad es mixta: WiFi en algunas sucursales, datos móviles en otras, y a veces se pierde señal a mitad del conteo. El cajero puede tener varias sucursales asignadas, pero cuenta **una sucursal a la vez**. Ve el precio y el subtotal de su propia línea; nunca el consolidado de la sesión (ADR-23).
 - **Administrador** — gestiona cajeros, sucursales y categorías; abre y cierra sesiones de conteo; ve el dashboard analítico con dinero y comparativo entre sucursales. También puede contar. Su panel es de escritorio (`/admin`, `docs/plan-panel-administrador.md`) y está construido: `cerrarSesion`, `crearCajero` y el resto de callables que necesita ya existen. Queda excluido de `docs/plan-diseno-visual-pwa.md`, que es sólo el flujo móvil del cajero.
 
 > **Desambiguación:** "Salir" en el panel admin llama a `signOut` de Firebase — cierra la *sesión de autenticación* del navegador. Es un concepto distinto de la callable `cerrarSesion`, que cierra una *sesión de conteo* (una sesión abierta en `/sucursales` con verificación RF-16). Comparten la palabra "sesión" en español pero no se refieren a lo mismo.
@@ -35,7 +35,7 @@ La app no muestra "cuántas unidades hay", muestra **cuánto contaste tú** fren
 ## Capabilities and Constraints
 
 - El conteo es acumulativo por cajero: cada uno declara cuánto contó **él**, no el total del anaquel; corregir un error es editar el propio aporte, nunca el de otro (supuestos 4–5).
-- El cajero nunca ve dinero; la separación se aplica en las Security Rules del backend, no sólo en la interfaz (`docs/diseno/01-requisitos-y-alcance.md#2-actores`).
+- El cajero nunca ve el consolidado de la sesión (`resumen`, `historicos`); esa separación se aplica en las Security Rules del backend, no sólo en la interfaz (`docs/diseno/01-requisitos-y-alcance.md#2-actores`, ADR-23). Sí ve el precio y el subtotal de su propia línea.
 - La app debe funcionar 100 % offline para las operaciones de conteo (RNF-02) y seguir funcionando correctamente tras 30 días sin abrirse (RNF-11) — de ahí que la tipografía esté autoalojada y nunca dependa de un CDN.
 - El cierre de una sesión de conteo verifica que todos los participantes hayan sincronizado antes de permitirlo (RF-16); es la salvaguarda que compensa la menor durabilidad del almacenamiento local en una PWA.
 - Presupuestos técnicos que acotan cualquier pantalla nueva: rendimiento de UI ≥ 55 fps con hasta 200 categorías (RNF-05, < 20 ms/frame), consumo de datos < 1,5 MB por sesión tras la carga inicial (RNF-10), bundle < 500 KB comprimido, arranque < 5 s en 4G / < 3 s con service worker caliente (RNF-07).
@@ -51,7 +51,7 @@ No hay activos de marca, capturas, testimonios ni datos de producción disponibl
 
 1. **Ningún aporte se pierde.** Es la garantía central del producto (RF-09, RNF-03, RNF-12) y la razón de ser de la firma visual del sistema (ver `docs/DESIGN.md`).
 2. **El uso mensual manda sobre la sutileza.** Cada pantalla tiene que explicarse sola, sin apoyarse en memoria muscular de una sesión anterior.
-3. **El cajero ve unidades, el administrador ve dinero.** La separación es de datos y de interfaz a la vez.
+3. **El cajero ve el precio y el subtotal de su propia línea; el administrador ve el consolidado.** La separación protege el consolidado de sesión (ADR-07), no el valorUnitario de una línea.
 4. **El estado de sincronización nunca bloquea, pero tampoco se esconde.** Offline es un estado normal del flujo, no un error.
 5. **Corregir es un toque.** El error humano (contar dos veces, teclear de más) se corrige editando el propio aporte, sin diálogos de confirmación innecesarios salvo cuando el riesgo es real (cantidad 10× el promedio).
 

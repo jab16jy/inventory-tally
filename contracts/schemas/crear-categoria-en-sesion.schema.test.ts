@@ -45,16 +45,33 @@ describe("crearCategoriaEnSesionSchema (doc 08 §3)", () => {
     expect(resultado.success).toBe(true);
   });
 
-  it("descarta `valor` si un cliente lo envía: el cajero nunca fija un importe (I-9, ADR-07)", () => {
-    // La guarda es el DESCARTE, no el rechazo. Los esquemas de contracts/ son
-    // `z.object` sin `.strict()`, y `validar()` (packages/functions/src/lib/
-    // validar.ts) devuelve `resultado.data` — así que una clave `valor`
-    // enviada por un cliente manipulado no llega a la callable. El servidor
-    // escribe `valor: 0` y el admin precia después.
-    const resultado = crearCategoriaEnSesionSchema.safeParse({ ...valido, valor: 999999 });
+  it("acepta `valor` si el cajero lo envía (ADR-23): ya no está reservado al admin", () => {
+    // ADR-23 corrige la lectura de ADR-07 que llevó a I-9/ADR-21 a bloquear
+    // este campo: lo que ADR-07 protege es el consolidado de sesión, no el
+    // valorUnitario de una línea. Par afirmativo con el siguiente test.
+    const resultado = crearCategoriaEnSesionSchema.safeParse({ ...valido, valor: 5000 });
+
+    expect(resultado.success).toBe(true);
+    expect(resultado.data).toHaveProperty("valor", 5000);
+  });
+
+  it("acepta un objeto válido sin `valor` (afirmativo, par del anterior)", () => {
+    const resultado = crearCategoriaEnSesionSchema.safeParse(valido);
 
     expect(resultado.success).toBe(true);
     expect(resultado.data).not.toHaveProperty("valor");
+  });
+
+  it("rechaza `valor` negativo (negativo)", () => {
+    const resultado = crearCategoriaEnSesionSchema.safeParse({ ...valido, valor: -1 });
+
+    expect(resultado.success).toBe(false);
+  });
+
+  it("rechaza `valor` decimal (negativo)", () => {
+    const resultado = crearCategoriaEnSesionSchema.safeParse({ ...valido, valor: 5000.5 });
+
+    expect(resultado.success).toBe(false);
   });
 
   it("descarta `orden` por la misma razón que `valor` (par afirmativo)", () => {

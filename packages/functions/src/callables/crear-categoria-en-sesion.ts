@@ -11,10 +11,11 @@ import { registrarAuditoria } from "../lib/auditoria.js";
 import { lineaSembrada } from "../lib/linea-sembrada.js";
 
 /**
- * crearCategoriaEnSesionImpl — núcleo de la callable (doc 08 §3, ADR-21). El
+ * crearCategoriaEnSesionImpl — núcleo de la callable (doc 08 §3, ADR-23). El
  * cajero crea un "producto nombrado" (ticket #39, D1) DESDE su sesión
- * abierta. `valor: 0` y `orden: 0` los pone el SERVIDOR, nunca el cliente
- * (I-9/ADR-07): el schema ni siquiera acepta esos campos.
+ * abierta. `valor` es opcional: si el cajero lo envía se usa tal cual, si no
+ * el SERVIDOR escribe `0` y el admin lo precia después. `orden: 0` sigue
+ * siendo sólo del servidor: el schema ni siquiera acepta ese campo.
  *
  * UNA sola transacción, misma cierre TOCTOU que `vincularAreaImpl`: el
  * snapshot de la sesión se lee aquí y se pasa a `exigirAdminOCajeroDeSesion`.
@@ -35,7 +36,8 @@ export async function crearCategoriaEnSesionImpl(
   auth: AutorizacionCajero,
   input: CrearCategoriaEnSesionInput,
 ): Promise<{ categoriaId: string; creada: true }> {
-  const { sesionId, etiqueta, areaId } = input;
+  const { sesionId, etiqueta, areaId, valor } = input;
+  const valorUnitario = valor ?? 0;
   const sesionRef = db.doc(`sesiones/${sesionId}`);
   const areaRef = areaId ? db.doc(`areas/${areaId}`) : undefined;
   const categoriaRef = db.collection("categoriasValor").doc();
@@ -57,7 +59,7 @@ export async function crearCategoriaEnSesionImpl(
 
     tx.create(categoriaRef, {
       etiqueta,
-      valor: 0,
+      valor: valorUnitario,
       orden: 0,
       activa: true,
       creadaEn: FieldValue.serverTimestamp(),
@@ -69,7 +71,7 @@ export async function crearCategoriaEnSesionImpl(
       lineaRef,
       lineaSembrada({
         categoriaId: categoriaRef.id,
-        valorUnitario: 0,
+        valorUnitario,
         etiqueta,
         actualizadaPor: auth.uid,
         // D-1 (docs/diseno/etapa-3-ui.md): misma areaIds que se acaba de
