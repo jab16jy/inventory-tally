@@ -64,12 +64,22 @@ export function totalPartidas(partidas: readonly Partida[] | undefined): number 
  * Quita del ledger la tanda con ese `id` (ADR-24 — "mandar a la papelera").
  * Idempotente: un id que no existe deja el array intacto y `restado: 0`, para
  * que un doble toque o un reintento offline no reste dos veces.
+ *
+ * Quita UNA sola entrada, por índice, no todas las que compartan el id: es lo
+ * que sostiene la invariante `restado === Σ(quitadas)`, de la que depende
+ * quien reste `restado` de `Aporte.cantidad`. Nada impide dos tandas con el
+ * mismo id —ni el tipo, ni los repositorios, ni las reglas— y borrar dos
+ * restando una dejaría el total del cajero por encima de la suma real del
+ * ledger, con unidades que ya nadie podría quitar desde la papelera.
  */
 export function quitarPartida(
   partidas: readonly Partida[],
   id: string,
 ): { readonly partidas: readonly Partida[]; readonly restado: number } {
-  const partida = partidas.find((p) => p.id === id);
-  if (partida === undefined) return { partidas, restado: 0 };
-  return { partidas: partidas.filter((p) => p.id !== id), restado: partida.cantidad };
+  const indice = partidas.findIndex((p) => p.id === id);
+  if (indice === -1) return { partidas, restado: 0 };
+  return {
+    partidas: [...partidas.slice(0, indice), ...partidas.slice(indice + 1)],
+    restado: partidas[indice]!.cantidad,
+  };
 }
