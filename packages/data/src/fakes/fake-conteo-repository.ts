@@ -3,7 +3,8 @@
 // `apps/web` sin tocar el SDK de Firebase ni el emulador.
 import { CantidadInvalidaError } from "@conteo/shared/errors.js";
 import type { Area } from "@conteo/shared/models/area.js";
-import type { Aporte } from "@conteo/shared/models/aporte.js";
+import type { Aporte, Partida } from "@conteo/shared/models/aporte.js";
+import { quitarPartida as quitarPartidaHelper } from "@conteo/shared/services/calculadora.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
@@ -192,30 +193,52 @@ export class FakeConteoRepository implements ConteoRepository {
     sesionId,
     categoriaId,
     areaId,
-    cantidad,
-    partidas,
+    deltaCantidad,
+    agregarPartida,
+    quitarPartida,
   }: RegistrarAporteInput): Promise<void> {
-    if (cantidad < 0) throw new CantidadInvalidaError("La cantidad no puede ser negativa");
+    if (!Number.isInteger(deltaCantidad) || deltaCantidad === 0) {
+      throw new CantidadInvalidaError("La cantidad del aporte debe ser un entero distinto de cero");
+    }
+    if (deltaCantidad > 0 && (!agregarPartida || agregarPartida.cantidad !== deltaCantidad)) {
+      throw new CantidadInvalidaError(
+        "Un aporte positivo requiere una partida con la misma cantidad que deltaCantidad",
+      );
+    }
+    if (deltaCantidad < 0 && (!quitarPartida || quitarPartida.cantidad !== -deltaCantidad)) {
+      throw new CantidadInvalidaError(
+        "Un aporte negativo requiere la partida exacta a retirar con cantidad igual a -deltaCantidad",
+      );
+    }
 
     const claveAporte = `${this.usuario.uid}__${areaId}`;
     const aportesLinea = this.aportesDeLinea(sesionId, categoriaId);
     const anterior = aportesLinea.get(claveAporte);
-    const delta = cantidad - (anterior?.cantidad ?? 0);
+    const cantidadNueva = (anterior?.cantidad ?? 0) + deltaCantidad;
+    if (cantidadNueva < 0) throw new CantidadInvalidaError("La cantidad no puede ser negativa");
     const eraNuevo = anterior === undefined;
+
+    let partidasActualizadas: readonly Partida[] | undefined = anterior?.partidas;
+    if (agregarPartida !== undefined) {
+      partidasActualizadas = [...(anterior?.partidas ?? []), agregarPartida];
+    } else if (quitarPartida !== undefined) {
+      partidasActualizadas = quitarPartidaHelper(
+        anterior?.partidas ?? [],
+        quitarPartida.id,
+      ).partidas;
+    }
 
     const aporte: Aporte = {
       uid: this.usuario.uid,
       areaId,
       nombre: this.usuario.nombre,
-      cantidad,
+      cantidad: cantidadNueva,
       registradoEn: new Date(),
       dispositivoId: "fake-device",
       version: (anterior?.version ?? 0) + 1,
       // Espeja `setDoc(..., { merge: true })` del repositorio real (ADR-24):
-      // un campo AUSENTE conserva el valor anterior, no lo borra. El stepper
-      // −/+ escribe `cantidad ± 1` sin mandar tandas, y sin este `??` el fake
-      // vaciaría la papelera en cada toque mientras producción la conserva.
-      partidas: partidas ?? anterior?.partidas,
+      // un campo AUSENTE conserva el valor anterior, no lo borra.
+      ...(partidasActualizadas !== undefined ? { partidas: partidasActualizadas } : {}),
     };
     aportesLinea.set(claveAporte, aporte);
     this.notificar(this.listenersAporte, `${sesionId}/${categoriaId}/${areaId}`, aporte);
@@ -225,11 +248,11 @@ export class FakeConteoRepository implements ConteoRepository {
     if (linea) {
       const actualizada: LineaConteo = {
         ...linea,
-        cantidadTotal: linea.cantidadTotal + delta,
+        cantidadTotal: linea.cantidadTotal + deltaCantidad,
         numAportantes: linea.numAportantes + (eraNuevo ? 1 : 0),
         versiones: { ...linea.versiones, [claveAporte]: aporte.version },
         // Mismo desglose que mantiene onAporteEscrito en producción (ADR-23).
-        porArea: { ...linea.porArea, [areaId]: (linea.porArea[areaId] ?? 0) + delta },
+        porArea: { ...linea.porArea, [areaId]: (linea.porArea[areaId] ?? 0) + deltaCantidad },
         actualizadaEn: aporte.registradoEn,
         actualizadaPor: this.usuario.uid,
       };

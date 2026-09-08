@@ -5,10 +5,9 @@
 // gratis). Sube desde el borde inferior sobre el deck, sin cubrir la
 // pantalla completa: la fila que se edita sigue visible arriba (plan §5).
 //
-// El teclado numérico es el camino PRINCIPAL de captura; el stepper −/+ de
-// la fila es el alternativo (doc 11 §158-166). "Volver", nunca "Cerrar": la
-// pantalla de conteo no puede tener un botón cuyo nombre accesible matchee
-// /cerrar|descartar/i.
+// La Hoja con teclado numérico es el ÚNICO camino de captura (ADR-24, doc 11
+// §4). "Volver", nunca "Cerrar": la pantalla de conteo no puede tener un botón
+// cuyo nombre accesible matchee /cerrar|descartar/i.
 //
 // ADR-24 (conteo por tandas): el cajero teclea una tanda, toca "Agrupar", y
 // la Hoja NO se cierra — el display vuelve a "0" listo para la siguiente
@@ -50,15 +49,11 @@ export interface HojaProps {
    * absurdo", igual que antes de que este prop existiera.
    */
   readonly promedioCategoria?: number;
-  /** La escritura anterior todavía no tuvo su acuse: Agrupar y las papeleras
-   *  quedan bloqueadas para que un toque rápido no pise la tanda recién
-   *  guardada. Lo tecleado NO se limpia — se conserva para reintentar. */
-  readonly esperandoEco?: boolean;
   /** Agrupa la tanda tecleada: sube `cantidad` y agrega una `Partida` al
    *  ledger. La Hoja NO se cierra tras esto — es el corazón de la feature. */
   readonly onAgrupar: (cantidad: number) => void;
-  /** Manda una tanda a la papelera por su `id` (ADR-24). */
-  readonly onBorrarPartida: (id: string) => void;
+  /** Manda una tanda a la papelera (ADR-24 / Issue #91). */
+  readonly onBorrarPartida: (partida: Partida) => void;
   readonly onVolver: () => void;
 }
 
@@ -75,7 +70,6 @@ export function Hoja({
   etiqueta,
   valorInicial,
   partidas,
-  esperandoEco = false,
   promedioCategoria = 0,
   onAgrupar,
   onBorrarPartida,
@@ -124,7 +118,6 @@ export function Hoja({
     // ConteoScreen: el botón ya está deshabilitado en 0, pero esta ruta
     // también la alcanza "Sí, guardar" de la confirmación suave.
     if (Number(valor) <= 0) return;
-    if (esperandoEco) return;
     onAgrupar(Number(valor));
     setValor("0");
     setTocado(false);
@@ -181,10 +174,9 @@ export function Hoja({
         </button>
       </div>
 
-      {/* Lo ya contado, aparte de la tanda que se está tecleando (ver el
-          comentario de R3-001 más arriba). NUNCA "Ya agrupado": este número
-          es `Aporte.cantidad`, que incluye los toques sueltos del stepper
-          −/+ y no es igual a la suma de `partidas`. */}
+      {/* Lo ya contado en tandas previas (ver el comentario de R3-001 más
+          arriba). Con la eliminación del stepper (issue #90, ADR-24),
+          `Aporte.cantidad === suma(partidas)` en todo momento. */}
       <p data-numeral className="text-micro text-tenue">
         Tu conteo: {valorInicial}
       </p>
@@ -235,7 +227,7 @@ export function Hoja({
                 if (confirmacion.tipo === "absurda") {
                   agruparTanda();
                 } else {
-                  onBorrarPartida(confirmacion.partida.id);
+                  onBorrarPartida(confirmacion.partida);
                   setConfirmacion(null);
                 }
               }}
@@ -261,10 +253,6 @@ export function Hoja({
                     type="button"
                     onClick={() => setConfirmacion({ tipo: "borrar", partida })}
                     aria-label={`Borrar tanda de ${partida.cantidad}`}
-                    // Mismo motivo que Agrupar: borrar también resta sobre el
-                    // aporte leído, así que sin el acuse de la escritura
-                    // anterior dos borrados seguidos se pisarían.
-                    disabled={esperandoEco}
                     className="inline-flex items-center justify-center rounded-placa border border-borde p-2 text-tenue active:border-riesgo active:text-riesgo disabled:opacity-50"
                   >
                     <Icono nombre="papelera" className="size-4" />
@@ -280,13 +268,7 @@ export function Hoja({
                 key={t}
                 type="button"
                 onClick={() => tecla(t)}
-                // Una tanda de 0 no significa nada, y además es un camino de
-                // PÉRDIDA DE CONTEO: tras agrupar el display vuelve a "0", y
-                // un segundo toque accidental haría que ConteoScreen sume
-                // sobre un `miAporteEnEdicion` que todavía no re-renderizó
-                // (la suscripción resuelve un render después), escribiendo
-                // `0 + 0 = 0` encima de la tanda recién guardada.
-                disabled={t === "guardar" && (Number(valor) <= 0 || esperandoEco)}
+                disabled={t === "guardar" && Number(valor) <= 0}
                 aria-label={t === "borrar" ? "Borrar dígito" : t === "guardar" ? "Agrupar" : t}
                 className={clsx(
                   "min-h-[var(--size-toque)] rounded-placa border text-medio font-semibold",

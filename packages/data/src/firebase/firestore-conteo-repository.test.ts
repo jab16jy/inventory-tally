@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CantidadInvalidaError } from "@conteo/shared/errors.js";
+import type { RegistrarAporteInput } from "../repositories/conteo-repository.js";
 
 const doc = vi.fn((...args: unknown[]) => ({ __ref: args.join("/") }));
 const collection = vi.fn((...args: unknown[]) => ({ __col: args.join("/") }));
@@ -13,9 +14,13 @@ const updateDoc = vi.fn();
 const getDocs = vi.fn();
 const startAfter = vi.fn((...args: unknown[]) => ({ __startAfter: args }));
 const increment = vi.fn((n: number) => ({ __op: "increment", n }));
+const arrayUnion = vi.fn((...args: unknown[]) => ({ __op: "arrayUnion", args }));
+const arrayRemove = vi.fn((...args: unknown[]) => ({ __op: "arrayRemove", args }));
 const serverTimestamp = vi.fn(() => ({ __op: "serverTimestamp" }));
 
 vi.mock("firebase/firestore", () => ({
+  arrayRemove: (...args: unknown[]) => arrayRemove(...args),
+  arrayUnion: (...args: unknown[]) => arrayUnion(...args),
   doc: (...args: unknown[]) => doc(...args),
   collection: (...args: unknown[]) => collection(...args),
   query: (...args: unknown[]) => query(...args),
@@ -67,7 +72,8 @@ describe("FirestoreConteoRepository.registrarAporte (doc 07 §6)", () => {
         sesionId: "ses_1",
         categoriaId: "cat_5000",
         areaId: "area_1",
-        cantidad: 12,
+        deltaCantidad: 12,
+        agregarPartida: { id: "p1", cantidad: 12 },
       }),
     ).resolves.toBeUndefined();
   });
@@ -80,15 +86,26 @@ describe("FirestoreConteoRepository.registrarAporte (doc 07 §6)", () => {
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 12,
+      deltaCantidad: 12,
+      agregarPartida: { id: "p1", cantidad: 12 },
     });
 
     expect(setDoc).toHaveBeenCalledTimes(1);
     const [, datos, opciones] = setDoc.mock.calls[0] as [unknown, Record<string, unknown>, unknown];
     expect(Object.keys(datos).sort()).toEqual(
-      ["areaId", "cantidad", "dispositivoId", "nombre", "registradoEn", "uid", "version"].sort(),
+      [
+        "areaId",
+        "cantidad",
+        "dispositivoId",
+        "nombre",
+        "partidas",
+        "registradoEn",
+        "uid",
+        "version",
+      ].sort(),
     );
     expect(opciones).toEqual({ merge: true });
+    expect(datos.cantidad).toEqual({ __op: "increment", n: 12 });
   });
 
   it("issue #83: el id del documento es la clave compuesta {uid}__{areaId} que exige infra/firestore.rules", async () => {
@@ -99,7 +116,8 @@ describe("FirestoreConteoRepository.registrarAporte (doc 07 §6)", () => {
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 12,
+      deltaCantidad: 12,
+      agregarPartida: { id: "p1", cantidad: 12 },
     });
 
     expect(doc).toHaveBeenCalledWith(
@@ -121,7 +139,8 @@ describe("FirestoreConteoRepository.registrarAporte (doc 07 §6)", () => {
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 12,
+      deltaCantidad: 12,
+      agregarPartida: { id: "p1", cantidad: 12 },
     });
 
     expect(increment).toHaveBeenCalledWith(1);
@@ -129,7 +148,7 @@ describe("FirestoreConteoRepository.registrarAporte (doc 07 §6)", () => {
     expect(datos.version).toEqual({ __op: "increment", n: 1 });
   });
 
-  it("rechaza cantidades negativas antes de tocar Firestore", async () => {
+  it("rechaza delta cero, positivo sin partida o negativo sin partida antes de tocar Firestore", async () => {
     const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
     await expect(
@@ -137,13 +156,31 @@ describe("FirestoreConteoRepository.registrarAporte (doc 07 §6)", () => {
         sesionId: "ses_1",
         categoriaId: "cat_5000",
         areaId: "area_1",
-        cantidad: -1,
-      }),
+        deltaCantidad: 0,
+      } as unknown as RegistrarAporteInput),
+    ).rejects.toBeInstanceOf(CantidadInvalidaError);
+
+    await expect(
+      repo.registrarAporte({
+        sesionId: "ses_1",
+        categoriaId: "cat_5000",
+        areaId: "area_1",
+        deltaCantidad: 10,
+      } as unknown as RegistrarAporteInput),
+    ).rejects.toBeInstanceOf(CantidadInvalidaError);
+
+    await expect(
+      repo.registrarAporte({
+        sesionId: "ses_1",
+        categoriaId: "cat_5000",
+        areaId: "area_1",
+        deltaCantidad: -1,
+      } as unknown as RegistrarAporteInput),
     ).rejects.toBeInstanceOf(CantidadInvalidaError);
     expect(setDoc).not.toHaveBeenCalled();
   });
 
-  it("ADR-24: partidas viaja en el setDoc cuando se pasa", async () => {
+  it("ADR-24 / Issue #91: agregarPartida viaja como arrayUnion en el setDoc", async () => {
     setDoc.mockResolvedValue(undefined);
     const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
@@ -151,21 +188,16 @@ describe("FirestoreConteoRepository.registrarAporte (doc 07 §6)", () => {
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 80,
-      partidas: [
-        { id: "p1", cantidad: 50 },
-        { id: "p2", cantidad: 30 },
-      ],
+      deltaCantidad: 50,
+      agregarPartida: { id: "p1", cantidad: 50 },
     });
 
+    expect(arrayUnion).toHaveBeenCalledWith({ id: "p1", cantidad: 50 });
     const [, datos] = setDoc.mock.calls[0] as [unknown, Record<string, unknown>];
-    expect(datos.partidas).toEqual([
-      { id: "p1", cantidad: 50 },
-      { id: "p2", cantidad: 30 },
-    ]);
+    expect(datos.partidas).toEqual({ __op: "arrayUnion", args: [{ id: "p1", cantidad: 50 }] });
   });
 
-  it("ADR-24: sin partidas, la clave NO aparece en el objeto escrito", async () => {
+  it("ADR-24 / Issue #91: quitarPartida viaja como arrayRemove en el setDoc", async () => {
     setDoc.mockResolvedValue(undefined);
     const repo = new FirestoreConteoRepository({} as never, usuario, functions);
 
@@ -173,11 +205,35 @@ describe("FirestoreConteoRepository.registrarAporte (doc 07 §6)", () => {
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 12,
+      deltaCantidad: -50,
+      quitarPartida: { id: "p1", cantidad: 50 },
     });
 
+    expect(arrayRemove).toHaveBeenCalledWith({ id: "p1", cantidad: 50 });
     const [, datos] = setDoc.mock.calls[0] as [unknown, Record<string, unknown>];
-    expect("partidas" in datos).toBe(false);
+    expect(datos.partidas).toEqual({ __op: "arrayRemove", args: [{ id: "p1", cantidad: 50 }] });
+  });
+
+  it("ADR-24: rechaza escrituras sin partida correspondiente para blindar cantidad === suma(partidas)", async () => {
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
+
+    await expect(
+      repo.registrarAporte({
+        sesionId: "ses_1",
+        categoriaId: "cat_5000",
+        areaId: "area_1",
+        deltaCantidad: 12,
+      } as never),
+    ).rejects.toBeInstanceOf(CantidadInvalidaError);
+
+    await expect(
+      repo.registrarAporte({
+        sesionId: "ses_1",
+        categoriaId: "cat_5000",
+        areaId: "area_1",
+        deltaCantidad: -10,
+      } as never),
+    ).rejects.toBeInstanceOf(CantidadInvalidaError);
   });
 });
 
@@ -403,7 +459,8 @@ describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 12,
+      deltaCantidad: 12,
+      agregarPartida: { id: "p1", cantidad: 12 },
     });
     expect(valores.at(-1)).toBe(1);
 
@@ -428,7 +485,8 @@ describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
         sesionId: "ses_1",
         categoriaId: "cat_5000",
         areaId: "area_1",
-        cantidad: 12,
+        deltaCantidad: 12,
+        agregarPartida: { id: "p1", cantidad: 12 },
       });
       expect(valores.at(-1)).toBe(1);
       expect(setDoc).toHaveBeenCalledTimes(1);
@@ -474,7 +532,8 @@ describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
         sesionId: "ses_1",
         categoriaId: "cat_5000",
         areaId: "area_1",
-        cantidad: 12,
+        deltaCantidad: 12,
+        agregarPartida: { id: "p1", cantidad: 12 },
       });
       expect(errores.at(-1)).toBe(0);
 
@@ -515,7 +574,8 @@ describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
         sesionId: "ses_1",
         categoriaId: "cat_5000",
         areaId: "area_1",
-        cantidad: 12,
+        deltaCantidad: 12,
+        agregarPartida: { id: "p1", cantidad: 12 },
       });
 
       rechazador(new Error("permission-denied"));
@@ -554,7 +614,8 @@ describe("FirestoreConteoRepository.observarEscriturasPendientes", () => {
         sesionId: "ses_1",
         categoriaId: "cat_5000",
         areaId: "area_1",
-        cantidad: 12,
+        deltaCantidad: 12,
+        agregarPartida: { id: "p1", cantidad: 12 },
       });
 
       for (let intento = 0; intento < 4; intento++) {

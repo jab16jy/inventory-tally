@@ -69,73 +69,6 @@ describe("Hoja", () => {
     expect(onAgrupar).not.toHaveBeenCalled();
   });
 
-  it("esperandoEco bloquea Agrupar y las papeleras, y conserva lo tecleado", () => {
-    // `agrupar` y `borrarTanda` de ConteoScreen SUMAN y RESTAN sobre el aporte
-    // leído de `useMiAporte`, y el repositorio escribe valores planos (no
-    // `increment`/`arrayUnion`). Hasta que la escritura anterior tenga acuse,
-    // una segunda escritura calculada sobre el mismo valor la pisaría.
-    //
-    // Esto se prueba ACÁ y no en ConteoScreen a propósito: el fake notifica a
-    // los listeners de forma SÍNCRONA dentro de `registrarAporte`, así que un
-    // test de integración no puede producir la ventana — pasaría con guarda y
-    // sin ella, que es no probar nada. Acá el bloqueo es observable directo.
-    const onAgrupar = vi.fn();
-    const onBorrarPartida = vi.fn();
-    render(
-      <Hoja
-        abierta={true}
-        etiqueta="$5.000"
-        valorInicial={50}
-        partidas={[{ id: "p1", cantidad: 50 }]}
-        esperandoEco={true}
-        onAgrupar={onAgrupar}
-        onBorrarPartida={onBorrarPartida}
-        onVolver={() => {}}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "3" }));
-    fireEvent.click(screen.getByRole("button", { name: "0" }));
-
-    const agrupar = screen.getByRole("button", { name: "Agrupar" });
-    const papelera = screen.getByRole("button", { name: "Borrar tanda de 50" });
-    expect(agrupar).toBeDisabled();
-    expect(papelera).toBeDisabled();
-
-    fireEvent.click(agrupar);
-    fireEvent.click(papelera);
-    expect(onAgrupar).not.toHaveBeenCalled();
-    expect(onBorrarPartida).not.toHaveBeenCalled();
-    // Lo tecleado NO se pierde: el cajero reintenta cuando se libera.
-    expect(screen.getByTestId("hoja-valor")).toHaveTextContent("30");
-  });
-
-  it("sin esperandoEco, con lo mismo tecleado, Agrupar y la papelera SÍ disparan", () => {
-    // Par afirmativo del anterior: sin esto, "queda bloqueado" pasaría igual
-    // si estuviera bloqueado siempre, o si los botones no existieran.
-    const onAgrupar = vi.fn();
-    const onBorrarPartida = vi.fn();
-    render(
-      <Hoja
-        abierta={true}
-        etiqueta="$5.000"
-        valorInicial={50}
-        partidas={[{ id: "p1", cantidad: 50 }]}
-        esperandoEco={false}
-        onAgrupar={onAgrupar}
-        onBorrarPartida={onBorrarPartida}
-        onVolver={() => {}}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "3" }));
-    fireEvent.click(screen.getByRole("button", { name: "0" }));
-
-    expect(screen.getByRole("button", { name: "Borrar tanda de 50" })).toBeEnabled();
-    fireEvent.click(screen.getByRole("button", { name: "Agrupar" }));
-    expect(onAgrupar).toHaveBeenCalledWith(30);
-  });
-
   it("con un valor tecleado, Agrupar se habilita y emite esa cantidad", () => {
     // Par afirmativo del anterior: sin esto, "el botón está deshabilitado"
     // pasaría igual si estuviera deshabilitado SIEMPRE.
@@ -344,7 +277,7 @@ describe("Hoja", () => {
       expect(screen.getByRole("button", { name: "Borrar tanda de 50" })).toBeInTheDocument();
     });
 
-    it('"Sí, borrar" llama onBorrarPartida con el id de la tanda', () => {
+    it('"Sí, borrar" llama onBorrarPartida con la tanda', () => {
       const onBorrarPartida = vi.fn();
       render(
         <Hoja
@@ -361,7 +294,7 @@ describe("Hoja", () => {
       fireEvent.click(screen.getByRole("button", { name: "Borrar tanda de 50" }));
       fireEvent.click(screen.getByRole("button", { name: /sí, borrar/i }));
 
-      expect(onBorrarPartida).toHaveBeenCalledWith("p1");
+      expect(onBorrarPartida).toHaveBeenCalledWith({ id: "p1", cantidad: 50 });
     });
   });
 
