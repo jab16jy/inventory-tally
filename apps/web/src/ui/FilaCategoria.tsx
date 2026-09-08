@@ -17,9 +17,7 @@
 import { memo, useEffect } from "react";
 import { aporteConfirmado, subtotal, type LineaConteo } from "@conteo/shared";
 import { moneda } from "../lib/formato.js";
-import { useConteoRepository } from "../state/repositorio-contexto.js";
 import { useMiAporte } from "../state/useMiAporte.js";
-import { BotonPaso } from "./primitivos/BotonPaso.js";
 import { Numeral } from "./primitivos/Numeral.js";
 import { Placa } from "./primitivos/Placa.js";
 
@@ -48,7 +46,6 @@ function FilaCategoriaBase({
   onCantidadPropiaCambio,
   mostrarOtrasAreas,
 }: FilaCategoriaProps) {
-  const repo = useConteoRepository();
   const miAporte = useMiAporte(sesionId, linea.categoriaId, areaId);
   const miCantidad = miAporte?.cantidad ?? 0;
   const confirmado = aporteConfirmado(linea, miAporte);
@@ -85,15 +82,6 @@ function FilaCategoriaBase({
     onCantidadPropiaCambio?.(linea.categoriaId, miCantidad);
   }, [linea.categoriaId, miCantidad, onCantidadPropiaCambio]);
 
-  function registrar(cantidad: number): void {
-    void repo.registrarAporte({
-      sesionId,
-      categoriaId: linea.categoriaId,
-      areaId,
-      cantidad: Math.max(0, cantidad),
-    });
-  }
-
   return (
     <li
       aria-label={
@@ -108,10 +96,9 @@ function FilaCategoriaBase({
       className="list-none [content-visibility:auto] [contain-intrinsic-size:auto_5rem]"
     >
       <Placa confirmado={confirmado} className="py-2.5">
-        {/* El stepper se centra contra las DOS líneas de texto en vez de
-            colgar de la primera: así la fila mide ~78 px en vez de ~105 y
-            entran cuatro categorías más en el primer viewport, que con 60
-            categorías es la diferencia entre desplazarse 6 veces o 9. */}
+        {/* El Numeral propio a la derecha se centra contra las DOS líneas de
+            texto: así la fila mide ~78 px en vez de ~105 y entran cuatro
+            categorías más en el primer viewport. */}
         <div className="flex items-center gap-2">
           {/* Tocar la fila es el camino PRINCIPAL de captura (doc 11
               §158-166): abre la Hoja con teclado numérico. Un <button>, no
@@ -149,13 +136,6 @@ function FilaCategoriaBase({
             </span>
           </button>
 
-          <BotonPaso
-            signo="menos"
-            etiqueta={`Restar ${linea.etiqueta}`}
-            onClick={() => registrar(miCantidad - 1)}
-            disabled={miCantidad === 0}
-          />
-
           <Numeral
             tamano="medio"
             data-testid="mi-cantidad"
@@ -163,12 +143,6 @@ function FilaCategoriaBase({
           >
             {miCantidad}
           </Numeral>
-
-          <BotonPaso
-            signo="mas"
-            etiqueta={`Sumar ${linea.etiqueta}`}
-            onClick={() => registrar(miCantidad + 1)}
-          />
         </div>
       </Placa>
     </li>

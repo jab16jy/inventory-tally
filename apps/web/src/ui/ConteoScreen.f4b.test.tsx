@@ -94,7 +94,7 @@ describe("ConteoScreen · esqueleto de carga (F4-B)", () => {
     // getByRole (no getByText): con ADR-22 la línea también aparece dentro de
     // la HojaAreas (siempre montada, aunque cerrada) porque sigue siendo
     // reetiquetable — "$5.000" a secas ya no identifica una sola fila.
-    expect(screen.getByRole("button", { name: /sumar \$5\.000/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /contar \$5\.000/i })).toBeInTheDocument();
   });
 
   it("con la sesión BORRADA no promete contenido: no va a llegar nada", () => {

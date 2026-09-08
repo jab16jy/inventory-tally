@@ -6,8 +6,8 @@
 // rediseño y quedan intactos.
 import { FakeConteoRepository } from "@conteo/data";
 import type { LineaConteo } from "@conteo/shared";
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { moneda } from "../lib/formato.js";
 import { ConteoRepositoryProvider } from "../state/repositorio-contexto.js";
 import { FilaCategoria } from "./FilaCategoria.js";
@@ -63,7 +63,8 @@ describe("FilaCategoria · estado de sincronización (RF-16)", () => {
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 4,
+      deltaCantidad: 4,
+      agregarPartida: { id: "p1", cantidad: 4 },
     });
 
     renderFila(repo, { uid_ana__area_1: 1 });
@@ -72,11 +73,36 @@ describe("FilaCategoria · estado de sincronización (RF-16)", () => {
     expect(screen.queryByText(/sin enviar/i)).not.toBeInTheDocument();
   });
 
-  it("no se puede restar por debajo de cero", () => {
+  it("al tocar la fila se llama a onSeleccionar con el id de categoría", () => {
     const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
-    renderFila(repo);
+    const onSeleccionar = vi.fn();
+    const linea: LineaConteo = {
+      categoriaId: "cat_5000",
+      valorUnitario: 5000,
+      etiqueta: "$5.000",
+      porArea: {},
+      cantidadTotal: 0,
+      numAportantes: 0,
+      versiones: {},
+      actualizadaEn: new Date(),
+      actualizadaPor: "",
+    };
+    repo.sembrarLinea("ses_1", linea);
+    render(
+      <ConteoRepositoryProvider repo={repo}>
+        <ul>
+          <FilaCategoria
+            sesionId="ses_1"
+            areaId="area_1"
+            linea={linea}
+            onSeleccionar={onSeleccionar}
+          />
+        </ul>
+      </ConteoRepositoryProvider>,
+    );
 
-    expect(screen.getByRole("button", { name: /restar \$5\.000/i })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /contar \$5\.000/i }));
+    expect(onSeleccionar).toHaveBeenCalledWith("cat_5000");
   });
 });
 
@@ -107,7 +133,7 @@ describe("FilaCategoria · desglose de otras áreas (D-4)", () => {
         <ul>
           <FilaCategoria
             sesionId="ses_1"
-            areaId="area_activa"
+            areaId="area_1"
             linea={linea}
             mostrarOtrasAreas={mostrarOtrasAreas}
           />
@@ -116,22 +142,23 @@ describe("FilaCategoria · desglose de otras áreas (D-4)", () => {
     );
   }
 
-  it("en modo 'ver todo', con unidades en otra área, muestra 'Otras áreas: N'", () => {
-    renderFilaConDesglose(true, { area_activa: 3, area_bodega: 12 });
-
-    expect(screen.getByText(/otras áreas: 12/i)).toBeInTheDocument();
-  });
-
-  it("fuera de modo 'ver todo' NO muestra el desglose, aunque haya unidades en otra área", () => {
-    renderFilaConDesglose(false, { area_activa: 3, area_bodega: 12 });
+  it("con mostrarOtrasAreas=false (por defecto), NO pinta 'Otras áreas'", () => {
+    renderFilaConDesglose(false, { area_1: 5, area_2: 3 });
 
     expect(screen.queryByText(/otras áreas/i)).not.toBeInTheDocument();
   });
 
-  it("en modo 'ver todo' sin unidades fuera del área activa, NO muestra el desglose", () => {
-    renderFilaConDesglose(true, { area_activa: 3 });
+  it("con mostrarOtrasAreas=true pero sin unidades fuera de mi área, NO pinta 'Otras áreas'", () => {
+    renderFilaConDesglose(true, { area_1: 5 });
 
     expect(screen.queryByText(/otras áreas/i)).not.toBeInTheDocument();
+  });
+
+  it("con mostrarOtrasAreas=true y unidades en otras áreas, pinta la suma correcta", () => {
+    // 3 en area_2 + 2 en area_3 = 5 en otras áreas (area_1 es la mía y se ignora)
+    renderFilaConDesglose(true, { area_1: 10, area_2: 3, area_3: 2 });
+
+    expect(screen.getByText(/otras áreas: 5/i)).toBeInTheDocument();
   });
 });
 
@@ -149,11 +176,12 @@ describe("FilaCategoria · precio unitario y subtotal propios (D-6)", () => {
     const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
     repo.sembrarLinea("ses_1", linea);
     if (miCantidadInicial > 0) {
-      repo.registrarAporte({
+      void repo.registrarAporte({
         sesionId: "ses_1",
         categoriaId: linea.categoriaId,
         areaId: "area_1",
-        cantidad: miCantidadInicial,
+        deltaCantidad: miCantidadInicial,
+        agregarPartida: { id: "p1", cantidad: miCantidadInicial },
       });
     }
     return render(

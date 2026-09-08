@@ -154,17 +154,17 @@ La pantalla crítica del sistema.
 ├────────────────────────────────────────────┤
 │ [ Todas las áreas ▾ ] [ Sin área (12) ] [ + Producto ] │
 ├────────────────────────────────────────────┤
-│  $1.000                          [ ─ 12 + ]│
-│  Tú: 12 · Equipo: 45                        │
+│  $1.000                                 12 │
+│  Tú: 12 · Equipo: 45                       │
 ├────────────────────────────────────────────┤
-│  $2.000                          [ ─ 30 + ]│
-│  Tú: 30 · Equipo: 310                       │
+│  $2.000                                 30 │
+│  Tú: 30 · Equipo: 310                      │
 ├────────────────────────────────────────────┤
-│  $5.000                          [ ─  0 + ]│
-│  Tú: — · Equipo: 55                         │
+│  $5.000                                  0 │
+│  Tú: — · Equipo: 55                        │
 ├────────────────────────────────────────────┤
-│  Tu aporte: 412 u      Equipo: 1.840 u      │
-│           [  Finalizar conteo  ]            │
+│  Tu aporte: 412 u      Equipo: 1.840 u     │
+│           [  Finalizar conteo  ]           │
 └────────────────────────────────────────────┘
 ```
 
@@ -185,16 +185,19 @@ confianza. Separándolos, el número que él controla nunca cambia solo.
 
 ```mermaid
 flowchart LR
-    A["Toca la fila"] --> B["Bottom sheet · teclado numérico"]
-    B --> C["Escribe la cantidad"]
-    C --> D["Guardar"]
-    D --> E["Escritura local · UI al instante"]
-    E --> F["Avanza a la siguiente pendiente"]
+    A["Toca la fila"] --> B["Hoja · teclado numérico"]
+    B --> C["Escribe la tanda"]
+    C --> D["Agrupar tanda"]
+    D --> E["Escritura atómica · delta + arrayUnion"]
+    E --> F["Aporte propio al instante"]
     E -.->|"en segundo plano"| G["Sincroniza → trigger → total del equipo"]
 ```
 
-Botones `−`/`+` para ajustes de una unidad sin abrir el teclado, y búsqueda por valor para
-catálogos grandes.
+Tocar la fila abre la **Hoja** (teclado numérico y desglose de tandas). Cada aporte se registra
+como una tanda en el ledger `partidas` (`deltaCantidad` + `agregarPartida`), y cada borrado
+retira la partida exacta (`quitarPartida` vía `arrayRemove`). El stepper `−`/`+` fue
+eliminado (ADR-24, issue #90) para blindar la invariante `cantidad === suma(partidas)`:
+ningún aporte puede existir sin su correspondiente tanda explicada en el ledger.
 
 ### Catálogo desde el conteo (ADR-21)
 
@@ -207,10 +210,9 @@ con la sesión abierta: da de alta una categoría nueva dentro de la sesión en 
 `valorUnitario: 0` — el admin la precia después, la separación monetaria de I-9 no se cruza
 desde el conteo.
 
-> **Punto de atención de UX:** la entrada de texto en Safari móvil se valida con el
-> prototipo descrito en [06](06-plataforma-web.md); al usar campos HTML nativos el riesgo
-> es bajo, pero los botones `−`/`+` no son sólo comodidad: son la ruta alternativa si el
-> teclado resulta incómodo.
+> **Punto de atención de UX:** la captura por tandas en la Hoja permite registrar múltiplos
+> (por ejemplo, bolsas de 50 o paquetes de 100) y auditar o borrar tandas individuales con la
+> papelera, manteniendo el conteo siempre justificado y transparente.
 
 ---
 
