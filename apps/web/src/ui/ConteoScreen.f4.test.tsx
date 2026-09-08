@@ -117,6 +117,60 @@ describe("ConteoScreen · sesión cerrada por el admin (F4-A1, doc 11 §5)", () 
     expect(screen.queryByRole("button", { name: /sumar \$5\.000/i })).not.toBeInTheDocument();
   });
 
+  it("con la sesión cerrada a mitad de tanda, tocar Agrupar no escribe (ADR-24)", () => {
+    // La Hoja se monta SIEMPRE (igual que el resto de la pantalla) y no se
+    // cierra sola cuando el admin cierra la sesión: la guarda vive en
+    // `agrupar`, no en el desmontaje. Mismo criterio que el test de arriba
+    // con los +/-: la garantía es la comprobación, no la capa de pintura.
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarSesion(sesionBase());
+    repo.sembrarLinea("ses_1", lineaBase("cat_5000", "$5.000", 5000));
+    renderConteoScreen(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /contar \$5\.000/i }));
+    const hoja = screen.getByRole("dialog", { name: /contar \$5\.000/i });
+    const espia = vi.spyOn(repo, "registrarAporte");
+
+    act(() => {
+      repo.sembrarSesion(sesionBase({ estado: "cerrada" }));
+    });
+
+    fireEvent.click(within(hoja).getByRole("button", { name: "5" }));
+    fireEvent.click(within(hoja).getByRole("button", { name: /agrupar/i }));
+
+    expect(espia).not.toHaveBeenCalled();
+  });
+
+  it("con la sesión cerrada, tocar Sí, borrar en una tanda no escribe (ADR-24)", async () => {
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarSesion(sesionBase());
+    repo.sembrarLinea("ses_1", lineaBase("cat_5000", "$5.000", 5000));
+    // Siembra una tanda propia ANTES de cerrar la sesión, con la sesión
+    // todavía abierta — igual que la haría el cajero de verdad.
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 50,
+      partidas: [{ id: "p1", cantidad: 50 }],
+    });
+    renderConteoScreen(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /contar \$5\.000/i }));
+    const hoja = await screen.findByRole("dialog", { name: /contar \$5\.000/i });
+    await within(hoja).findByText("Tu conteo: 50");
+    const espia = vi.spyOn(repo, "registrarAporte");
+
+    act(() => {
+      repo.sembrarSesion(sesionBase({ estado: "cerrada" }));
+    });
+
+    fireEvent.click(within(hoja).getByRole("button", { name: "Borrar tanda de 50" }));
+    fireEvent.click(within(hoja).getByRole("button", { name: /sí, borrar/i }));
+
+    expect(espia).not.toHaveBeenCalled();
+  });
+
   it("nunca coexisten dos role=alert: el banner de pendientes y el modal no chocan (restricción dura)", () => {
     // Las escrituras pendientes se siembran ANTES de que la sesión se
     // cierre —por el repositorio, no por la UI—, que es el orden real: el
@@ -160,7 +214,7 @@ describe("ConteoScreen · confirmación suave sobre cantidad absurda (F4-A1, doc
     for (const digito of ["5", "0", "0"]) {
       fireEvent.click(within(hoja).getByRole("button", { name: digito }));
     }
-    fireEvent.click(within(hoja).getByRole("button", { name: /guardar/i }));
+    fireEvent.click(within(hoja).getByRole("button", { name: /agrupar/i }));
 
     expect(within(hoja).getByText(/mucho más que el promedio/i)).toBeInTheDocument();
     expect(screen.queryByText(/tú: 500/i)).not.toBeInTheDocument();
@@ -179,7 +233,7 @@ describe("ConteoScreen · confirmación suave sobre cantidad absurda (F4-A1, doc
     for (const digito of ["5", "0", "0"]) {
       fireEvent.click(within(hoja).getByRole("button", { name: digito }));
     }
-    fireEvent.click(within(hoja).getByRole("button", { name: /guardar/i }));
+    fireEvent.click(within(hoja).getByRole("button", { name: /agrupar/i }));
     fireEvent.click(within(hoja).getByRole("button", { name: /sí, guardar/i }));
 
     expect(screen.getByText(/tú: 500/i)).toBeInTheDocument();
@@ -195,7 +249,7 @@ describe("ConteoScreen · confirmación suave sobre cantidad absurda (F4-A1, doc
     for (const digito of ["9", "9", "9"]) {
       fireEvent.click(within(hoja).getByRole("button", { name: digito }));
     }
-    fireEvent.click(within(hoja).getByRole("button", { name: /guardar/i }));
+    fireEvent.click(within(hoja).getByRole("button", { name: /agrupar/i }));
 
     expect(screen.getByText(/tú: 999/i)).toBeInTheDocument();
   });
