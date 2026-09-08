@@ -91,23 +91,62 @@ describe('ConteoScreen · filtro "sólo pendientes" (F2, doc 10 §2)', () => {
   });
 });
 
-describe("ConteoScreen · Hoja con teclado numérico y avance automático (F2, plan §5)", () => {
-  it("tocar la fila abre la Hoja, guardar registra el aporte y avanza a la siguiente pendiente", async () => {
+describe("ConteoScreen · Hoja con teclado numérico y conteo por tandas (ADR-24)", () => {
+  it("agrupar 50 y luego 30 en la MISMA categoría deja Tú: 80", async () => {
     const repo = repoConTresCategorias();
     renderConteoScreen(repo);
 
     fireEvent.click(screen.getByRole("button", { name: /contar \$1\.000/i }));
+    const hoja = screen.getByRole("dialog", { name: /contar \$1\.000/i });
 
-    const hoja1 = screen.getByRole("dialog", { name: /contar \$1\.000/i });
-    fireEvent.click(within(hoja1).getByRole("button", { name: "7" }));
-    fireEvent.click(within(hoja1).getByRole("button", { name: /guardar/i }));
+    fireEvent.click(within(hoja).getByRole("button", { name: "5" }));
+    fireEvent.click(within(hoja).getByRole("button", { name: "0" }));
+    fireEvent.click(within(hoja).getByRole("button", { name: /agrupar/i }));
 
-    // Avanza sola a la siguiente categoría pendiente ($2.000, la única que
-    // queda sin contar), sin que el cajero tenga que volver a tocar la fila.
-    const hoja2 = await screen.findByRole("dialog", { name: /contar \$2\.000/i });
-    expect(hoja2).toBeInTheDocument();
+    expect(await screen.findByText(/tú: 50/i)).toBeInTheDocument();
 
-    expect(await screen.findByText(/tú: 7/i)).toBeInTheDocument();
+    fireEvent.click(within(hoja).getByRole("button", { name: "3" }));
+    fireEvent.click(within(hoja).getByRole("button", { name: "0" }));
+    fireEvent.click(within(hoja).getByRole("button", { name: /agrupar/i }));
+
+    expect(await screen.findByText(/tú: 80/i)).toBeInTheDocument();
+  });
+
+  it("agrupar NO auto-avanza de categoría: la Hoja sigue abierta sobre la misma fila", () => {
+    const repo = repoConTresCategorias();
+    renderConteoScreen(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /contar \$1\.000/i }));
+    const hoja = screen.getByRole("dialog", { name: /contar \$1\.000/i });
+
+    fireEvent.click(within(hoja).getByRole("button", { name: "7" }));
+    fireEvent.click(within(hoja).getByRole("button", { name: /agrupar/i }));
+
+    // Sigue siendo el mismo diálogo, sobre la misma categoría — nunca el de
+    // la siguiente pendiente ($2.000).
+    expect(screen.getByRole("dialog", { name: /contar \$1\.000/i })).toBeVisible();
+    expect(screen.queryByRole("dialog", { name: /contar \$2\.000/i })).not.toBeInTheDocument();
+  });
+
+  it("borrar la tanda de 50 deja Tú: 30", async () => {
+    const repo = repoConTresCategorias();
+    renderConteoScreen(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /contar \$1\.000/i }));
+    const hoja = screen.getByRole("dialog", { name: /contar \$1\.000/i });
+
+    fireEvent.click(within(hoja).getByRole("button", { name: "5" }));
+    fireEvent.click(within(hoja).getByRole("button", { name: "0" }));
+    fireEvent.click(within(hoja).getByRole("button", { name: /agrupar/i }));
+    fireEvent.click(within(hoja).getByRole("button", { name: "3" }));
+    fireEvent.click(within(hoja).getByRole("button", { name: "0" }));
+    fireEvent.click(within(hoja).getByRole("button", { name: /agrupar/i }));
+    expect(await screen.findByText(/tú: 80/i)).toBeInTheDocument();
+
+    fireEvent.click(within(hoja).getByRole("button", { name: "Borrar tanda de 50" }));
+    fireEvent.click(within(hoja).getByRole("button", { name: /sí, borrar/i }));
+
+    expect(await screen.findByText(/tú: 30/i)).toBeInTheDocument();
   });
 
   it('el botón para cerrar la Hoja es "Volver", nunca "Cerrar" (restricción de la pantalla)', () => {
@@ -146,13 +185,13 @@ describe("ConteoScreen · consumo de datos (issue #20 item 2, doc 11 §24)", () 
   });
 });
 
-describe("ConteoScreen · Hoja precargada (regresión R3-001)", () => {
-  it("reabrir una categoría ya contada precarga la cantidad real, no cero", async () => {
+describe("ConteoScreen · Hoja precargada (regresión R3-001, reencuadrada por ADR-24)", () => {
+  it('reabrir una categoría ya contada muestra "Tu conteo: 12" así llegue un render después de abrir', async () => {
     // La suscripción al aporte de la categoría en edición resuelve UN render
-    // después de abrir la Hoja. Si el reset del teclado sólo mira la
-    // etiqueta, adopta el 0 del primer render y nunca relee el valor real:
-    // el cajero ve 0 sobre una categoría donde ya había contado 12, y si
-    // teclea encima pisa su propio conteo.
+    // después de abrir la Hoja: el cajero NO puede ver "Tu conteo: 0" fijo
+    // sobre una categoría donde ya había contado 12 — la intención original
+    // de R3-001 (nunca ocultarle al cajero lo que ya contó) ahora vive en
+    // esta línea de solo lectura, no en el display de la tanda en curso.
     const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
     repo.sembrarLinea("ses_1", lineaBase("cat_5000", "$5.000", 5000));
     // areaId: "area_1" — coincide con la área activa que renderConteoScreen
@@ -168,6 +207,9 @@ describe("ConteoScreen · Hoja precargada (regresión R3-001)", () => {
     renderConteoScreen(repo);
     fireEvent.click(screen.getByRole("button", { name: /contar \$5\.000/i }));
 
-    expect(await screen.findByTestId("hoja-valor")).toHaveTextContent("12");
+    expect(await screen.findByText("Tu conteo: 12")).toBeInTheDocument();
+    // El display de la tanda en curso arranca en 0, sin importar lo ya
+    // contado — precisamente lo que ADR-24 cambia a propósito.
+    expect(screen.getByTestId("hoja-valor")).toHaveTextContent("0");
   });
 });
