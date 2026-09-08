@@ -54,7 +54,7 @@ function renderConteoScreen(repo: FakeConteoRepository, sesionId = "ses_1") {
         <Routes>
           <Route
             path="/conteo/:sesionId"
-            element={<ConteoScreen auth={{} as never} onSalir={() => {}} />}
+            element={<ConteoScreen auth={{} as never} />}
           />
           <Route path="/sucursales" element={<p>Sucursales — próximamente</p>} />
         </Routes>

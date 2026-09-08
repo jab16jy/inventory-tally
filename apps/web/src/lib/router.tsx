@@ -145,7 +145,7 @@ export function AppRouter(): ReactNode {
           path="/conteo/:sesionId"
           element={
             <RequireAuth>
-              <ConteoScreenPorSesion auth={auth} onSalir={() => signOut(auth)} />
+              <ConteoScreenPorSesion auth={auth} />
             </RequireAuth>
           }
         />

@@ -56,7 +56,7 @@ function renderConDosSesiones() {
         <Routes>
           <Route
             path="/conteo/:sesionId"
-            element={<ConteoScreenPorSesion auth={{} as never} onSalir={() => {}} />}
+            element={<ConteoScreenPorSesion auth={{} as never} />}
           />
         </Routes>
       </ConteoRepositoryProvider>

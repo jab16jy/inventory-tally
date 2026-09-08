@@ -27,7 +27,7 @@ function renderConteoScreen(repo: FakeConteoRepository, sesionId = "ses_1") {
         <Routes>
           <Route
             path="/conteo/:sesionId"
-            element={<ConteoScreen auth={{} as never} onSalir={vi.fn()} />}
+            element={<ConteoScreen auth={{} as never} />}
           />
         </Routes>
       </ConteoRepositoryProvider>

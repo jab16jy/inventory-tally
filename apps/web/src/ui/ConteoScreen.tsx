@@ -26,7 +26,6 @@ import { useMiAporte } from "../state/useMiAporte.js";
 import { usePendientes } from "../state/usePendientes.js";
 import { useSesion } from "../state/useSesion.js";
 import { BannerPendientes } from "./BannerPendientes.js";
-import { BotonSalir } from "./BotonSalir.js";
 import { FilaCategoria } from "./FilaCategoria.js";
 import { HojaNuevoProducto } from "./HojaNuevoProducto.js";
 import { ModalSesionCerrada } from "./ModalSesionCerrada.js";
@@ -39,14 +38,12 @@ import { Placa } from "./primitivos/Placa.js";
 
 export interface ConteoScreenProps {
   readonly auth: Auth;
-  // issue #40: sin título de una línea como las otras 3 pantallas (esta
-  // cabecera ya es progreso+búsqueda), así que "Salir" no pasa por
-  // CabeceraCajero — se inserta directo en la fila de búsqueda/filtro con el
-  // mismo BotonSalir que usan las demás.
-  readonly onSalir: () => void | Promise<void>;
+  // Sin "Salir": la salida vive en Cuenta (cajero, vía CabeceraCajero) y en
+  // el panel (admin, vía AdminLayout); en Preparar/Finalizar el cajero también
+  // la tiene. Durante el conteo no se sale de la app a mitad de tarea.
 }
 
-export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
+export function ConteoScreen({ auth }: ConteoScreenProps) {
   // Mismo criterio que PrepararScreen/FinalizarScreen: un admin que entró a
   // contar desde /admin no tiene forma de volver salvo cerrar sesión.
   const esAdmin = useAuthState(auth)?.esAdmin ?? false;
@@ -303,7 +300,6 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
               Volver al panel
             </button>
           )}
-          <BotonSalir onSalir={onSalir} />
         </div>
 
         {/* Fila propia (D-5/D-3, docs/diseno/etapa-3-ui.md): no cabe
@@ -466,7 +462,7 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
  * cuenta para quien CREA el elemento, no para el componente que lo contiene
  * (error real cometido y corregido durante esta ola).
  */
-export function ConteoScreenPorSesion({ auth, onSalir }: ConteoScreenProps) {
+export function ConteoScreenPorSesion({ auth }: ConteoScreenProps) {
   const { sesionId } = useParams<{ sesionId: string }>();
-  return <ConteoScreen key={sesionId} auth={auth} onSalir={onSalir} />;
+  return <ConteoScreen key={sesionId} auth={auth} />;
 }

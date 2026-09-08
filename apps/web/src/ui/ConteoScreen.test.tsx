@@ -1,5 +1,5 @@
 import { FakeConteoRepository } from "@conteo/data";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ConteoRepositoryProvider } from "../state/repositorio-contexto.js";
@@ -24,7 +24,6 @@ function usuarioFake(rol: "admin" | "cajero") {
 function renderConteoScreen(
   repo: FakeConteoRepository,
   sesionId = "ses_1",
-  onSalir = vi.fn(),
   areaActiva = "area_1",
 ) {
   // ADR-23: sin esto, ConteoScreen redirige a /preparar por falta de área activa.
@@ -33,10 +32,7 @@ function renderConteoScreen(
     <MemoryRouter initialEntries={[`/conteo/${sesionId}`]}>
       <ConteoRepositoryProvider repo={repo}>
         <Routes>
-          <Route
-            path="/conteo/:sesionId"
-            element={<ConteoScreen auth={{} as never} onSalir={onSalir} />}
-          />
+          <Route path="/conteo/:sesionId" element={<ConteoScreen auth={{} as never} />} />
           <Route path="/admin" element={<p>Pantalla de admin</p>} />
         </Routes>
       </ConteoRepositoryProvider>
@@ -130,7 +126,7 @@ describe("ConteoScreen (doc 11 §4)", () => {
       actualizadaPor: "",
     });
 
-    renderConteoScreen(repo, "ses_1", vi.fn(), "area_aseo");
+    renderConteoScreen(repo, "ses_1", "area_aseo");
 
     // Por defecto sólo se ve mi área (Aseo) — Bebidas no es mía.
     expect(await screen.findByRole("button", { name: /contar \$5\.000/i })).toBeInTheDocument();
@@ -202,7 +198,7 @@ describe("ConteoScreen (doc 11 §4)", () => {
       actualizadaPor: "",
     });
 
-    renderConteoScreen(repo, "ses_1", vi.fn(), "area_bodega");
+    renderConteoScreen(repo, "ses_1", "area_bodega");
 
     expect(await screen.findByRole("button", { name: /contar \$1\.000/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /contar \$3\.000/i })).toBeInTheDocument();
@@ -245,7 +241,7 @@ describe("ConteoScreen (doc 11 §4)", () => {
       actualizadaPor: "",
     });
 
-    renderConteoScreen(repo, "ses_1", vi.fn(), "area_bodega");
+    renderConteoScreen(repo, "ses_1", "area_bodega");
 
     expect(await screen.findByRole("button", { name: /contar \$1\.000/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /contar \$3\.000/i })).toBeInTheDocument();
@@ -313,7 +309,7 @@ describe("ConteoScreen (doc 11 §4)", () => {
       actualizadaPor: "",
     });
 
-    renderConteoScreen(repo, "ses_1", vi.fn(), "area_bodega"); // mi área no tiene nada asignado
+    renderConteoScreen(repo, "ses_1", "area_bodega"); // mi área no tiene nada asignado
 
     expect(await screen.findByRole("status")).toHaveTextContent(
       /no hay categorías asignadas a tu área/i,
@@ -339,7 +335,7 @@ describe("ConteoScreen (doc 11 §4)", () => {
       actualizadaPor: "",
     });
 
-    renderConteoScreen(repo, "ses_1", vi.fn(), "area_bodega"); // mi área SÍ tiene categorías
+    renderConteoScreen(repo, "ses_1", "area_bodega"); // mi área SÍ tiene categorías
 
     await screen.findByRole("button", { name: /contar \$10\.000/i });
 
@@ -351,17 +347,11 @@ describe("ConteoScreen (doc 11 §4)", () => {
     expect(screen.queryByRole("button", { name: /contar/i })).not.toBeInTheDocument();
   });
 
-  it("ofrece un control de salida (issue #40), sin romper la restricción de /cerrar|descartar/i", () => {
-    const onSalir = vi.fn();
-    renderConteoScreen(new FakeConteoRepository(), "ses_1", onSalir);
+  it("no ofrece Salir en conteo: la salida vive en Cuenta (cajero) y en el panel (admin)", () => {
+    renderConteoScreen(new FakeConteoRepository());
 
-    const boton = screen.getByRole("button", { name: /^salir$/i });
+    expect(screen.queryByRole("button", { name: /^salir$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /cerrar|descartar/i })).not.toBeInTheDocument();
-
-    fireEvent.click(boton);
-    const dialogo = screen.getByRole("dialog");
-    fireEvent.click(within(dialogo).getByRole("button", { name: /^salir$/i }));
-    expect(onSalir).toHaveBeenCalledTimes(1);
   });
 
   // Par afirmativo de la guarda `lineasDeMiArea.length < lineas.length`
@@ -410,7 +400,8 @@ describe("ConteoScreen (doc 11 §4)", () => {
 
     renderConteoScreen(new FakeConteoRepository());
 
-    expect(await screen.findByRole("button", { name: /^salir$/i })).toBeInTheDocument();
+    await screen.findByRole("searchbox");
+    expect(screen.queryByRole("button", { name: /^salir$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /volver al panel/i })).not.toBeInTheDocument();
   });
 });

@@ -1,9 +1,9 @@
 // apps/web/src/ui/CabeceraCajero.tsx — issue #40 (variante A elegida sobre
 // /prototype: Salir dentro de la cabecera existente, sin barra nueva). Las 3
 // pantallas lineales del cajero con título propio (Sucursales, Preparar,
-// Finalizar) comparten esta cabecera; ConteoScreen no, porque su cabecera ya
-// es progreso+búsqueda sin un título de una línea — ahí BotonSalir se inserta
-// directo en su fila existente.
+// Finalizar) comparten esta cabecera; ConteoScreen no lleva Salir: su
+// cabecera es progreso+búsqueda y la salida vive en Cuenta (cajero) y en el
+// panel (admin).
 import type { ReactNode } from "react";
 import { BotonSalir } from "./BotonSalir.js";
 
