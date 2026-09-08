@@ -11,7 +11,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   estaPendiente,
   promedioCategoria,
-  siguientePendiente,
+  quitarPartida,
   totalUnidadesSesion,
 } from "@conteo/shared";
 import { datos } from "../lib/formato.js";
@@ -167,8 +167,42 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
   // 0 como "nunca absurdo", sin cálculo aparte aquí.
   const promedioEnEdicion = lineaEnEdicion ? promedioCategoria(lineaEnEdicion) : 0;
 
-  function confirmarDesdeHoja(cantidad: number): void {
+  // `agrupar` y `borrarTanda` SUMAN Y RESTAN sobre `miAporteEnEdicion`, que
+  // llega un render DESPUÉS de escribir, y el repositorio escribe `cantidad` y
+  // `partidas` como valores planos (no `increment`/`arrayUnion`, que sí usa
+  // `version`). Dos escrituras seguidas antes del eco leerían el mismo
+  // snapshot viejo y la segunda pisaría la tanda de la primera: un conteo
+  // perdido en silencio, que es justo lo que AGENTS.md §1 prohíbe simplificar.
+  //
+  // Contención: `version` sube en CADA escritura (el fake la incrementa, el
+  // repositorio real usa `increment(1)`), así que sirve de acuse genérico para
+  // agrupar y para borrar por igual. Mientras la versión no supere a la que
+  // había al escribir, la Hoja queda bloqueada y lo tecleado se conserva.
+  //
+  // ponytail: contención, no la cura. La cura de raíz es que el cliente mande
+  // un DELTA y el backend sume con `FieldValue.increment` + `arrayUnion`, como
+  // ya hace con `version` — eso elimina la lectura previa en vez de esperarla,
+  // y de paso arregla dos dispositivos del mismo cajero, que esto no cubre.
+  // Exige cambiar `RegistrarAporteInput` en packages/data, fuera de este
+  // candidato.
+  const [versionAlEscribir, setVersionAlEscribir] = useState<number | null>(null);
+  const versionVista = miAporteEnEdicion?.version ?? 0;
+  const esperandoEco = versionAlEscribir !== null && versionVista <= versionAlEscribir;
+
+  useEffect(() => {
+    setVersionAlEscribir(null);
+  }, [categoriaEnEdicion]);
+
+  // ADR-24: agrupar una tanda SUMA sobre lo que el cajero ya tenía —nunca
+  // reemplaza `cantidad`— y agrega la tanda al ledger `partidas`. A
+  // diferencia de la vieja `confirmarDesdeHoja`, NO avanza a la siguiente
+  // pendiente: quedarse en la misma categoría para la próxima tanda es el
+  // requisito central de la feature (el cajero cuenta 50, agrupa, cuenta 30
+  // más, agrupa de nuevo, sin volver a tocar la fila).
+  function agrupar(cantidad: number): void {
     if (!categoriaEnEdicion) return;
+    if (esperandoEco) return;
+    setVersionAlEscribir(versionVista);
     // El modal bloqueante NO es la garantía: la inercia del <dialog> nativo
     // sólo detiene la INTERACCIÓN del usuario, y aun así deja una ventana
     // real entre que el admin cierra la sesión y que el listener lo emite.
@@ -180,11 +214,39 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
       sesionId,
       categoriaId: categoriaEnEdicion,
       areaId: areaActiva,
-      cantidad,
+      cantidad: (miAporteEnEdicion?.cantidad ?? 0) + cantidad,
+      partidas: [...(miAporteEnEdicion?.partidas ?? []), { id: crypto.randomUUID(), cantidad }],
     });
-    // Avanza sola a la siguiente pendiente (plan §5) — o cierra si el
-    // cajero ya terminó el catálogo.
-    setCategoriaEnEdicion(siguientePendiente(lineas, uid, categoriaEnEdicion, areaActiva));
+  }
+
+  // Borra UNA tanda del ledger (ADR-24, papelera): `quitarPartida` calcula
+  // cuánto restar de `cantidad` — nunca la cantidad de la tanda a ciegas, por
+  // si algún día dos tandas comparten id (ver el docstring de la función en
+  // calculadora.ts). Misma guarda de sesión cerrada que `agrupar`, y por la
+  // misma razón: el modal no es la garantía de integridad.
+  function borrarTanda(id: string): void {
+    if (!categoriaEnEdicion) return;
+    if (sesionCerrada) return;
+    if (esperandoEco) return;
+    setVersionAlEscribir(versionVista);
+    const { partidas, restado } = quitarPartida(miAporteEnEdicion?.partidas ?? [], id);
+    void repo.registrarAporte({
+      sesionId,
+      categoriaId: categoriaEnEdicion,
+      areaId: areaActiva,
+      // El clamp NO es decorativo y la invariante `suma(partidas) <= cantidad`
+      // NO está garantizada: el stepper −/+ de `FilaCategoria` escribe
+      // `cantidad` sin tocar `partidas`, así que bajarlo a mano puede dejar
+      // `cantidad` por DEBAJO de la suma del ledger. En ese estado borrar una
+      // tanda restaría de más, y el clamp evita una cantidad negativa —
+      // enmascarando el desfase, no reconciliándolo: "Tu conteo" puede leer 0
+      // con tandas todavía listadas en la papelera.
+      // ponytail: se acota el daño, no se reconcilia. La reconciliación real
+      // es que el stepper mantenga también el ledger, o que desaparezca ahora
+      // que la calculadora agrupa — decisión de UX que no entra acá.
+      cantidad: Math.max(0, (miAporteEnEdicion?.cantidad ?? 0) - restado),
+      partidas,
+    });
   }
 
   // Cierra la Hoja sólo tras confirmar la escritura (no en un `finally`):
@@ -416,8 +478,11 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
         abierta={lineaEnEdicion !== null}
         etiqueta={lineaEnEdicion?.etiqueta ?? ""}
         valorInicial={miAporteEnEdicion?.cantidad ?? 0}
+        partidas={miAporteEnEdicion?.partidas ?? []}
+        esperandoEco={esperandoEco}
         promedioCategoria={promedioEnEdicion}
-        onConfirmar={confirmarDesdeHoja}
+        onAgrupar={agrupar}
+        onBorrarPartida={borrarTanda}
         onVolver={() => setCategoriaEnEdicion(null)}
       />
 
