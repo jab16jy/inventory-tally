@@ -185,6 +185,27 @@ describe("quitarPartida", () => {
     expect(resultado.restado).toBe(50);
   });
 
+  it("ids duplicados: quita UNA sola entrada y resta exactamente esa cantidad", () => {
+    // R3-002 del review de ADR-24. Nada en el tipo `Partida`, en los
+    // repositorios ni en las reglas impide dos tandas con el mismo id. Con
+    // `find` para restar y `filter` para borrar, el ledger perdía las dos
+    // entradas mientras `restado` informaba una sola: quien reste eso de
+    // `Aporte.cantidad` deja el total POR ENCIMA de la suma real del ledger,
+    // que es dinero contado que nadie puede ya borrar desde la papelera.
+    const partidas: Partida[] = [
+      { id: "dup", cantidad: 50 },
+      { id: "otra", cantidad: 30 },
+      { id: "dup", cantidad: 50 },
+    ];
+    const resultado = quitarPartida(partidas, "dup");
+    expect(resultado.partidas).toEqual([
+      { id: "otra", cantidad: 30 },
+      { id: "dup", cantidad: 50 },
+    ]);
+    expect(resultado.restado).toBe(50);
+    expect(totalPartidas(resultado.partidas)).toBe(totalPartidas(partidas) - resultado.restado);
+  });
+
   it("id inexistente: deja el array intacto y restado 0 (idempotente ante doble toque)", () => {
     const partidas: Partida[] = [{ id: "p1", cantidad: 50 }];
     const resultado = quitarPartida(partidas, "p_no_existe");
