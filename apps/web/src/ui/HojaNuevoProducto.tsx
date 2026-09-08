@@ -128,6 +128,12 @@ export function HojaNuevoProducto({ abierta, areas, onCrear, onVolver }: HojaNue
       ref={dialogRef}
       onClose={onVolver}
       onCancel={onVolver}
+      // Mismo cierre por backdrop que Hoja.tsx: sólo cierra cuando el toque
+      // cae fuera del contenido. Sin pérdida: el formulario sólo se resetea
+      // al abrir, no al cerrar.
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onVolver();
+      }}
       aria-label="Nuevo producto"
       className="fixed inset-x-0 top-auto bottom-0 m-0 w-full max-w-md rounded-t-placa border-t border-borde bg-placa-alta p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop:bg-fondo/70 open:flex open:flex-col open:gap-3"
     >
@@ -162,7 +168,13 @@ export function HojaNuevoProducto({ abierta, areas, onCrear, onVolver }: HojaNue
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <p className="text-medio font-semibold text-tinta">Nuevo producto</p>
-            <button type="button" onClick={onVolver} className="text-micro text-tenue underline">
+            {/* Botón secundario de verdad, igual que en Hoja.tsx: objetivo
+                táctil --size-toque en vez de texto subrayado. */}
+            <button
+              type="button"
+              onClick={onVolver}
+              className="min-h-[var(--size-toque)] shrink-0 rounded-placa border border-borde px-3 text-micro font-semibold text-tenue active:border-senal active:text-tinta"
+            >
               Volver
             </button>
           </div>

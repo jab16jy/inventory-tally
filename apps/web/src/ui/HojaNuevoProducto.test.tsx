@@ -158,4 +158,34 @@ describe("HojaNuevoProducto (ADR-21, doc 11 §10)", () => {
     expect(screen.queryByText(/no se pudo crear el producto/i)).not.toBeInTheDocument();
     consoleError.mockRestore();
   });
+
+  it('"Volver" se llama Volver y es un botón de verdad con objetivo táctil', () => {
+    render(<HojaNuevoProducto abierta={true} areas={[]} onCrear={vi.fn()} onVolver={() => {}} />);
+
+    expect(screen.queryByRole("button", { name: /cerrar|descartar/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /volver/i })).toHaveClass(
+      "min-h-[var(--size-toque)]",
+    );
+  });
+
+  it("tocar fuera de la hoja (backdrop) la cierra sin crear nada", () => {
+    const onVolver = vi.fn();
+    const onCrear = vi.fn();
+    render(<HojaNuevoProducto abierta={true} areas={[]} onCrear={onCrear} onVolver={onVolver} />);
+
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Bolsas" } });
+    fireEvent.click(screen.getByRole("dialog"));
+
+    expect(onVolver).toHaveBeenCalledTimes(1);
+    expect(onCrear).not.toHaveBeenCalled();
+  });
+
+  it("tocar dentro de la hoja no la cierra (control negativo del backdrop)", () => {
+    const onVolver = vi.fn();
+    render(<HojaNuevoProducto abierta={true} areas={[]} onCrear={vi.fn()} onVolver={onVolver} />);
+
+    fireEvent.click(screen.getByText("Nuevo producto"));
+
+    expect(onVolver).not.toHaveBeenCalled();
+  });
 });

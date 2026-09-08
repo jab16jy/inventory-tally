@@ -465,4 +465,59 @@ describe("Hoja", () => {
     fireEvent.click(screen.getByRole("button", { name: /volver/i }));
     expect(onVolver).toHaveBeenCalledOnce();
   });
+
+  it('"Volver" es un botón de verdad con objetivo táctil, no texto subrayado', () => {
+    render(
+      <Hoja
+        abierta={true}
+        etiqueta="$5.000"
+        valorInicial={0}
+        partidas={[]}
+        onAgrupar={() => {}}
+        onBorrarPartida={() => {}}
+        onVolver={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /volver/i })).toHaveClass(
+      "min-h-[var(--size-toque)]",
+    );
+  });
+
+  it("tocar fuera de la hoja (backdrop) la cierra sin agrupar", () => {
+    const onVolver = vi.fn();
+    const onAgrupar = vi.fn();
+    render(
+      <Hoja
+        abierta={true}
+        etiqueta="$5.000"
+        valorInicial={0}
+        partidas={[]}
+        onAgrupar={onAgrupar}
+        onBorrarPartida={() => {}}
+        onVolver={onVolver}
+      />,
+    );
+    fireEvent.click(screen.getByRole("dialog"));
+
+    expect(onVolver).toHaveBeenCalledTimes(1);
+    expect(onAgrupar).not.toHaveBeenCalled();
+  });
+
+  it("tocar dentro de la hoja no la cierra (control negativo del backdrop)", () => {
+    const onVolver = vi.fn();
+    render(
+      <Hoja
+        abierta={true}
+        etiqueta="$5.000"
+        valorInicial={0}
+        partidas={[]}
+        onAgrupar={() => {}}
+        onBorrarPartida={() => {}}
+        onVolver={onVolver}
+      />,
+    );
+    fireEvent.click(screen.getByText("$5.000"));
+
+    expect(onVolver).not.toHaveBeenCalled();
+  });
 });

@@ -153,6 +153,14 @@ export function Hoja({
       ref={dialogRef}
       onClose={onVolver}
       onCancel={onVolver}
+      // Cierre por backdrop (toque fuera): `e.target` es el <dialog> sólo
+      // cuando el toque cae fuera de su contenido — los toques dentro
+      // burbujean con otro target y no cierran. Sin pérdida: lo tecleado sin
+      // agrupar sobrevive porque el estado sólo se resetea al cambiar de
+      // categoría (efecto de [etiqueta]).
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onVolver();
+      }}
       aria-label={`Contar ${etiqueta}`}
       className={clsx(
         // `top-auto` es lo que de verdad hace que suba "dentro del deck" en
@@ -169,7 +177,15 @@ export function Hoja({
     >
       <div className="flex items-center justify-between">
         <p className="text-medio font-semibold text-tinta">{etiqueta}</p>
-        <button type="button" onClick={onVolver} className="text-micro text-tenue underline">
+        {/* Botón secundario de verdad (objetivo táctil --size-toque), no texto
+            subrayado: con guantes y poca luz el enlace no se ve tocable. El
+            nombre accesible sigue siendo "Volver", nunca "Cerrar" (DESIGN.md,
+            restricción de ConteoScreen.test.tsx). */}
+        <button
+          type="button"
+          onClick={onVolver}
+          className="min-h-[var(--size-toque)] shrink-0 rounded-placa border border-borde px-3 text-micro font-semibold text-tenue active:border-senal active:text-tinta"
+        >
           Volver
         </button>
       </div>
