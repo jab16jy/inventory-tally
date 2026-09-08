@@ -569,10 +569,7 @@ describe("AnalisisScreen (rediseño)", () => {
       "ses_1",
       lineaBase("cat_a", 2000, 10, { aplicados: { uid_ana__area_1: 10 } }),
     ); // 20.000
-    repo.sembrarLinea(
-      "ses_1",
-      lineaBase("cat_b", 3000, 5, { aplicados: { uid_ana__area_2: 5 } }),
-    ); // 15.000
+    repo.sembrarLinea("ses_1", lineaBase("cat_b", 3000, 5, { aplicados: { uid_ana__area_2: 5 } })); // 15.000
     repo.sembrarSincronizacion("ses_1", todosSincronizados());
 
     renderPantalla(repo);
