@@ -108,12 +108,14 @@ describe("FirestoreConteoRepository.registrarAporte · repositorio real contra e
       sesionId,
       categoriaId: "cat_1",
       areaId: "area_1",
-      cantidad: 3,
+      deltaCantidad: 3,
+      agregarPartida: { id: "p1", cantidad: 3 },
     });
 
     const ref = dbAdmin.doc(`sesiones/${sesionId}/lineas/cat_1/aportes/uid_ana_real__area_1`);
     const snap = await esperarDoc(ref);
     expect(snap.data()?.areaId).toBe("area_1");
     expect(snap.data()?.cantidad).toBe(3);
+    expect(snap.data()?.partidas).toEqual([{ id: "p1", cantidad: 3 }]);
   }, 15_000);
 });

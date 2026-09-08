@@ -2,6 +2,8 @@
 import type { Functions } from "firebase/functions";
 import { httpsCallable } from "firebase/functions";
 import {
+  arrayRemove,
+  arrayUnion,
   collection,
   doc,
   getDocs,
@@ -225,10 +227,23 @@ export class FirestoreConteoRepository implements ConteoRepository {
     sesionId,
     categoriaId,
     areaId,
-    cantidad,
-    partidas,
+    deltaCantidad,
+    agregarPartida,
+    quitarPartida,
   }: RegistrarAporteInput): Promise<void> {
-    if (cantidad < 0) throw new CantidadInvalidaError("La cantidad no puede ser negativa");
+    if (!Number.isInteger(deltaCantidad) || deltaCantidad === 0) {
+      throw new CantidadInvalidaError("La cantidad del aporte debe ser un entero distinto de cero");
+    }
+    if (deltaCantidad > 0 && (!agregarPartida || agregarPartida.cantidad !== deltaCantidad)) {
+      throw new CantidadInvalidaError(
+        "Un aporte positivo requiere una partida con la misma cantidad que deltaCantidad",
+      );
+    }
+    if (deltaCantidad < 0 && (!quitarPartida || quitarPartida.cantidad !== -deltaCantidad)) {
+      throw new CantidadInvalidaError(
+        "Un aporte negativo requiere la partida exacta a retirar con cantidad igual a -deltaCantidad",
+      );
+    }
 
     const uid = this.usuario.obtenerUid();
     const ref = doc(
@@ -240,17 +255,16 @@ export class FirestoreConteoRepository implements ConteoRepository {
       "aportes",
       `${uid}__${areaId}`,
     );
-    const datos = {
+    const datos: Record<string, unknown> = {
       uid,
       areaId,
       nombre: this.usuario.obtenerNombre() ?? "",
-      cantidad,
+      cantidad: increment(deltaCantidad),
       registradoEn: serverTimestamp(),
       dispositivoId: obtenerIdDispositivo(),
       version: increment(1),
-      // ADR-24: sólo se incluye cuando viene definida — Firestore rechaza
-      // `undefined` como valor de campo.
-      ...(partidas !== undefined ? { partidas } : {}),
+      ...(agregarPartida !== undefined ? { partidas: arrayUnion(agregarPartida) } : {}),
+      ...(quitarPartida !== undefined ? { partidas: arrayRemove(quitarPartida) } : {}),
     };
 
     this.incrementarPendientes(sesionId);

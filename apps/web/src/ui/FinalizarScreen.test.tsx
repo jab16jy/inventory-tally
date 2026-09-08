@@ -118,7 +118,8 @@ describe("FinalizarScreen (F3-B, doc 11 §6)", () => {
       sesionId: "ses_1",
       categoriaId: "cat_1000",
       areaId: "",
-      cantidad: 3,
+      deltaCantidad: 3,
+      agregarPartida: { id: "p1", cantidad: 3 },
     });
 
     renderPantalla(repo);
@@ -195,7 +196,8 @@ describe("FinalizarScreen (F3-B, doc 11 §6)", () => {
       sesionId: "ses_1",
       categoriaId: "cat_1000",
       areaId: "",
-      cantidad: 3,
+      deltaCantidad: 3,
+      agregarPartida: { id: "p1", cantidad: 3 },
     });
 
     renderPantalla(repo);

@@ -15,17 +15,31 @@ import type { Pagina } from "./admin-repository.js";
 
 export type Unsubscribe = () => void;
 
-export interface RegistrarAporteInput {
+export interface RegistrarAporteBase {
   readonly sesionId: string;
   readonly categoriaId: string;
   /** Área activa del contador al aportar (ADR-23) — parte de la clave del
    *  documento (`{uid}__{areaId}`, infra/firestore.rules:74-80). */
   readonly areaId: string;
-  readonly cantidad: number;
-  /** Ledger de tandas agrupadas (ADR-24). Ausente = toque suelto del
-   *  stepper: no crea una tanda nueva en `Aporte.partidas`. */
-  readonly partidas?: readonly Partida[];
 }
+
+export interface RegistrarAporteAgregar extends RegistrarAporteBase {
+  /** Delta positivo a sumar en `cantidad` (ADR-24 / Issue #91). */
+  readonly deltaCantidad: number;
+  /** Tanda nueva a anexar al ledger (`arrayUnion`). Debe coincidir con deltaCantidad. */
+  readonly agregarPartida: Partida;
+  readonly quitarPartida?: never;
+}
+
+export interface RegistrarAporteQuitar extends RegistrarAporteBase {
+  /** Delta negativo a restar en `cantidad` (ADR-24 / Issue #91). */
+  readonly deltaCantidad: number;
+  /** Tanda a retirar del ledger (`arrayRemove`). Debe tener cantidad igual a -deltaCantidad. */
+  readonly quitarPartida: Partida;
+  readonly agregarPartida?: never;
+}
+
+export type RegistrarAporteInput = RegistrarAporteAgregar | RegistrarAporteQuitar;
 
 // ── payloads de catálogo-en-conteo ──
 // Declarados AQUÍ, no importados de `@conteo/contracts` — mismo criterio que

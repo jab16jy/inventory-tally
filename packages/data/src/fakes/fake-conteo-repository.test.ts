@@ -5,6 +5,7 @@ import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import { describe, expect, it, vi } from "vitest";
+import type { RegistrarAporteInput } from "../repositories/conteo-repository.js";
 import { FakeConteoRepository } from "./fake-conteo-repository.js";
 
 function crearLinea(overrides: Partial<LineaConteo> = {}): LineaConteo {
@@ -86,7 +87,8 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 12,
+      deltaCantidad: 12,
+      agregarPartida: { id: "p1", cantidad: 12 },
     });
 
     const ultima = recibidas.at(-1);
@@ -102,7 +104,8 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_bodega",
-      cantidad: 12,
+      deltaCantidad: 12,
+      agregarPartida: { id: "p1", cantidad: 12 },
     });
 
     const recibidas: LineaConteo[][] = [];
@@ -120,22 +123,24 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 12,
+      deltaCantidad: 12,
+      agregarPartida: { id: "p1", cantidad: 12 },
     });
     await repo.registrarAporte({
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 8,
+      deltaCantidad: 5,
+      agregarPartida: { id: "p2", cantidad: 5 },
     });
 
     const recibidas: LineaConteo[][] = [];
     repo.observarLineas("ses_1", (lineas) => recibidas.push(lineas));
-    expect(recibidas[0]?.[0]?.cantidadTotal).toBe(8);
+    expect(recibidas[0]?.[0]?.cantidadTotal).toBe(17);
     expect(recibidas[0]?.[0]?.numAportantes).toBe(1);
   });
 
-  it("ADR-24: agrupar 50 y después 80 (dos tandas) deja cantidad 80, dos partidas y cantidadTotal 80; después 30 con una tanda baja cantidadTotal y porArea", async () => {
+  it("ADR-24: agrupar 50 y después 30 deja cantidad 80 y dos partidas; después borrar tanda 30 baja cantidadTotal y porArea", async () => {
     const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
     repo.sembrarLinea("ses_1", crearLinea());
 
@@ -146,18 +151,15 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 50,
-      partidas: [{ id: "p1", cantidad: 50 }],
+      deltaCantidad: 50,
+      agregarPartida: { id: "p1", cantidad: 50 },
     });
     await repo.registrarAporte({
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 80,
-      partidas: [
-        { id: "p1", cantidad: 50 },
-        { id: "p2", cantidad: 30 },
-      ],
+      deltaCantidad: 30,
+      agregarPartida: { id: "p2", cantidad: 30 },
     });
 
     expect(recibidos.at(-1)?.cantidad).toBe(80);
@@ -171,51 +173,21 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 30,
-      partidas: [{ id: "p3", cantidad: 30 }],
+      deltaCantidad: -30,
+      quitarPartida: { id: "p2", cantidad: 30 },
     });
 
-    expect(recibidos.at(-1)?.cantidad).toBe(30);
-    expect(recibidos.at(-1)?.partidas).toEqual([{ id: "p3", cantidad: 30 }]);
+    expect(recibidos.at(-1)?.cantidad).toBe(50);
+    expect(recibidos.at(-1)?.partidas).toEqual([{ id: "p1", cantidad: 50 }]);
 
     const recibidasFinal: LineaConteo[][] = [];
     repo.observarLineas("ses_1", (lineas) => recibidasFinal.push(lineas));
-    expect(recibidasFinal[0]?.[0]?.cantidadTotal).toBe(30);
-    expect(recibidasFinal[0]?.[0]?.porArea).toEqual({ area_1: 30 });
+    expect(recibidasFinal[0]?.[0]?.cantidadTotal).toBe(50);
+    expect(recibidasFinal[0]?.[0]?.porArea).toEqual({ area_1: 50 });
   });
 
-  it("ADR-24: una escritura sin `partidas` (el stepper −/+) conserva el ledger ya agrupado", async () => {
-    // Espeja `setDoc(..., { merge: true })` de FirestoreConteoRepository: un
-    // campo AUSENTE no borra el valor anterior. Sin esta guarda el fake
-    // pisaba `partidas` con `undefined` y el primer toque del stepper después
-    // de agrupar vaciaba la papelera sólo en los tests — producción conservaba
-    // las tandas. Un fake que miente sobre esto es peor que no tenerlo.
+  it("ADR-24: rechaza escrituras positivas sin partida o con cantidad desigual para blindar cantidad === suma(partidas)", async () => {
     const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
-    repo.sembrarLinea("ses_1", crearLinea());
-
-    const recibidos: Array<Aporte | null> = [];
-    repo.observarMiAporte("ses_1", "cat_5000", "area_1", (aporte) => recibidos.push(aporte));
-
-    await repo.registrarAporte({
-      sesionId: "ses_1",
-      categoriaId: "cat_5000",
-      areaId: "area_1",
-      cantidad: 50,
-      partidas: [{ id: "p1", cantidad: 50 }],
-    });
-    await repo.registrarAporte({
-      sesionId: "ses_1",
-      categoriaId: "cat_5000",
-      areaId: "area_1",
-      cantidad: 51, // stepper +1: no manda partidas
-    });
-
-    expect(recibidos.at(-1)?.cantidad).toBe(51);
-    expect(recibidos.at(-1)?.partidas).toEqual([{ id: "p1", cantidad: 50 }]);
-  });
-
-  it("registrarAporte con cantidad negativa lanza CantidadInvalidaError", async () => {
-    const repo = new FakeConteoRepository();
     repo.sembrarLinea("ses_1", crearLinea());
 
     await expect(
@@ -223,7 +195,41 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
         sesionId: "ses_1",
         categoriaId: "cat_5000",
         areaId: "area_1",
-        cantidad: -1,
+        deltaCantidad: 50,
+      } as unknown as RegistrarAporteInput),
+    ).rejects.toBeInstanceOf(CantidadInvalidaError);
+
+    await expect(
+      repo.registrarAporte({
+        sesionId: "ses_1",
+        categoriaId: "cat_5000",
+        areaId: "area_1",
+        deltaCantidad: 50,
+        agregarPartida: { id: "p1", cantidad: 40 },
+      }),
+    ).rejects.toBeInstanceOf(CantidadInvalidaError);
+  });
+
+  it("ADR-24: rechaza escrituras negativas sin partida o con cantidad desigual", async () => {
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarLinea("ses_1", crearLinea());
+
+    await expect(
+      repo.registrarAporte({
+        sesionId: "ses_1",
+        categoriaId: "cat_5000",
+        areaId: "area_1",
+        deltaCantidad: -10,
+      } as unknown as RegistrarAporteInput),
+    ).rejects.toBeInstanceOf(CantidadInvalidaError);
+
+    await expect(
+      repo.registrarAporte({
+        sesionId: "ses_1",
+        categoriaId: "cat_5000",
+        areaId: "area_1",
+        deltaCantidad: -10,
+        quitarPartida: { id: "p1", cantidad: 5 },
       }),
     ).rejects.toBeInstanceOf(CantidadInvalidaError);
   });
@@ -242,7 +248,8 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 12,
+      deltaCantidad: 12,
+      agregarPartida: { id: "p1", cantidad: 12 },
     });
     expect(recibidos.at(-1)).toEqual({ cantidad: 12, version: 1 });
 
@@ -250,7 +257,8 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 15,
+      deltaCantidad: 3,
+      agregarPartida: { id: "p2", cantidad: 3 },
     });
     expect(recibidos.at(-1)).toEqual({ cantidad: 15, version: 2 });
   });
@@ -269,7 +277,8 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_2",
-      cantidad: 10,
+      deltaCantidad: 10,
+      agregarPartida: { id: "p1", cantidad: 10 },
     });
 
     expect(recibidosArea1).toHaveLength(1);
@@ -279,7 +288,8 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 5,
+      deltaCantidad: 5,
+      agregarPartida: { id: "p2", cantidad: 5 },
     });
     expect(recibidosArea1).toHaveLength(2);
     expect(recibidosArea1[1]).toEqual({ cantidad: 5, version: 1 });
@@ -371,7 +381,8 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
         sesionId: "ses_1",
         categoriaId: "cat_5000",
         areaId: "area_1",
-        cantidad: 12,
+        deltaCantidad: 12,
+        agregarPartida: { id: "p1", cantidad: 12 },
       });
       // El registro local es instantáneo: la promesa resuelve sin esperar la
       // "sincronización" (mismo contrato que FirestoreConteoRepository).
@@ -487,7 +498,8 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
           sesionId: "ses_1",
           categoriaId: "cat_5000",
           areaId: "area_1",
-          cantidad: 12,
+          deltaCantidad: 12,
+          agregarPartida: { id: "p1", cantidad: 12 },
         });
         expect(pendientes.at(-1)).toBe(1);
 
@@ -516,7 +528,8 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
           sesionId: "ses_1",
           categoriaId: "cat_5000",
           areaId: "area_1",
-          cantidad: 12,
+          deltaCantidad: 12,
+          agregarPartida: { id: "p1", cantidad: 12 },
         });
         await vi.advanceTimersByTimeAsync(0);
 
@@ -546,7 +559,8 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
           sesionId: "ses_1",
           categoriaId: "cat_5000",
           areaId: "area_1",
-          cantidad: 12,
+          deltaCantidad: 12,
+          agregarPartida: { id: "p1", cantidad: 12 },
         });
         await vi.advanceTimersByTimeAsync(0);
         expect(errores.at(-1)).toBe(1);
