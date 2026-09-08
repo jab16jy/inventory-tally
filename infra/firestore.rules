@@ -75,12 +75,20 @@ service cloud.firestore {
         && tieneSucursal(sesion(sesionId).sucursalId)            // ← A-3
         && sesionAbierta(sesionId)                               // ← A-4
         && request.resource.data.keys().hasOnly(
-             ['uid', 'areaId', 'nombre', 'cantidad', 'registradoEn', 'dispositivoId', 'version'])
+             ['uid', 'areaId', 'nombre', 'cantidad', 'registradoEn', 'dispositivoId', 'version', 'partidas'])
         && request.resource.data.areaId is string
         && request.resource.data.areaId.size() > 0
         && request.resource.data.cantidad is int
         && request.resource.data.cantidad >= 0                   // ← A-7
         && request.resource.data.cantidad <= 100000
+        // ponytail: las reglas de Firestore no iteran, no se puede validar
+        // cada elemento del array (ADR-24) — `cantidad` sigue siendo el
+        // campo con contrato duro (`is int`, `0..100000`) y `partidas` es un
+        // ledger descriptivo. No hay superficie de ataque nueva: `cantidad`
+        // ya la declaraba el cliente sin este campo.
+        && (!('partidas' in request.resource.data) ||
+              (request.resource.data.partidas is list
+               && request.resource.data.partidas.size() <= 200))
         && request.resource.data.uid == miUid()
         // D1: `version` es la única guardia de idempotencia del trigger; sin
         // acotarla aquí el cliente la controla y puede congelar el total.

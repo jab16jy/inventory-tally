@@ -142,6 +142,43 @@ describe("FirestoreConteoRepository.registrarAporte (doc 07 §6)", () => {
     ).rejects.toBeInstanceOf(CantidadInvalidaError);
     expect(setDoc).not.toHaveBeenCalled();
   });
+
+  it("ADR-24: partidas viaja en el setDoc cuando se pasa", async () => {
+    setDoc.mockResolvedValue(undefined);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
+
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 80,
+      partidas: [
+        { id: "p1", cantidad: 50 },
+        { id: "p2", cantidad: 30 },
+      ],
+    });
+
+    const [, datos] = setDoc.mock.calls[0] as [unknown, Record<string, unknown>];
+    expect(datos.partidas).toEqual([
+      { id: "p1", cantidad: 50 },
+      { id: "p2", cantidad: 30 },
+    ]);
+  });
+
+  it("ADR-24: sin partidas, la clave NO aparece en el objeto escrito", async () => {
+    setDoc.mockResolvedValue(undefined);
+    const repo = new FirestoreConteoRepository({} as never, usuario, functions);
+
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 12,
+    });
+
+    const [, datos] = setDoc.mock.calls[0] as [unknown, Record<string, unknown>];
+    expect("partidas" in datos).toBe(false);
+  });
 });
 
 describe("FirestoreConteoRepository.observarMiAporte (issue #83)", () => {

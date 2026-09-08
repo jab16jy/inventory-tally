@@ -193,6 +193,7 @@ export class FakeConteoRepository implements ConteoRepository {
     categoriaId,
     areaId,
     cantidad,
+    partidas,
   }: RegistrarAporteInput): Promise<void> {
     if (cantidad < 0) throw new CantidadInvalidaError("La cantidad no puede ser negativa");
 
@@ -210,6 +211,11 @@ export class FakeConteoRepository implements ConteoRepository {
       registradoEn: new Date(),
       dispositivoId: "fake-device",
       version: (anterior?.version ?? 0) + 1,
+      // Espeja `setDoc(..., { merge: true })` del repositorio real (ADR-24):
+      // un campo AUSENTE conserva el valor anterior, no lo borra. El stepper
+      // −/+ escribe `cantidad ± 1` sin mandar tandas, y sin este `??` el fake
+      // vaciaría la papelera en cada toque mientras producción la conserva.
+      partidas: partidas ?? anterior?.partidas,
     };
     aportesLinea.set(claveAporte, aporte);
     this.notificar(this.listenersAporte, `${sesionId}/${categoriaId}/${areaId}`, aporte);

@@ -1,4 +1,5 @@
 import { CantidadInvalidaError } from "@conteo/shared/errors.js";
+import type { Aporte } from "@conteo/shared/models/aporte.js";
 import type { Area } from "@conteo/shared/models/area.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
@@ -132,6 +133,85 @@ describe("FakeConteoRepository (implementación en memoria, doc 07 §6)", () => 
     repo.observarLineas("ses_1", (lineas) => recibidas.push(lineas));
     expect(recibidas[0]?.[0]?.cantidadTotal).toBe(8);
     expect(recibidas[0]?.[0]?.numAportantes).toBe(1);
+  });
+
+  it("ADR-24: agrupar 50 y después 80 (dos tandas) deja cantidad 80, dos partidas y cantidadTotal 80; después 30 con una tanda baja cantidadTotal y porArea", async () => {
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarLinea("ses_1", crearLinea());
+
+    const recibidos: Array<Aporte | null> = [];
+    repo.observarMiAporte("ses_1", "cat_5000", "area_1", (aporte) => recibidos.push(aporte));
+
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 50,
+      partidas: [{ id: "p1", cantidad: 50 }],
+    });
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 80,
+      partidas: [
+        { id: "p1", cantidad: 50 },
+        { id: "p2", cantidad: 30 },
+      ],
+    });
+
+    expect(recibidos.at(-1)?.cantidad).toBe(80);
+    expect(recibidos.at(-1)?.partidas).toHaveLength(2);
+
+    const recibidasTrasAgrupar: LineaConteo[][] = [];
+    repo.observarLineas("ses_1", (lineas) => recibidasTrasAgrupar.push(lineas));
+    expect(recibidasTrasAgrupar[0]?.[0]?.cantidadTotal).toBe(80);
+
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 30,
+      partidas: [{ id: "p3", cantidad: 30 }],
+    });
+
+    expect(recibidos.at(-1)?.cantidad).toBe(30);
+    expect(recibidos.at(-1)?.partidas).toEqual([{ id: "p3", cantidad: 30 }]);
+
+    const recibidasFinal: LineaConteo[][] = [];
+    repo.observarLineas("ses_1", (lineas) => recibidasFinal.push(lineas));
+    expect(recibidasFinal[0]?.[0]?.cantidadTotal).toBe(30);
+    expect(recibidasFinal[0]?.[0]?.porArea).toEqual({ area_1: 30 });
+  });
+
+  it("ADR-24: una escritura sin `partidas` (el stepper −/+) conserva el ledger ya agrupado", async () => {
+    // Espeja `setDoc(..., { merge: true })` de FirestoreConteoRepository: un
+    // campo AUSENTE no borra el valor anterior. Sin esta guarda el fake
+    // pisaba `partidas` con `undefined` y el primer toque del stepper después
+    // de agrupar vaciaba la papelera sólo en los tests — producción conservaba
+    // las tandas. Un fake que miente sobre esto es peor que no tenerlo.
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarLinea("ses_1", crearLinea());
+
+    const recibidos: Array<Aporte | null> = [];
+    repo.observarMiAporte("ses_1", "cat_5000", "area_1", (aporte) => recibidos.push(aporte));
+
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 50,
+      partidas: [{ id: "p1", cantidad: 50 }],
+    });
+    await repo.registrarAporte({
+      sesionId: "ses_1",
+      categoriaId: "cat_5000",
+      areaId: "area_1",
+      cantidad: 51, // stepper +1: no manda partidas
+    });
+
+    expect(recibidos.at(-1)?.cantidad).toBe(51);
+    expect(recibidos.at(-1)?.partidas).toEqual([{ id: "p1", cantidad: 50 }]);
   });
 
   it("registrarAporte con cantidad negativa lanza CantidadInvalidaError", async () => {

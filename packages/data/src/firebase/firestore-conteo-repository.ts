@@ -226,6 +226,7 @@ export class FirestoreConteoRepository implements ConteoRepository {
     categoriaId,
     areaId,
     cantidad,
+    partidas,
   }: RegistrarAporteInput): Promise<void> {
     if (cantidad < 0) throw new CantidadInvalidaError("La cantidad no puede ser negativa");
 
@@ -247,6 +248,9 @@ export class FirestoreConteoRepository implements ConteoRepository {
       registradoEn: serverTimestamp(),
       dispositivoId: obtenerIdDispositivo(),
       version: increment(1),
+      // ADR-24: sólo se incluye cuando viene definida — Firestore rechaza
+      // `undefined` como valor de campo.
+      ...(partidas !== undefined ? { partidas } : {}),
     };
 
     this.incrementarPendientes(sesionId);
