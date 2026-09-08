@@ -4,7 +4,7 @@
 import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, type Transaction } from "firebase-admin/firestore";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { recalcularResumenesImpl } from "../../src/scheduled/recalcular-resumenes.js";
 import { procesarAporteEscrito } from "../../src/triggers/on-aporte-escrito.js";
 
@@ -13,7 +13,15 @@ if (getApps().length === 0) {
 }
 const db = getFirestore();
 
+const sesionesCreadas: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(sesionesCreadas.map((id) => db.recursiveDelete(db.doc(`sesiones/${id}`))));
+  sesionesCreadas.length = 0;
+});
+
 async function crearSesion(sesionId: string, estado: "abierta" | "cerrada"): Promise<void> {
+  sesionesCreadas.push(sesionId);
   await db.doc(`sesiones/${sesionId}`).set({
     sucursalId: "suc_norte",
     estado,
@@ -97,15 +105,6 @@ describe("recalcularResumenesImpl", () => {
 
     const resumenCorrupto = await resumenDe(sesionCorruptaId);
     expect(resumenCorrupto.get("dirty")).toBe(true); // sin escribir, reintenta después
-
-    // Limpieza: al no poder recomputarse nunca, esta sesión quedaría dirty
-    // para siempre y contaminaría los demás tests de este archivo (misma
-    // consulta global `estado == "abierta"`, mismo emulador compartido) —
-    // cada llamada posterior a `recalcularResumenesImpl` volvería a intentar
-    // (y descartar) su transacción, con orden no determinista frente a la de
-    // la sesión bajo prueba en cada test. Sacarla de "abierta" la saca de la
-    // consulta del cron.
-    await db.doc(`sesiones/${sesionCorruptaId}`).delete();
   });
 
   it("Cron scope · una sesión abierta y dirty se recomputa", async () => {
