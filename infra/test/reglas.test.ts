@@ -402,6 +402,42 @@ describe("ADR-24 · ledger de partidas en aportes", () => {
     );
   });
 
+  // R3-001 del review de ADR-24: los dos negativos de arriba (otro uid, sesión
+  // cerrada) ya son denegados por `claveAporte == miUid() + '__' + areaId` y
+  // por `sesionAbierta(sesionId)`, ambas PREEXISTENTES. Seguirían en verde
+  // aunque la guarda nueva de `partidas` no existiera, así que no prueban esa
+  // guarda. Estos dos aíslan `partidas is list`: mismo uid, sesión abierta,
+  // todo lo demás válido, y lo único roto es el tipo del campo.
+  it("rechaza partidas que no es una lista (string)", async () => {
+    await assertFails(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1")
+        .set({
+          uid: "uid_ana",
+          areaId: "area_1",
+          cantidad: 50,
+          version: 2,
+          partidas: "p1",
+        }),
+    );
+  });
+
+  it("rechaza partidas que no es una lista (objeto)", async () => {
+    await assertFails(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1")
+        .set({
+          uid: "uid_ana",
+          areaId: "area_1",
+          cantidad: 50,
+          version: 2,
+          partidas: { id: "p1", cantidad: 50 },
+        }),
+    );
+  });
+
   it("rechaza un array de 201 partidas", async () => {
     const partidas = Array.from({ length: 201 }, (_, i) => ({ id: `p${i}`, cantidad: 1 }));
     await assertFails(
