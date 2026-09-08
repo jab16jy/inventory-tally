@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { Aporte } from "../models/aporte.js";
+import type { Aporte, Partida } from "../models/aporte.js";
 import type { LineaConteo } from "../models/linea-conteo.js";
 import {
   cantidadTotalDesdeAportes,
+  quitarPartida,
   subtotal,
   totalMonetarioSesion,
+  totalPartidas,
   totalUnidadesSesion,
   totalPorArea,
 } from "./calculadora.js";
@@ -151,5 +153,52 @@ describe("totalPorArea", () => {
       "area_cocina",
       "area_ferreteria",
     ]);
+  });
+});
+
+describe("totalPartidas", () => {
+  it("suma la cantidad de todas las tandas agrupadas", () => {
+    const partidas: Partida[] = [
+      { id: "p1", cantidad: 50 },
+      { id: "p2", cantidad: 30 },
+    ];
+    expect(totalPartidas(partidas)).toBe(80);
+  });
+
+  it("devuelve 0 con un array vacío", () => {
+    expect(totalPartidas([])).toBe(0);
+  });
+
+  it("devuelve 0 con undefined (aportes viejos sin partidas)", () => {
+    expect(totalPartidas(undefined)).toBe(0);
+  });
+});
+
+describe("quitarPartida", () => {
+  it("quita la tanda del id pedido y devuelve lo restado", () => {
+    const partidas: Partida[] = [
+      { id: "p1", cantidad: 50 },
+      { id: "p2", cantidad: 30 },
+    ];
+    const resultado = quitarPartida(partidas, "p1");
+    expect(resultado.partidas).toEqual([{ id: "p2", cantidad: 30 }]);
+    expect(resultado.restado).toBe(50);
+  });
+
+  it("id inexistente: deja el array intacto y restado 0 (idempotente ante doble toque)", () => {
+    const partidas: Partida[] = [{ id: "p1", cantidad: 50 }];
+    const resultado = quitarPartida(partidas, "p_no_existe");
+    expect(resultado.partidas).toEqual(partidas);
+    expect(resultado.restado).toBe(0);
+  });
+
+  it("dos tandas con la misma cantidad: quita sólo la del id pedido", () => {
+    const partidas: Partida[] = [
+      { id: "p1", cantidad: 20 },
+      { id: "p2", cantidad: 20 },
+    ];
+    const resultado = quitarPartida(partidas, "p2");
+    expect(resultado.partidas).toEqual([{ id: "p1", cantidad: 20 }]);
+    expect(resultado.restado).toBe(20);
   });
 });

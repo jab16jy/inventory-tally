@@ -1,4 +1,4 @@
-export type { Aporte } from "./models/aporte.js";
+export type { Aporte, Partida } from "./models/aporte.js";
 export type { LineaConteo } from "./models/linea-conteo.js";
 export type { EstadoSesion, SesionConteo } from "./models/sesion-conteo.js";
 export type { RolUsuario, Usuario } from "./models/usuario.js";
@@ -11,8 +11,10 @@ export type { Historico } from "./models/historico.js";
 export type { LineaSumable, LineaAgrupablePorArea } from "./services/calculadora.js";
 export {
   cantidadTotalDesdeAportes,
+  quitarPartida,
   subtotal,
   totalMonetarioSesion,
+  totalPartidas,
   totalUnidadesSesion,
   totalPorArea,
 } from "./services/calculadora.js";
