@@ -4,7 +4,7 @@
 // `ImportMeta.env` de Vite — innecesario aquí y fuera del alcance de esta
 // ola tocar `packages/shared` para exponerlo en este programa de TS.
 import type { Area } from "@conteo/shared/models/area.js";
-import type { Aporte } from "@conteo/shared/models/aporte.js";
+import type { Aporte, Partida } from "@conteo/shared/models/aporte.js";
 import type { LineaConteo } from "@conteo/shared/models/linea-conteo.js";
 import type { SesionConteo } from "@conteo/shared/models/sesion-conteo.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
@@ -22,6 +22,9 @@ export interface RegistrarAporteInput {
    *  documento (`{uid}__{areaId}`, infra/firestore.rules:74-80). */
   readonly areaId: string;
   readonly cantidad: number;
+  /** Ledger de tandas agrupadas (ADR-24). Ausente = toque suelto del
+   *  stepper: no crea una tanda nueva en `Aporte.partidas`. */
+  readonly partidas?: readonly Partida[];
 }
 
 // ── payloads de catálogo-en-conteo ──

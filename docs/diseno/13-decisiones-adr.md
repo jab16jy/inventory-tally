@@ -843,6 +843,59 @@ deliberadamente.
 
 ---
 
+## ADR-24 {#adr-24}
+
+### El ledger de tandas agrupadas vive como array en el propio `Aporte`, no en una subcolección
+
+**Contexto.** El cajero cuenta en tandas: teclea 50 en la calculadora, lo agrupa, el
+contador se reinicia, teclea 30, lo agrupa, y la categoría queda en 80. Cada tanda
+agrupada tiene que poder mandarse a la papelera — pero sólo la propia, y sólo mientras el
+conteo esté abierto.
+
+**Decisión.** `Aporte` gana `partidas?: readonly Partida[]`, un ledger de las tandas
+agrupadas dentro del MISMO documento `sesiones/{sesionId}/lineas/{categoriaId}/aportes/{uid}__{areaId}`,
+en vez de una subcolección `.../aportes/{uid}__{areaId}/partidas/{id}`:
+
+- **Cero superficie nueva.** El array vive bajo las reglas que ya protegen `aportes`
+  ([ADR-23](#adr-23), `infra/firestore.rules:73-104`): el id del documento ya exige
+  `miUid() + '__' + areaId` (nadie toca la tanda de otro) y `sesionAbierta()` ya bloquea
+  escrituras sobre sesión cerrada. Una subcolección exigiría reglas nuevas, un listener
+  nuevo (`observarMiAporte` pasaría a observar dos rutas) y fan-out en el trigger
+  `onAporteEscrito`, que hoy sólo lee `cantidad` de un único documento.
+- **`suma(partidas) <= cantidad`, nunca `==`.** Los toques sueltos del stepper −/+
+  escriben `cantidad ± 1` sin tocar `partidas` — no son tandas, y por lo tanto no
+  aparecen en la papelera. Forzar la igualdad convertiría cada toque suelto en una tanda
+  de tamaño 1, exactamente lo que el cajero NO agrupó.
+- **Sin `registradoEn` por tanda.** Firestore prohíbe sentinelas `FieldValue`
+  (`serverTimestamp()`) dentro de elementos de array, y la hora no hace falta para
+  borrar una tanda: `Partida` es sólo `{ id, cantidad }`.
+- **Borrar una tanda = reescribir el documento con una tanda menos y `cantidad`
+  recalculada.** `allow delete: if false` en `aportes` se queda — nunca se borra el
+  documento, se corrige, igual que ya corrige `cantidad` hoy.
+- **Reglas: `cantidad` sigue siendo el contrato duro** (`is int`, `0..100000`);
+  `partidas` sólo valida `is list` y `size() <= 200` — Firestore Security Rules no itera
+  arrays, así que no se puede validar cada elemento. No es una superficie de ataque
+  nueva: `cantidad` ya la declaraba el cliente sin este campo.
+
+| Alternativa | Por qué se descartó |
+| --- | --- |
+| Subcolección `aportes/{uid}__{areaId}/partidas/{id}` | Reglas nuevas, listener nuevo, fan-out en el trigger — para un dato que sólo describe cómo se llegó a `cantidad`, no una fuente de verdad independiente |
+| Exigir `suma(partidas) == cantidad` | Forzaría que cada toque suelto del stepper cree su propia tanda, contradiciendo el propósito de la papelera: borrar "lo agrupado", no los toques sueltos |
+| `registradoEn` por tanda | Firestore no permite `FieldValue` dentro de un array, y la hora no se pidió para esta funcionalidad |
+
+**Consecuencias.** ✅ Cero cambios en `packages/functions/src/triggers/on-aporte-escrito.ts`
+(sólo lee `cantidad`) · ✅ El id del documento ya impide que un cajero toque la tanda de
+otro, sin reglas nuevas · ⚠️ `merge:true` reemplaza el array `partidas` ENTERO, no lo
+fusiona elemento a elemento: si el mismo cajero escribe desde dos dispositivos a la vez,
+gana el último que escribe — el mismo techo que ya tiene `cantidad` hoy con `version`
+como única guardia de idempotencia (D1), no una regresión nueva.
+
+**Detonante de reevaluación:** si se necesita historial temporal por tanda (cuándo se
+agrupó cada una) o tandas compartidas entre varios cajeros, el array deja de alcanzar y
+hay que reconsiderar la subcolección descartada arriba.
+
+---
+
 ## Evolución del diseño
 
 ```mermaid

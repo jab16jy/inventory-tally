@@ -2,7 +2,7 @@
 // convierten tipos de Firestore (Timestamp) a los tipos de dominio de
 // `packages/shared` (doc 07 §2/§6: shared no puede importar Firebase).
 import type { DocumentData, Timestamp } from "firebase/firestore";
-import type { Aporte } from "@conteo/shared/models/aporte.js";
+import type { Aporte, Partida } from "@conteo/shared/models/aporte.js";
 import type { Area } from "@conteo/shared/models/area.js";
 import type { CategoriaValor } from "@conteo/shared/models/categoria-valor.js";
 import type { EventoAuditoria } from "@conteo/shared/models/evento-auditoria.js";
@@ -20,6 +20,9 @@ interface AporteDoc {
   readonly registradoEn: Timestamp;
   readonly dispositivoId: string;
   readonly version: number;
+  /** Ledger de tandas agrupadas (ADR-24). Sin conversión: no hay Timestamps
+   *  adentro, así que pasa tal cual. */
+  readonly partidas?: readonly Partida[];
 }
 
 export function aporteDesdeDoc(data: AporteDoc): Aporte {
@@ -31,6 +34,7 @@ export function aporteDesdeDoc(data: AporteDoc): Aporte {
     registradoEn: data.registradoEn.toDate(),
     dispositivoId: data.dispositivoId,
     version: data.version,
+    partidas: data.partidas,
   };
 }
 

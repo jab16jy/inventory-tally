@@ -199,12 +199,25 @@ sin colisión ([ADR-23](13-decisiones-adr.md#adr-23)).**
   "uid": "uid_ana",
   "areaId": "area_aseo",
   "nombre": "Ana Ramírez",
-  "cantidad": 30,
+  "cantidad": 80,
   "registradoEn": "2026-08-02T09:12:10Z",
   "dispositivoId": "safari-ios-a91f",
-  "version": 3
+  "version": 3,
+  "partidas": [
+    { "id": "p1", "cantidad": 50 },
+    { "id": "p2", "cantidad": 30 }
+  ]
 }
 ```
+
+`partidas?: Partida[]` es el ledger de tandas agrupadas por el cajero ([ADR-24](13-decisiones-adr.md#adr-24)):
+cuenta en tandas, teclea 50, agrupa, el contador se reinicia, teclea 30, agrupa de nuevo, y
+`cantidad` queda en 80 con dos entradas en `partidas`. Opcional — los aportes viejos no lo
+tienen y siguen siendo válidos — y sin `registradoEn` por elemento (Firestore prohíbe
+sentinelas `FieldValue` dentro de un array). Invariante: `suma(partidas) <= cantidad`, nunca
+`==` — los toques sueltos del stepper −/+ mueven `cantidad` sin tocar `partidas`. Cada tanda
+puede mandarse a la papelera reescribiendo el documento con una tanda menos y `cantidad`
+recalculada; `allow delete: if false` en `aportes` no cambia.
 
 ### `sesiones/{sesionId}/resumen/actual` — sólo administrador
 

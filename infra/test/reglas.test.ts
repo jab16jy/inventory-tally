@@ -338,6 +338,91 @@ describe("D1 · version obligatoria y monótona en aportes", () => {
   });
 });
 
+describe("ADR-24 · ledger de partidas en aportes", () => {
+  it("un cajero SÍ escribe sus propias partidas con la sesión abierta", async () => {
+    await assertSucceeds(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1")
+        .set({
+          uid: "uid_ana",
+          areaId: "area_1",
+          cantidad: 80,
+          version: 2,
+          partidas: [
+            { id: "p1", cantidad: 50 },
+            { id: "p2", cantidad: 30 },
+          ],
+        }),
+    );
+  });
+
+  it("un cajero NO puede escribir partidas en el aporte de OTRO uid", async () => {
+    await assertFails(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_luis__area_1")
+        .set({
+          uid: "uid_luis",
+          areaId: "area_1",
+          cantidad: 50,
+          version: 1,
+          partidas: [{ id: "p1", cantidad: 50 }],
+        }),
+    );
+  });
+
+  it("nadie puede tocar partidas con la sesión CERRADA", async () => {
+    await assertFails(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .doc("sesiones/ses_cerrada/lineas/cat_5000/aportes/uid_ana__area_1")
+        .set({
+          uid: "uid_ana",
+          areaId: "area_1",
+          cantidad: 50,
+          version: 1,
+          partidas: [{ id: "p1", cantidad: 50 }],
+        }),
+    );
+  });
+
+  it("un cajero SÍ escribe partidas con la sesión abierta (par afirmativo de la sesión cerrada)", async () => {
+    await assertSucceeds(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1")
+        .set({
+          uid: "uid_ana",
+          areaId: "area_1",
+          cantidad: 50,
+          version: 2,
+          partidas: [{ id: "p1", cantidad: 50 }],
+        }),
+    );
+  });
+
+  it("rechaza un array de 201 partidas", async () => {
+    const partidas = Array.from({ length: 201 }, (_, i) => ({ id: `p${i}`, cantidad: 1 }));
+    await assertFails(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1")
+        .set({ uid: "uid_ana", areaId: "area_1", cantidad: 201, version: 2, partidas }),
+    );
+  });
+
+  it("acepta un array de 200 partidas", async () => {
+    const partidas = Array.from({ length: 200 }, (_, i) => ({ id: `p${i}`, cantidad: 1 }));
+    await assertSucceeds(
+      cajero("uid_ana", ["suc_norte"])
+        .firestore()
+        .doc("sesiones/ses1/lineas/cat_5000/aportes/uid_ana__area_1")
+        .set({ uid: "uid_ana", areaId: "area_1", cantidad: 200, version: 2, partidas }),
+    );
+  });
+});
+
 describe("ADR-23 · claveAporte y areaId en aportes", () => {
   it("rechaza si claveAporte no coincide con miUid() + '__' + areaId", async () => {
     await assertFails(
