@@ -34,7 +34,7 @@ async function crearSesionAbierta(sesionId: string): Promise<void> {
 }
 
 afterEach(async () => {
-  await Promise.all(sesionesCreadas.map((id) => db.doc(`sesiones/${id}`).delete()));
+  await Promise.all(sesionesCreadas.map((id) => db.recursiveDelete(db.doc(`sesiones/${id}`))));
   sesionesCreadas.length = 0;
 });
 
@@ -243,6 +243,7 @@ describe("procesarAporteEscrito", () => {
   it("I-4 · no agrega sobre una sesión cerrada", async () => {
     const sesionId = `ses_${randomUUID()}`;
     const categoriaId = "cat_5000";
+    sesionesCreadas.push(sesionId);
     await db.doc(`sesiones/${sesionId}`).set({
       sucursalId: "suc_norte",
       estado: "cerrada",
