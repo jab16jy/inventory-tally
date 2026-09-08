@@ -132,7 +132,7 @@ function FilaCategoriaBase({
                 findByText(/tú: 1/i), y meter el número en un <span> aparte
                 rompe esa consulta. Es la restricción más fuerte del
                 rediseño de la fila. */}
-            <span className="mt-1 flex gap-3 text-micro text-tenue">
+            <span className="mt-1 flex flex-wrap gap-3 text-micro text-tenue">
               <span>Tú: {miAporte ? miCantidad : "—"}</span>
               <span>Equipo: {linea.cantidadTotal}</span>
               {mostrarPrecioUnitario && <span>{moneda(linea.valorUnitario)} c/u</span>}
