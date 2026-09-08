@@ -5,7 +5,18 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default defineConfig([
-  globalIgnores(["**/dist/**", "**/build/**", "**/coverage/**", "**/.firebase/**"]),
+  // `.stryker-tmp` es el sandbox que Stryker copia para mutar: código
+  // generado, con `@ts-nocheck` inyectado, que ya está en .gitignore. ESLint
+  // plano NO lee .gitignore, así que sin esta entrada cualquier corrida de
+  // Stryker —que AGENTS.md §2 exige cuando existe config para el archivo
+  // tocado— deja 276 errores y pone `npm run lint` en rojo.
+  globalIgnores([
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/.firebase/**",
+    "**/.stryker-tmp/**",
+  ]),
   js.configs.recommended,
   tseslint.configs.recommended,
   {
