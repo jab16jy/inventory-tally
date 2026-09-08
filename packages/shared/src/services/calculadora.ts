@@ -1,4 +1,4 @@
-import type { Aporte } from "../models/aporte.js";
+import type { Aporte, Partida } from "../models/aporte.js";
 import type { LineaConteo } from "../models/linea-conteo.js";
 
 /**
@@ -53,4 +53,23 @@ export function totalPorArea(
   return [...totales.entries()]
     .map(([areaId, cantidad]) => ({ areaId, cantidad }))
     .sort((a, b) => a.areaId.localeCompare(b.areaId));
+}
+
+/** Suma de cantidad de las tandas agrupadas de un aporte (ADR-24); sin tandas da 0. */
+export function totalPartidas(partidas: readonly Partida[] | undefined): number {
+  return (partidas ?? []).reduce((total, partida) => total + partida.cantidad, 0);
+}
+
+/**
+ * Quita del ledger la tanda con ese `id` (ADR-24 — "mandar a la papelera").
+ * Idempotente: un id que no existe deja el array intacto y `restado: 0`, para
+ * que un doble toque o un reintento offline no reste dos veces.
+ */
+export function quitarPartida(
+  partidas: readonly Partida[],
+  id: string,
+): { readonly partidas: readonly Partida[]; readonly restado: number } {
+  const partida = partidas.find((p) => p.id === id);
+  if (partida === undefined) return { partidas, restado: 0 };
+  return { partidas: partidas.filter((p) => p.id !== id), restado: partida.cantidad };
 }
