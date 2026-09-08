@@ -47,6 +47,13 @@ describe("ModalActualizacionDisponible", () => {
     expect(updateServiceWorker).toHaveBeenCalledWith(true);
   });
 
+  it("el modal va centrado (m-auto: el preflight anula el margin:auto del UA)", () => {
+    necesitaActualizar = true;
+    render(<ModalActualizacionDisponible />);
+
+    expect(screen.getByRole("dialog")).toHaveClass("m-auto");
+  });
+
   it("NO bloquea si el cajero ya empezó a usar la app: el plan dice «al arrancar»", () => {
     // `needRefresh` se enciende cuando el service worker detecta la versión
     // nueva, y eso pasa en cualquier momento — no sólo al arrancar. Sin esta

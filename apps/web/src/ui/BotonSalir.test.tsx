@@ -43,4 +43,12 @@ describe("BotonSalir (issue #40)", () => {
     expect(onSalir).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
+
+  it("el diálogo va centrado (m-auto: el preflight anula el margin:auto del UA)", () => {
+    render(<BotonSalir onSalir={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^salir$/i }));
+
+    expect(screen.getByRole("dialog")).toHaveClass("m-auto");
+  });
 });

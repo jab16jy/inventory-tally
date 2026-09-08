@@ -40,4 +40,10 @@ describe("ModalDetalleAuditoria", () => {
     fireEvent.click(screen.getByRole("button", { name: /cerrar/i }));
     expect(onCerrar).toHaveBeenCalledTimes(1);
   });
+
+  it("el diálogo va centrado (m-auto: el preflight anula el margin:auto del UA)", () => {
+    render(<ModalDetalleAuditoria evento={eventoPrueba} onCerrar={vi.fn()} />);
+
+    expect(screen.getByRole("dialog")).toHaveClass("m-auto");
+  });
 });

@@ -33,4 +33,9 @@ describe("ModalSesionCerrada", () => {
     render(<ModalSesionCerrada abierta={true} onSalir={() => {}} />);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
+
+  it("el modal va centrado (m-auto: el preflight anula el margin:auto del UA)", () => {
+    render(<ModalSesionCerrada abierta={true} onSalir={() => {}} />);
+    expect(screen.getByRole("dialog")).toHaveClass("m-auto");
+  });
 });

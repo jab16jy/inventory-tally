@@ -61,7 +61,7 @@ export function ModalActualizacionDisponible() {
       ref={dialogRef}
       onCancel={(e) => e.preventDefault()}
       aria-label="Actualización disponible"
-      className="w-[calc(100%-1.5rem)] max-w-sm rounded-placa border border-borde bg-placa-alta p-4 backdrop:bg-fondo/70"
+      className="m-auto w-[calc(100%-1.5rem)] max-w-sm rounded-placa border border-borde bg-placa-alta p-4 backdrop:bg-fondo/70"
     >
       <p className="text-base text-tinta">
         Hay una nueva versión de la app. Actualiza para seguir contando sin errores.

@@ -46,7 +46,7 @@ export function ModalDetalleAuditoria({
       ref={dialogoRef}
       aria-label="Detalle de auditoría"
       onClose={onCerrar}
-      className="w-[calc(100%-2rem)] max-w-xl rounded-placa border border-borde bg-placa-alta p-6 text-tinta backdrop:bg-fondo/70"
+      className="m-auto w-[calc(100%-2rem)] max-w-xl rounded-placa border border-borde bg-placa-alta p-6 text-tinta backdrop:bg-fondo/70"
     >
       <header className="mb-4 border-b border-borde pb-3">
         <div className="flex items-baseline justify-between gap-2">

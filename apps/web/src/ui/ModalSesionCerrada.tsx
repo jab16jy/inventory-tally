@@ -37,7 +37,7 @@ export function ModalSesionCerrada({ abierta, onSalir }: ModalSesionCerradaProps
       ref={dialogRef}
       onCancel={(e) => e.preventDefault()}
       aria-label="Sesión cerrada"
-      className="w-[calc(100%-1.5rem)] max-w-sm rounded-placa border border-borde bg-placa-alta p-4 backdrop:bg-fondo/70"
+      className="m-auto w-[calc(100%-1.5rem)] max-w-sm rounded-placa border border-borde bg-placa-alta p-4 backdrop:bg-fondo/70"
     >
       <p className="text-base text-tinta">
         El administrador cerró esta sesión. Ya no puedes registrar más conteos aquí.

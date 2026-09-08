@@ -100,6 +100,14 @@ describe("AdminLayout (F1)", () => {
 
     expect(onSalir).not.toHaveBeenCalled();
   });
+
+  it("el diálogo de salida va centrado (m-auto: el preflight anula el margin:auto del UA)", () => {
+    renderLayout("/admin");
+
+    fireEvent.click(screen.getByRole("button", { name: /^salir$/i }));
+
+    expect(screen.getByRole("dialog")).toHaveClass("m-auto");
+  });
 });
 
 describe("AdminLayout · breakpoints (issue #20 item 1, doc 11 §298-304)", () => {

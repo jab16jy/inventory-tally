@@ -38,7 +38,7 @@ export function BotonSalir({ onSalir }: BotonSalirProps) {
       <dialog
         ref={dialogoRef}
         aria-label="Confirmar salida"
-        className="w-[calc(100%-1.5rem)] max-w-sm rounded-placa border border-borde bg-placa-alta p-4 backdrop:bg-fondo/70"
+        className="m-auto w-[calc(100%-1.5rem)] max-w-sm rounded-placa border border-borde bg-placa-alta p-4 backdrop:bg-fondo/70"
       >
         <p className="text-base text-tinta">¿Seguro que quieres salir?</p>
         <div className="mt-4 flex gap-2">
