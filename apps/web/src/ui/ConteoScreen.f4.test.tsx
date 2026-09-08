@@ -151,8 +151,8 @@ describe("ConteoScreen · sesión cerrada por el admin (F4-A1, doc 11 §5)", () 
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 50,
-      partidas: [{ id: "p1", cantidad: 50 }],
+      deltaCantidad: 50,
+      agregarPartida: { id: "p1", cantidad: 50 },
     });
     renderConteoScreen(repo);
 
@@ -186,7 +186,8 @@ describe("ConteoScreen · sesión cerrada por el admin (F4-A1, doc 11 §5)", () 
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "",
-      cantidad: 3,
+      deltaCantidad: 3,
+      agregarPartida: { id: "p1", cantidad: 3 },
     });
     repo.sembrarSesion(sesionBase({ estado: "cerrada" }));
     renderConteoScreen(repo);

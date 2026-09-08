@@ -178,7 +178,9 @@ describe("ConteoScreen · consumo de datos (issue #20 item 2, doc 11 §24)", () 
     renderConteoScreen(repoConTresCategorias());
     const textoInicial = screen.getByText(PATRON_CONSUMO_DATOS).textContent;
 
-    fireEvent.click(screen.getByRole("button", { name: /sumar \$1\.000/i }));
+    fireEvent.click(screen.getByRole("button", { name: /contar \$1\.000/i }));
+    fireEvent.click(screen.getByRole("button", { name: "1" }));
+    fireEvent.click(screen.getByRole("button", { name: /agrupar/i }));
 
     const textoFinal = screen.getByText(PATRON_CONSUMO_DATOS).textContent;
     expect(textoFinal).not.toBe(textoInicial);
@@ -201,7 +203,8 @@ describe("ConteoScreen · Hoja precargada (regresión R3-001, reencuadrada por A
       sesionId: "ses_1",
       categoriaId: "cat_5000",
       areaId: "area_1",
-      cantidad: 12,
+      deltaCantidad: 12,
+      agregarPartida: { id: "p1", cantidad: 12 },
     });
 
     renderConteoScreen(repo);

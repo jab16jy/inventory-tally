@@ -61,8 +61,9 @@ describe("ConteoScreen (doc 11 §4)", () => {
 
     renderConteoScreen(repo);
 
-    const botonMas = screen.getByRole("button", { name: /sumar \$5\.000/i });
-    fireEvent.click(botonMas);
+    fireEvent.click(screen.getByRole("button", { name: /contar \$5\.000/i }));
+    fireEvent.click(screen.getByRole("button", { name: "1" }));
+    fireEvent.click(screen.getByRole("button", { name: /agrupar/i }));
 
     expect(await screen.findByText(/tú: 1/i)).toBeInTheDocument();
     expect(await screen.findByText(/equipo: 1/i)).toBeInTheDocument();
@@ -88,7 +89,9 @@ describe("ConteoScreen (doc 11 §4)", () => {
     renderConteoScreen(repo);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /sumar \$5\.000/i }));
+    fireEvent.click(screen.getByRole("button", { name: /contar \$5\.000/i }));
+    fireEvent.click(screen.getByRole("button", { name: "1" }));
+    fireEvent.click(screen.getByRole("button", { name: /agrupar/i }));
 
     const banner = await screen.findByRole("alert");
     expect(banner).toHaveTextContent(/no cierres la aplicación/i);
@@ -130,17 +133,19 @@ describe("ConteoScreen (doc 11 §4)", () => {
     renderConteoScreen(repo, "ses_1", vi.fn(), "area_aseo");
 
     // Por defecto sólo se ve mi área (Aseo) — Bebidas no es mía.
-    expect(await screen.findByRole("button", { name: /sumar \$5\.000/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /sumar \$10\.000/i })).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /contar \$5\.000/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /contar \$10\.000/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^ver todo$/i }));
 
     // Par afirmativo (AGENTS.md §2): contamos Bebidas con "Ver todo" activo —
     // si la barra derivara del filtro en vez de `lineas` completas, el
     // assert de abajo (tras volver a "mi área") daría 0/1 en vez de 1/2.
-    const botonBebidas = screen.getByRole("button", { name: /sumar \$10\.000/i });
+    const botonBebidas = screen.getByRole("button", { name: /contar \$10\.000/i });
     expect(botonBebidas).toBeInTheDocument();
     fireEvent.click(botonBebidas);
+    fireEvent.click(screen.getByRole("button", { name: "1" }));
+    fireEvent.click(screen.getByRole("button", { name: /agrupar/i }));
     expect(await screen.findByText(/tú: 1/i)).toBeInTheDocument();
 
     const progreso = screen.getByRole("progressbar");
@@ -148,8 +153,8 @@ describe("ConteoScreen (doc 11 §4)", () => {
     expect(progreso).toHaveAttribute("aria-valuemax", "2");
 
     fireEvent.click(screen.getByRole("button", { name: /^ver todo$/i }));
-    expect(screen.getByRole("button", { name: /sumar \$5\.000/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /sumar \$10\.000/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /contar \$5\.000/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /contar \$10\.000/i })).not.toBeInTheDocument();
     // El progreso del equipo no cambia al volver a "mi área".
     expect(progreso).toHaveAttribute("aria-valuenow", "1");
     expect(progreso).toHaveAttribute("aria-valuemax", "2");
@@ -199,15 +204,15 @@ describe("ConteoScreen (doc 11 §4)", () => {
 
     renderConteoScreen(repo, "ses_1", vi.fn(), "area_bodega");
 
-    expect(await screen.findByRole("button", { name: /sumar \$1\.000/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /sumar \$3\.000/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /sumar \$2\.000/i })).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /contar \$1\.000/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /contar \$3\.000/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /contar \$2\.000/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^ver todo$/i }));
 
-    expect(screen.getByRole("button", { name: /sumar \$1\.000/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /sumar \$2\.000/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /sumar \$3\.000/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /contar \$1\.000/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /contar \$2\.000/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /contar \$3\.000/i })).toBeInTheDocument();
   });
 
   // Gemelo del test D-1 en linea-sembrada.test.ts: `areaIds: []` explícito
@@ -242,8 +247,8 @@ describe("ConteoScreen (doc 11 §4)", () => {
 
     renderConteoScreen(repo, "ses_1", vi.fn(), "area_bodega");
 
-    expect(await screen.findByRole("button", { name: /sumar \$1\.000/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /sumar \$3\.000/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /contar \$1\.000/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /contar \$3\.000/i })).toBeInTheDocument();
   });
 
   it("D-5: muestra el área activa en la cabecera, resuelta a su nombre", async () => {
@@ -313,10 +318,10 @@ describe("ConteoScreen (doc 11 §4)", () => {
     expect(await screen.findByRole("status")).toHaveTextContent(
       /no hay categorías asignadas a tu área/i,
     );
-    expect(screen.queryByRole("button", { name: /sumar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /contar/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^ver todo$/i }));
-    expect(await screen.findByRole("button", { name: /sumar \$10\.000/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /contar \$10\.000/i })).toBeInTheDocument();
   });
 
   it("no confunde 'sin resultados de búsqueda' con 'área sin categorías'", async () => {
@@ -336,14 +341,14 @@ describe("ConteoScreen (doc 11 §4)", () => {
 
     renderConteoScreen(repo, "ses_1", vi.fn(), "area_bodega"); // mi área SÍ tiene categorías
 
-    await screen.findByRole("button", { name: /sumar \$10\.000/i });
+    await screen.findByRole("button", { name: /contar \$10\.000/i });
 
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "no existe" } });
 
     // La búsqueda vacía la lista, pero el área activa sí tiene categorías:
     // no debe aparecer el aviso de "sin categorías asignadas a tu área".
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /sumar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /contar/i })).not.toBeInTheDocument();
   });
 
   it("ofrece un control de salida (issue #40), sin romper la restricción de /cerrar|descartar/i", () => {
@@ -380,7 +385,7 @@ describe("ConteoScreen (doc 11 §4)", () => {
 
     renderConteoScreen(repo);
 
-    expect(await screen.findByRole("button", { name: /sumar/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /contar/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^ver todo$/i })).not.toBeInTheDocument();
   });
 

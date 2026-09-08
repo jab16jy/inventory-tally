@@ -11,8 +11,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   estaPendiente,
   promedioCategoria,
-  quitarPartida,
   totalUnidadesSesion,
+  type Partida,
 } from "@conteo/shared";
 import { datos } from "../lib/formato.js";
 import { useAreaActiva } from "../state/useAreaActiva.js";
@@ -167,85 +167,34 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
   // 0 como "nunca absurdo", sin cálculo aparte aquí.
   const promedioEnEdicion = lineaEnEdicion ? promedioCategoria(lineaEnEdicion) : 0;
 
-  // `agrupar` y `borrarTanda` SUMAN Y RESTAN sobre `miAporteEnEdicion`, que
-  // llega un render DESPUÉS de escribir, y el repositorio escribe `cantidad` y
-  // `partidas` como valores planos (no `increment`/`arrayUnion`, que sí usa
-  // `version`). Dos escrituras seguidas antes del eco leerían el mismo
-  // snapshot viejo y la segunda pisaría la tanda de la primera: un conteo
-  // perdido en silencio, que es justo lo que AGENTS.md §1 prohíbe simplificar.
-  //
-  // Contención: `version` sube en CADA escritura (el fake la incrementa, el
-  // repositorio real usa `increment(1)`), así que sirve de acuse genérico para
-  // agrupar y para borrar por igual. Mientras la versión no supere a la que
-  // había al escribir, la Hoja queda bloqueada y lo tecleado se conserva.
-  //
-  // ponytail: contención, no la cura. La cura de raíz es que el cliente mande
-  // un DELTA y el backend sume con `FieldValue.increment` + `arrayUnion`, como
-  // ya hace con `version` — eso elimina la lectura previa en vez de esperarla,
-  // y de paso arregla dos dispositivos del mismo cajero, que esto no cubre.
-  // Exige cambiar `RegistrarAporteInput` en packages/data, fuera de este
-  // candidato.
-  const [versionAlEscribir, setVersionAlEscribir] = useState<number | null>(null);
-  const versionVista = miAporteEnEdicion?.version ?? 0;
-  const esperandoEco = versionAlEscribir !== null && versionVista <= versionAlEscribir;
-
-  useEffect(() => {
-    setVersionAlEscribir(null);
-  }, [categoriaEnEdicion]);
-
-  // ADR-24: agrupar una tanda SUMA sobre lo que el cajero ya tenía —nunca
-  // reemplaza `cantidad`— y agrega la tanda al ledger `partidas`. A
-  // diferencia de la vieja `confirmarDesdeHoja`, NO avanza a la siguiente
-  // pendiente: quedarse en la misma categoría para la próxima tanda es el
-  // requisito central de la feature (el cajero cuenta 50, agrupa, cuenta 30
-  // más, agrupa de nuevo, sin volver a tocar la fila).
+  // ADR-24 / Issue #91: agrupar una tanda declara un delta positivo
+  // y anexa la tanda al ledger `partidas` vía arrayUnion. El cliente ya no
+  // hace read-modify-write ni espera el acuse de la escritura previa.
   function agrupar(cantidad: number): void {
     if (!categoriaEnEdicion) return;
-    if (esperandoEco) return;
-    setVersionAlEscribir(versionVista);
-    // El modal bloqueante NO es la garantía: la inercia del <dialog> nativo
-    // sólo detiene la INTERACCIÓN del usuario, y aun así deja una ventana
-    // real entre que el admin cierra la sesión y que el listener lo emite.
-    // La integridad del dato la sostiene esta comprobación, no la capa de
-    // pintura. Las reglas de Firestore son la última red; ésta evita la
-    // escritura optimista que el cajero vería aplicada en local.
     if (sesionCerrada) return;
     void repo.registrarAporte({
       sesionId,
       categoriaId: categoriaEnEdicion,
       areaId: areaActiva,
-      cantidad: (miAporteEnEdicion?.cantidad ?? 0) + cantidad,
-      partidas: [...(miAporteEnEdicion?.partidas ?? []), { id: crypto.randomUUID(), cantidad }],
+      deltaCantidad: cantidad,
+      agregarPartida: { id: crypto.randomUUID(), cantidad },
     });
   }
 
-  // Borra UNA tanda del ledger (ADR-24, papelera): `quitarPartida` calcula
-  // cuánto restar de `cantidad` — nunca la cantidad de la tanda a ciegas, por
-  // si algún día dos tandas comparten id (ver el docstring de la función en
-  // calculadora.ts). Misma guarda de sesión cerrada que `agrupar`, y por la
-  // misma razón: el modal no es la garantía de integridad.
-  function borrarTanda(id: string): void {
+  // Borra UNA tanda del ledger (ADR-24 / Issue #91, papelera): el cliente
+  // declara un delta negativo (-partida.cantidad) y retira la tanda exacta vía
+  // arrayRemove. Al eliminarse el stepper (#90), la invariante
+  // suma(partidas) === cantidad se sostiene siempre y no requiere clamps.
+  function borrarTanda(partida: Partida): void {
     if (!categoriaEnEdicion) return;
     if (sesionCerrada) return;
-    if (esperandoEco) return;
-    setVersionAlEscribir(versionVista);
-    const { partidas, restado } = quitarPartida(miAporteEnEdicion?.partidas ?? [], id);
     void repo.registrarAporte({
       sesionId,
       categoriaId: categoriaEnEdicion,
       areaId: areaActiva,
-      // El clamp NO es decorativo y la invariante `suma(partidas) <= cantidad`
-      // NO está garantizada: el stepper −/+ de `FilaCategoria` escribe
-      // `cantidad` sin tocar `partidas`, así que bajarlo a mano puede dejar
-      // `cantidad` por DEBAJO de la suma del ledger. En ese estado borrar una
-      // tanda restaría de más, y el clamp evita una cantidad negativa —
-      // enmascarando el desfase, no reconciliándolo: "Tu conteo" puede leer 0
-      // con tandas todavía listadas en la papelera.
-      // ponytail: se acota el daño, no se reconcilia. La reconciliación real
-      // es que el stepper mantenga también el ledger, o que desaparezca ahora
-      // que la calculadora agrupa — decisión de UX que no entra acá.
-      cantidad: Math.max(0, (miAporteEnEdicion?.cantidad ?? 0) - restado),
-      partidas,
+      deltaCantidad: -partida.cantidad,
+      quitarPartida: partida,
     });
   }
 
@@ -396,17 +345,12 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
         </div>
       </header>
 
-      {/* Con la sesión cerrada NO se montan las filas. Los +/- que escriben
-          viven dentro de FilaCategoria y llaman al repositorio ellos mismos,
-          así que taparlos con el modal no es una garantía de integridad: la
-          inercia del <dialog> detiene la interacción del usuario, pero no
-          cubre la ventana entre que el admin cierra la sesión y que el
-          listener lo emite. Desmontar es lo único que quita el acceso a la
-          escritura desde aquí sin tocar FilaCategoria, y además es honesto:
-          esas filas ya no son accionables. Se descartó `<fieldset disabled>`
-          —la vía nativa, y la primera que se probó— porque su propagación a
-          los controles descendientes no es observable en el entorno de
-          test: quedaba un arreglo sin red de regresión. */}
+      {/* Con la sesión cerrada NO se montan las filas: taparlas con el modal
+          no es suficiente si un click entra antes de que el listener resuelva.
+          Desmontar es lo único que quita el acceso a la escritura desde aquí,
+          y además es honesto: esas filas ya no son accionables. Se descartó `<fieldset disabled>`
+          porque FilaCategoria es un <li> dentro de un <ul>, y meter un
+          fieldset dentro o fuera de la lista rompe la semántica HTML. */}
       {cargandoLineas ? (
         // Esqueleto con la forma final de la fila real (plan §5, F4): nunca
         // un spinner. Cuenta fija (no hay de dónde sacar el total real
@@ -479,7 +423,6 @@ export function ConteoScreen({ auth, onSalir }: ConteoScreenProps) {
         etiqueta={lineaEnEdicion?.etiqueta ?? ""}
         valorInicial={miAporteEnEdicion?.cantidad ?? 0}
         partidas={miAporteEnEdicion?.partidas ?? []}
-        esperandoEco={esperandoEco}
         promedioCategoria={promedioEnEdicion}
         onAgrupar={agrupar}
         onBorrarPartida={borrarTanda}

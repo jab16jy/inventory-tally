@@ -115,9 +115,11 @@ describe("ConteoScreen · catálogo en conteo (ADR-21, doc 11 §4/§10)", () => 
     repo.sembrarLinea("ses_1", crearLinea());
     renderConteoScreen(repo);
 
-    // Dispara el banner de pendientes (único role="alert" permitido) con la
-    // hoja montada (cerrada).
-    fireEvent.click(await screen.findByRole("button", { name: /sumar \$5\.000/i }));
+    // Dispara el banner de pendientes (único role="alert" permitido) agrupando
+    // una tanda desde la Hoja.
+    fireEvent.click(await screen.findByRole("button", { name: /contar \$5\.000/i }));
+    fireEvent.click(screen.getByRole("button", { name: "1" }));
+    fireEvent.click(screen.getByRole("button", { name: /agrupar/i }));
     await screen.findByRole("alert");
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     expect(screen.queryByRole("button", { name: /cerrar|descartar/i })).not.toBeInTheDocument();
