@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
+    tags: ["v*"]
 
 # El permiso por defecto del repo es sólo "read", que en Actions equivale a
 # contents:read — no incluye pull-requests:read. Sin esto, dorny/paths-filter
@@ -22,13 +23,20 @@ concurrency:
 jobs:
   # El monorepo hace el CI más largo (doc 12 §2), así que cada job se ejecuta
   # sólo si sus rutas cambiaron.
+  #
+  # Excepción: un push de tag. dorny/paths-filter, sin `base:`, diffea contra
+  # el merge-base con la rama por defecto — y un tag de release apunta a un
+  # commit que YA está en main, así que ese merge-base es el propio commit y
+  # el diff sale vacío. Sin este `startsWith(...)` los 4 outputs darían
+  # "false", saltando web/web-e2e/contratos/functions/reglas (skipped, no
+  # failed) y dejando a deploy-prod avanzar sin haber corrido un solo test.
   cambios:
     runs-on: ubuntu-latest
     outputs:
-      web: ${{ steps.filtro.outputs.web }}
-      functions: ${{ steps.filtro.outputs.functions }}
-      reglas: ${{ steps.filtro.outputs.reglas }}
-      contratos: ${{ steps.filtro.outputs.contratos }}
+      web: ${{ startsWith(github.ref, 'refs/tags/v') || steps.filtro.outputs.web == 'true' }}
+      functions: ${{ startsWith(github.ref, 'refs/tags/v') || steps.filtro.outputs.functions == 'true' }}
+      reglas: ${{ startsWith(github.ref, 'refs/tags/v') || steps.filtro.outputs.reglas == 'true' }}
+      contratos: ${{ startsWith(github.ref, 'refs/tags/v') || steps.filtro.outputs.contratos == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -205,6 +213,70 @@ jobs:
       # ponytail: sin retry/notificación/rollback automático — no lo pide el
       # issue #14, y un deploy fallido debe quedar en rojo para que lo mire
       # una persona, no reintentar solo hacia un estado a medias.
+
+  # Deploy a prod (issue #16, doc 12 §2-3): mismo orden y mismos `needs` de
+  # verificación que deploy-dev, disparado por un tag `v*` sobre main en vez
+  # de por push a la rama. Irreversible sobre datos reales de inventario.
+  deploy-prod:
+    needs: [cambios, web, web-e2e, contratos, functions, reglas]
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') &&
+      !cancelled() && !failure()
+    runs-on: ubuntu-latest
+    # Cada tag tiene un `github.ref` distinto, así que el `concurrency` del
+    # workflow (línea 19, agrupado por ref) no serializa dos tags pusheados
+    # casi juntos: correrían dos deploys a prod en paralelo, irreversibles,
+    # contra el mismo proyecto. `cancel-in-progress: false` porque abortar un
+    # deploy a mitad de camino es peor que dejarlo encolado.
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Un tag es una ref sin protección de rama: cualquiera con permiso de
+      # tag-creation podría apuntar un `v*` a un commit fuera de main. Va
+      # antes de `npm ci` (no sólo antes de las credenciales de prod): un
+      # tag apuntando a un commit ajeno podría traer un `package.json`
+      # hostil, y `npm ci` ya ejecuta scripts de instalación.
+      #
+      # Sin `--depth=N` en el fetch: `checkout@v4` ya trajo el historial
+      # completo (`fetch-depth: 0`, arriba); volver a fetchear con
+      # `--depth=1` re-shallowea el repo y `merge-base --is-ancestor` da
+      # falso negativo para cualquier tag que no sea la punta exacta de
+      # main (verificado: reproducido localmente).
+      - name: Verificar que el tag esté sobre main
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+            echo "::error::El tag ${GITHUB_REF_NAME} no apunta a un commit de main."
+            exit 1
+          }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Autenticar con la service account de prod
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT_PROD" > "$RUNNER_TEMP/firebase-sa-prod.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-sa-prod.json" >> "$GITHUB_ENV"
+        env:
+          FIREBASE_SERVICE_ACCOUNT_PROD: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROD }}
+      - run: npx firebase deploy --only firestore:indexes --project prod --non-interactive
+      - run: npx firebase deploy --only firestore:rules --project prod --non-interactive
+      # --force: misma razón que en deploy-dev (política de reintento de
+      # onAporteEscrito exige confirmación en modo no-interactivo).
+      - run: npx firebase deploy --only functions --project prod --non-interactive --force
+      - run: npm run build --workspace apps/web -- --mode prod
+        env:
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY_PROD }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN_PROD }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID_PROD }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET_PROD }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID_PROD }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID_PROD }}
+      - run: npx firebase deploy --only hosting --project prod --non-interactive
 
   # Canal de preview de Firebase Hosting por PR (issue #15, doc 12 §3): sólo
   # hosting, nunca reglas/índices/functions — el equipo de pruebas necesita
