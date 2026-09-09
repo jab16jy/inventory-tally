@@ -458,11 +458,13 @@ colección que se acaba de vaciar. Ese evento será purgado a su vez dentro de 1
 automático de Firestore, que `firestore.indexes.json` no deshabilita (`fieldOverrides: []`).
 No hace falta índice compuesto nuevo.
 
-> **No exporta, a diferencia de lo que decía la v1 de este documento.** El archivo
-> histórico ya existe y es la exportación diaria a Cloud Storage de
-> [12 §5](12-despliegue-y-entornos.md) (RPO 24 h). Un volcado propio dentro del cron
-> duplicaría un export gestionado que ya corre, y exigiría inventar una convención de
-> bucket y ruta que ningún documento define.
+> **No exporta, y desde [ADR-25](13-decisiones-adr.md#adr-25) tampoco existe archivo
+> histórico al que delegarlo.** La v1 de este documento no exportaba porque el export
+> diario a Cloud Storage de [12 §5](12-despliegue-y-entornos.md) ya guardaba una copia; ese
+> respaldo se retiró por quedar fuera del nivel gratuito. La conclusión no cambia —un
+> volcado propio dentro del cron exigiría inventar una convención de bucket y ruta que
+> ningún documento define, y pagar el almacenamiento que ADR-25 descartó— pero la
+> consecuencia sí: **la purga a 12 meses es definitiva y no hay copia en ningún sitio.**
 
 A diferencia de `recalcularResumenes` y `reconciliarLineas`, **no** aísla cada elemento con
 un `try/catch`: allí el aislamiento protege elementos heterogéneos entre sí (una sesión

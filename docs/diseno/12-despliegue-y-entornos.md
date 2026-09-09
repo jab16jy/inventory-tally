@@ -190,16 +190,24 @@ logEvent(analytics, "sesion_finalizada", {
 
 | Riesgo                         | Mitigación                                      | Objetivo                   |
 | ------------------------------ | ----------------------------------------------- | -------------------------- |
-| Borrado accidental             | Exportación diaria a Cloud Storage              | RPO 24 h                   |
+| **Borrado accidental**         | **No hay recuperación posible**                 | **Sólo prevención: reglas + credenciales** |
 | Regla mal desplegada           | Reversión a la versión anterior                 | < 10 min                   |
 | Función con error              | Reversión de revisión                           | < 10 min                   |
 | Agregaciones corruptas         | `reconciliarLineas` recalcula desde los aportes | < 1 h                      |
 | **Service worker atrapado**    | `index.html` sin caché + bloqueo por versión    | Siguiente apertura         |
 | **Aportes perdidos en la PWA** | **No hay recuperación posible**                 | **Sólo prevención: RF-16** |
 
-> La última fila es incómoda y por eso está escrita. Si un aporte nunca llegó al servidor,
-> no existe copia de respaldo que lo recupere. Toda la defensa es preventiva, y por eso la
+> Dos filas incómodas, y por eso están escritas. Si un aporte nunca llegó al servidor, no
+> existe copia de respaldo que lo recupere. Toda la defensa es preventiva, y por eso la
 > verificación de sincronización es un requisito y no una recomendación.
+>
+> La primera fila era, hasta [ADR-25](13-decisiones-adr.md#adr-25), una exportación diaria
+> a Cloud Storage con RPO 24 h. El proyecto opera dentro del nivel gratuito del plan Blaze
+> y los respaldos de Firestore quedan explícitamente fuera de ese nivel, así que la
+> mitigación se retiró en vez de fingir que existe. Un borrado accidental por parte de un
+> administrador es hoy **definitivo**: la única defensa es que las reglas de
+> `infra/firestore.rules` limiten qué se puede borrar y que las credenciales de admin se
+> entreguen con cuentagotas.
 
 ---
 
@@ -210,7 +218,6 @@ logEvent(analytics, "sesion_finalizada", {
 | Firestore                          | Dentro de cuota gratuita |  ~USD 1–2/mes |
 | Cloud Functions                    | Dentro de cuota gratuita |    ~USD 1/mes |
 | Hosting (PWA)                      |                   Gratis |        Gratis |
-| Cloud Storage (respaldos)          |           < USD 0,10/mes | ~USD 0,50/mes |
 | **Distribución (tiendas de apps)** |   **USD 0 — descartada** |         USD 0 |
 | **Total mensual recurrente**       |              **≈ USD 0** |   **≈ USD 2** |
 

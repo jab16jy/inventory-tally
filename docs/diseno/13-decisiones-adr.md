@@ -895,6 +895,49 @@ se deberá reconsiderar una subcolección dedicada.
 
 ---
 
+## ADR-25 {#adr-25}
+
+### Sin respaldo automático de Firestore: la restricción de nivel gratuito gana y el borrado accidental queda sin recuperación
+
+**Contexto.** [12 §5](12-despliegue-y-entornos.md) mitigaba el borrado accidental con una
+exportación diaria a Cloud Storage y un RPO de 24 h. El issue #18 iba a implementarla.
+Antes de hacerlo aparecieron dos hechos: el proyecto debe operar íntegramente dentro del
+nivel gratuito del plan Blaze, y la documentación de cuotas de Firestore es explícita en
+que el respaldo no cabe ahí:
+
+> "Features such as TTL deletes, PITR, backups, restores, and clone operations require
+> billing and do not include free usage."
+> — https://firebase.google.com/docs/firestore/quotas
+
+El nivel gratuito cubre 1 GiB almacenado, 50 000 lecturas, 20 000 escrituras y 20 000
+borrados diarios, más 10 GiB de salida mensual. Los respaldos, restauraciones y PITR se
+facturan desde el primer byte.
+
+**Decisión.** No hay respaldo automático. El issue #18 se cierra como `wontfix` y la fila
+"Borrado accidental" de [12 §5](12-despliegue-y-entornos.md) pasa a declarar que **no hay
+recuperación posible**, en lugar de prometer una mitigación que nadie va a construir.
+
+| Alternativa | Por qué se descartó |
+| --- | --- |
+| Respaldo programado nativo (`firebase firestore:backups:schedules:create`) | Un solo comando, retención de 14 semanas — pero se factura desde el primer byte y el proyecto no acepta costo recurrente |
+| Export a Cloud Storage + Cloud Scheduler (el mecanismo del diseño v1) | Plausiblemente gratuito (el export se factura como lecturas, que sí tienen cuota diaria libre; Scheduler regala 3 jobs), pero no se llegó a verificar y exige sostener bucket, política de retención y job programado a cambio de una cobertura incierta |
+| Dejar la fila del documento como estaba | Prohibido por AGENTS.md §0: un documento que promete un respaldo inexistente es peor que no tener respaldo, porque nadie audita lo que cree cubierto |
+
+**Consecuencias.** ❌ Un administrador que borra datos por error los borra de forma
+definitiva, y hoy existen dos cuentas admin con acceso total al inventario ·
+❌ `purgarAuditoria` ([08](08-contratos-y-cloud-functions.md)) deja de tener archivo
+histórico detrás: la purga a 12 meses es irreversible ·
+✅ Costo recurrente del sistema confirmado en USD 0 ·
+✅ Cero maquinaria de aprovisionamiento que mantener ·
+✅ La defensa restante es preventiva y ya existe: las reglas de `infra/firestore.rules`
+acotan qué puede borrarse, y el control de a quién se le entrega una credencial de admin.
+
+**Detonante de reevaluación:** que el proyecto acepte costo recurrente, que el volumen de
+datos crezca hasta que un borrado accidental deje de ser recuperable a mano, o que se
+verifique que el export a Cloud Storage cabe de verdad en el nivel gratuito.
+
+---
+
 ## Evolución del diseño
 
 ```mermaid

@@ -10,6 +10,7 @@ import { ConteoRepositoryProvider } from "./state/repositorio-contexto.js";
 import { BannerInstalarPwa } from "./ui/BannerInstalarPwa.js";
 import { BannerPersistenciaDegradada } from "./ui/BannerPersistenciaDegradada.js";
 import { BloqueoVersionMinima } from "./ui/BloqueoVersionMinima.js";
+import { ErrorBoundary } from "./ui/ErrorBoundary.js";
 import { ModalActualizacionDisponible } from "./ui/ModalActualizacionDisponible.js";
 
 const usuarioActual: ProveedorUsuarioActual = {
@@ -27,13 +28,17 @@ if (!raiz) throw new Error("No se encontró #root en index.html");
 
 createRoot(raiz).render(
   <StrictMode>
-    <ConteoRepositoryProvider repo={repo}>
-      <ModalActualizacionDisponible />
-      <BannerPersistenciaDegradada monitor={monitorPersistencia} />
-      <BannerInstalarPwa />
-      <BloqueoVersionMinima>
-        <AppRouter />
-      </BloqueoVersionMinima>
-    </ConteoRepositoryProvider>
+    {/* Envuelve el árbol entero, proveedor incluido: cualquier pantalla que
+        reviente cae en el fallback en vez de dejar #root vacío (issue #17). */}
+    <ErrorBoundary>
+      <ConteoRepositoryProvider repo={repo}>
+        <ModalActualizacionDisponible />
+        <BannerPersistenciaDegradada monitor={monitorPersistencia} />
+        <BannerInstalarPwa />
+        <BloqueoVersionMinima>
+          <AppRouter />
+        </BloqueoVersionMinima>
+      </ConteoRepositoryProvider>
+    </ErrorBoundary>
   </StrictMode>,
 );
