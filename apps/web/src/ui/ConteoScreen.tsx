@@ -58,7 +58,10 @@ export function ConteoScreen({ auth }: ConteoScreenProps) {
   // localStorage por sesionId.
   const [areaActiva] = useAreaActiva(sesionId);
 
-  const lineas = useLineasSesion(sesionId);
+  // `null` = el primer snapshot no ha llegado; `[]` = llegó y el catálogo
+  // está vacío. Son estados distintos y aquí sí hay que separarlos.
+  const lineasRecibidas = useLineasSesion(sesionId);
+  const lineas = lineasRecibidas ?? [];
   const escriturasPendientes = usePendientes(sesionId);
   const enLinea = useConexion();
   // issue #20 item 2 (doc 11 §24, "Datos móviles" · "consumo visible"):
@@ -103,14 +106,24 @@ export function ConteoScreen({ auth }: ConteoScreenProps) {
   // separar esos casos es justamente lo que `EstadoSesion` vino a resolver:
   // antes ambos eran `null`.
   //
-  // ponytail: queda un caso sin acotar — una sesión abierta cuyo catálogo se
-  // sembró con CERO categorías activas es indistinguible desde el cliente de
-  // una cuyas líneas siguen llegando, así que ahí el esqueleto no termina. Es
-  // configuración del servidor, no un fallo de esta pantalla, y el cliente no
-  // recibe ninguna señal que las separe. Ruta de escalamiento: que la sesión
+  // El caso que antes quedaba sin acotar —catálogo sembrado con CERO
+  // categorías activas, cero líneas para siempre— ya no cae aquí: lo que
+  // apaga el esqueleto es el primer snapshot, no que traiga algo. Un catálogo
+  // vacío se dice con palabras más abajo, que es lo honesto; el esqueleto
+  // sigue reservado a la ventana en que de verdad viene algo en camino (la
+  // siembra por lotes de `abrirSesion`, fuera de su transacción).
+  //
+  // ponytail: durante esa ventana de siembra el primer snapshot puede llegar
+  // vacío, y entonces se ve un instante el aviso de catálogo vacío antes de
+  // que aparezcan las filas. Ruta de escalamiento si molesta: que la sesión
   // lleve el número de líneas esperadas —`abrirSesion` ya lo conoce al
-  // sembrar— y comparar contra él en vez de contra cero.
-  const cargandoLineas = !sesionBorrada && !sesionCerrada && lineas.length === 0;
+  // sembrar— y comparar contra él.
+  // También mientras la sesión sigue sin resolver: decir "no tiene categorías"
+  // exige saber que la sesión existe, y ahí todavía no se sabe nada.
+  const cargandoLineas =
+    !sesionBorrada &&
+    !sesionCerrada &&
+    (lineasRecibidas === null || sesion.estado === "sin-resolver");
 
   const [busqueda, setBusqueda] = useState("");
   const [soloPendientes, setSoloPendientes] = useState(false);
@@ -367,6 +380,16 @@ export function ConteoScreen({ auth }: ConteoScreenProps) {
             </li>
           ))}
         </ul>
+      ) : !sesionCerrada && !sesionBorrada && lineas.length === 0 ? (
+        // Nunca con la sesión "borrada": también es caché fría sin conexión, y
+        // ahí la lista vacía de abajo no afirma nada; esto sí (R3-001).
+        // Catálogo vacío: la sesión se abrió sin ninguna categoría activa. No
+        // es un error de esta pantalla ni algo que esperar sentado, así que
+        // se dice y se ofrece la salida que ya existe (ADR-21, "+ Producto").
+        // role="status" por el mismo motivo que el aviso de área de abajo.
+        <p role="status" className="mt-5 text-base text-tenue">
+          Esta sesión no tiene categorías. Usa &quot;+ Producto&quot; para agregar una.
+        </p>
       ) : !sesionCerrada && !verTodo && lineasDeMiArea.length === 0 && lineas.length > 0 ? (
         // Aviso de área vacía (docs/diseno/etapa-3-ui.md §3.1): el modo de
         // fallo que #84 nombra — si el admin llenó mal `areaIds`, hay

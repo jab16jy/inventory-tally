@@ -63,10 +63,7 @@ function renderConteoScreen(repo: FakeConteoRepository, sesionId = "ses_1") {
     <MemoryRouter initialEntries={[`/conteo/${sesionId}`]}>
       <ConteoRepositoryProvider repo={repo}>
         <Routes>
-          <Route
-            path="/conteo/:sesionId"
-            element={<ConteoScreen auth={{} as never} />}
-          />
+          <Route path="/conteo/:sesionId" element={<ConteoScreen auth={{} as never} />} />
         </Routes>
       </ConteoRepositoryProvider>
     </MemoryRouter>,
@@ -74,13 +71,34 @@ function renderConteoScreen(repo: FakeConteoRepository, sesionId = "ses_1") {
 }
 
 describe("ConteoScreen · esqueleto de carga (F4-B)", () => {
-  it("con la sesión abierta y sin líneas todavía, pinta filas de esqueleto en vez de una lista vacía", () => {
+  it("con la sesión abierta y el primer snapshot de líneas en camino, pinta filas de esqueleto", () => {
+    const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
+    repo.sembrarSesion(sesionBase());
+    // Mismo doble que el de `observarSesion` más abajo, y por la misma razón:
+    // `observarLineas` del fake responde SÍNCRONAMENTE con `[]`, así que con
+    // él la ventana previa al primer snapshot —la única que el esqueleto puede
+    // prometer— no existe.
+    const repoLineasLentas = Object.assign(Object.create(Object.getPrototypeOf(repo)), repo, {
+      observarLineas: () => () => {},
+    }) as FakeConteoRepository;
+
+    renderConteoScreen(repoLineasLentas);
+
+    expect(screen.getAllByTestId("fila-esqueleto").length).toBeGreaterThan(0);
+  });
+
+  // Regresión: el catálogo sembrado con cero categorías activas deja la sesión
+  // con cero líneas PARA SIEMPRE. Mientras eso contaba como "cargando", el
+  // cajero se quedaba mirando un esqueleto que no iba a resolverse nunca.
+  it("con el catálogo vacío avisa y ofrece la salida, en vez de un esqueleto eterno", () => {
     const repo = new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" });
     repo.sembrarSesion(sesionBase());
 
     renderConteoScreen(repo);
 
-    expect(screen.getAllByTestId("fila-esqueleto").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("fila-esqueleto")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/no tiene categorías/i);
+    expect(screen.getByRole("button", { name: /producto/i })).toBeInTheDocument();
   });
 
   it("en cuanto llegan líneas reales, el esqueleto desaparece y se ven las filas de verdad", () => {
@@ -113,6 +131,9 @@ describe("ConteoScreen · esqueleto de carga (F4-B)", () => {
     renderConteoScreen(repo);
 
     expect(screen.queryByTestId("fila-esqueleto")).not.toBeInTheDocument();
+    // Tampoco el aviso de catálogo vacío: "borrada" también es caché fría sin
+    // conexión, y ahí afirmar "no tiene categorías" sería falso (R3-001).
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("mientras el listener de sesión no ha resuelto, SÍ pinta esqueleto: es la ventana honesta", () => {

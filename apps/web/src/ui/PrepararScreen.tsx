@@ -52,7 +52,9 @@ export function PrepararScreen({ auth, onSalir }: PrepararScreenProps) {
   const navigate = useNavigate();
   const repo = useConteoRepository();
 
-  const lineas = useLineasSesion(sesionId);
+  // `?? []`: esta pantalla no distingue "sin snapshot todavía" de "catálogo
+  // vacío" (ver useLineasSesion.ts).
+  const lineas = useLineasSesion(sesionId) ?? [];
   const pendientes = usePendientes(sesionId);
   const enLinea = useConexion();
   // Área activa obligatoria (ADR-23): el contador elige con qué área

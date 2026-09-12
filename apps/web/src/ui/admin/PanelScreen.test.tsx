@@ -65,15 +65,43 @@ function renderPanel(repo: FakeAdminRepository) {
   );
 }
 
+/** Listener de líneas que NUNCA emite: modela la única ventana que el esqueleto
+ *  puede prometer de verdad — entre suscribirse y el primer snapshot. El fake
+ *  normal emite `[]` al suscribirse, así que con él esa ventana no existe. */
+class RepoSinPrimerSnapshot extends FakeAdminRepository {
+  override observarLineasSesion(): () => void {
+    return () => {};
+  }
+}
+
 describe("PanelScreen (R0, F1)", () => {
-  it("muestra un esqueleto con la forma final mientras carga", () => {
-    const repo = new FakeAdminRepository();
+  it("muestra un esqueleto con la forma final mientras no llega el primer snapshot", () => {
+    const repo = new RepoSinPrimerSnapshot();
     repo.sembrarSesion(sesionBase());
 
     renderPanel(repo);
 
     expect(screen.getAllByTestId("fila-esqueleto").length).toBeGreaterThan(0);
     expect(screen.queryByText("Sucursal Norte")).not.toBeInTheDocument();
+  });
+
+  // Regresión: una sesión abierta cuyo catálogo se sembró con CERO categorías
+  // activas tiene cero líneas para siempre. Tratar eso como "cargando" dejaba
+  // la fila en esqueleto eterno, y el esqueleto no pinta los tres botones —
+  // sin `Cerrar →` no queda ninguna otra puerta al cierre (SesionesScreen sólo
+  // enlaza a /analisis), así que la sucursal quedaba muerta: I-1 tampoco deja
+  // abrir otra sesión mientras esa siga abierta.
+  it("una sesión sin líneas (catálogo vacío) sigue ofreciendo las tres acciones", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(sesionBase());
+
+    renderPanel(repo);
+
+    expect(screen.getByText("Sucursal Norte")).toBeInTheDocument();
+    expect(screen.queryByTestId("fila-esqueleto")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /cerrar/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /contar/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /análisis/i })).toBeInTheDocument();
   });
 
   it("lista una fila por sucursal con sesión abierta", () => {

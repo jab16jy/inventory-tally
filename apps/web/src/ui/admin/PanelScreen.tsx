@@ -60,14 +60,18 @@ export function PanelScreen() {
       ) : (
         <ul className="flex flex-col gap-2">
           {sesiones.map((sesion) => {
-            // ponytail: "sin líneas todavía" y "sesión con cero categorías
-            // activas" son indistinguibles desde el cliente — mismo hueco ya
-            // aceptado en ConteoScreen.tsx (F4-B) para /conteo/:sesionId, con
-            // la misma razón: no hay señal aparte que las separe.
-            const lineas = lineasPorSesion.get(sesion.sesionId) ?? [];
-            const cargando = lineas.length === 0;
+            // "El primer snapshot todavía no llegó" y "el catálogo está
+            // vacío" son estados DISTINTOS, y el Map ya los separa solo:
+            // `undefined` es el primero, `[]` el segundo. El `?? []` que había
+            // aquí los colapsaba, y una sesión abierta con cero categorías
+            // activas —que tiene cero líneas para siempre— se quedaba en
+            // esqueleto eterno. El esqueleto no pinta `Cerrar →`, y esa es la
+            // única puerta al cierre que existe (SesionesScreen sólo enlaza a
+            // /analisis): la sucursal quedaba muerta, porque I-1 tampoco deja
+            // abrir otra sesión mientras esa siga abierta.
+            const lineas = lineasPorSesion.get(sesion.sesionId);
 
-            if (cargando) {
+            if (lineas === undefined) {
               return (
                 <li
                   key={sesion.sesionId}
