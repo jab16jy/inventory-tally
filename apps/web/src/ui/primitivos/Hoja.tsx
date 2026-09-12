@@ -76,6 +76,9 @@ export function Hoja({
   onVolver,
 }: HojaProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  // Gesto de backdrop: true si el toque EMPEZÓ fuera del rect propio del
+  // <dialog> (ver comentario del onClick más abajo).
+  const gestoFueraRef = useRef(false);
   // El display arranca en "0" para cada tanda nueva — nunca precarga
   // `valorInicial` (ADR-24): "cuánto ya conté" y "cuánto llevo tecleado de
   // esta tanda" son dos números distintos, y fusionarlos es justo el bug que
@@ -153,13 +156,33 @@ export function Hoja({
       ref={dialogRef}
       onClose={onVolver}
       onCancel={onVolver}
-      // Cierre por backdrop (toque fuera): `e.target` es el <dialog> sólo
-      // cuando el toque cae fuera de su contenido — los toques dentro
-      // burbujean con otro target y no cierran. Sin pérdida: lo tecleado sin
-      // agrupar sobrevive porque el estado sólo se resetea al cambiar de
-      // categoría (efecto de [etiqueta]).
+      // Cierre por backdrop (toque fuera): `e.target === e.currentTarget`
+      // también es cierto para un toque sobre el PADDING del propio <dialog>
+      // (p-4 pb-[...] más abajo) — ese padding es superficie del elemento,
+      // no de un hijo, así que ningún hijo lo cubre y el toque llega al
+      // <dialog> igual que el backdrop real. Bug de campo: "agrupo y se
+      // cierra la calculadora" (ver hoja-cierre.spec.ts). La geometría
+      // distingue los dos casos: el backdrop cae FUERA del rect propio del
+      // <dialog>, el padding cae DENTRO. onPointerDown mide dónde EMPIEZA el
+      // gesto; onClick exige que también TERMINE fuera, así un
+      // arrastre que cruza el borde no cierra a mitad de camino. Se
+      // mantiene `e.target === e.currentTarget`: un click activado por
+      // teclado reporta clientX/clientY = 0, que geométricamente cae
+      // "fuera" del rect. Duplicado en HojaNuevoProducto.tsx (mismo
+      // <dialog>, mismo padding).
+      onPointerDown={(e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        gestoFueraRef.current =
+          e.target === e.currentTarget &&
+          (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom);
+      }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onVolver();
+        const r = e.currentTarget.getBoundingClientRect();
+        const fuera =
+          e.target === e.currentTarget &&
+          (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom);
+        if (gestoFueraRef.current && fuera) onVolver();
+        gestoFueraRef.current = false;
       }}
       aria-label={`Contar ${etiqueta}`}
       className={clsx(

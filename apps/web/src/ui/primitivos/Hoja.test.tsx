@@ -483,6 +483,22 @@ describe("Hoja", () => {
     );
   });
 
+  /** jsdom no calcula layout: el rect del <dialog> se simula para poder
+   *  distinguir "dentro del padding" de "backdrop real" (ver Hoja.tsx). */
+  function mockearRectDialogo(dialog: Element): void {
+    vi.spyOn(dialog, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      right: 390,
+      top: 400,
+      bottom: 844,
+      width: 390,
+      height: 444,
+      x: 0,
+      y: 400,
+      toJSON() {},
+    } as DOMRect);
+  }
+
   it("tocar fuera de la hoja (backdrop) la cierra sin agrupar", () => {
     const onVolver = vi.fn();
     const onAgrupar = vi.fn();
@@ -497,10 +513,65 @@ describe("Hoja", () => {
         onVolver={onVolver}
       />,
     );
-    fireEvent.click(screen.getByRole("dialog"));
+    const dialog = screen.getByRole("dialog");
+    mockearRectDialogo(dialog);
+
+    fireEvent.pointerDown(dialog, { clientX: 195, clientY: 100 });
+    fireEvent.click(dialog, { clientX: 195, clientY: 100 });
 
     expect(onVolver).toHaveBeenCalledTimes(1);
     expect(onAgrupar).not.toHaveBeenCalled();
+  });
+
+  it("tocar el padding del diálogo (bajo «Agrupar», dentro de su propio rect) NO la cierra (bug de campo)", () => {
+    // Reporte real: "agrupo 50 productos de $1.000 y se cierra la
+    // calculadora". clientY:830 cae en la franja de padding inferior
+    // (p-4 + safe-area), dentro del rect simulado (bottom:844) — pero
+    // `e.target` sigue siendo el <dialog> porque nada lo cubre ahí.
+    const onVolver = vi.fn();
+    render(
+      <Hoja
+        abierta={true}
+        etiqueta="$5.000"
+        valorInicial={0}
+        partidas={[]}
+        onAgrupar={() => {}}
+        onBorrarPartida={() => {}}
+        onVolver={onVolver}
+      />,
+    );
+    const dialog = screen.getByRole("dialog");
+    mockearRectDialogo(dialog);
+
+    fireEvent.pointerDown(dialog, { clientX: 195, clientY: 830 });
+    fireEvent.click(dialog, { clientX: 195, clientY: 830 });
+
+    expect(onVolver).not.toHaveBeenCalled();
+  });
+
+  it("un gesto que empieza dentro de la hoja y suelta fuera no la cierra", () => {
+    const onVolver = vi.fn();
+    render(
+      <Hoja
+        abierta={true}
+        etiqueta="$5.000"
+        valorInicial={0}
+        partidas={[]}
+        onAgrupar={() => {}}
+        onBorrarPartida={() => {}}
+        onVolver={onVolver}
+      />,
+    );
+    const dialog = screen.getByRole("dialog");
+    mockearRectDialogo(dialog);
+
+    // El pointerdown cae sobre un hijo (la etiqueta), no sobre el <dialog>
+    // mismo: el gesto no "empezó fuera", así que el click posterior sobre
+    // el <dialog> con coordenadas fuera del rect no debe cerrar nada.
+    fireEvent.pointerDown(screen.getByText("$5.000"));
+    fireEvent.click(dialog, { clientX: 195, clientY: 100 });
+
+    expect(onVolver).not.toHaveBeenCalled();
   });
 
   it("tocar dentro de la hoja no la cierra (control negativo del backdrop)", () => {
