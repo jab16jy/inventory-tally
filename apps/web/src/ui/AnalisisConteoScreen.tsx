@@ -78,7 +78,9 @@ export function AnalisisConteoScreen({ onSalir }: AnalisisConteoScreenProps) {
 
   const [dimension, setDimension] = useState<DimensionAnalisis>("categoria");
 
-  const lineas = useLineasSesion(sesionId);
+  // `?? []`: esta pantalla no distingue "sin snapshot todavía" de "catálogo
+  // vacío" (ver useLineasSesion.ts).
+  const lineas = useLineasSesion(sesionId) ?? [];
   const sesion = useSesion(sesionId);
   const [areasActivas] = useAreasActivas(repo);
 

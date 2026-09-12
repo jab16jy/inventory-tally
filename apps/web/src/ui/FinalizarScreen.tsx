@@ -48,7 +48,9 @@ export function FinalizarScreen({ auth, onSalir }: FinalizarScreenProps) {
   // /admin no tiene forma de volver salvo cerrar sesión.
   const esAdmin = useAuthState(auth)?.esAdmin ?? false;
 
-  const lineas = useLineasSesion(sesionId);
+  // `?? []`: esta pantalla no distingue "sin snapshot todavía" de "catálogo
+  // vacío" (ver useLineasSesion.ts).
+  const lineas = useLineasSesion(sesionId) ?? [];
   const pendientes = usePendientes(sesionId);
   const escriturasConError = useEscriturasConError(sesionId);
   const [areasActivas] = useAreasActivas(repo);
