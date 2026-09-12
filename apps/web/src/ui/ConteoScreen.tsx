@@ -415,7 +415,9 @@ export function ConteoScreen({ auth }: ConteoScreenProps) {
       </div>
 
       <Hoja
-        abierta={lineaEnEdicion !== null}
+        // Abierta porque el cajero la abrió, no porque un `find` sobre un
+        // snapshot vivo (lineaEnEdicion) encuentre la línea.
+        abierta={categoriaEnEdicion !== null}
         etiqueta={lineaEnEdicion?.etiqueta ?? ""}
         valorInicial={miAporteEnEdicion?.cantidad ?? 0}
         partidas={miAporteEnEdicion?.partidas ?? []}

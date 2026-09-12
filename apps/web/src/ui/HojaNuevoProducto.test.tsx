@@ -168,16 +168,62 @@ describe("HojaNuevoProducto (ADR-21, doc 11 §10)", () => {
     );
   });
 
+  /** jsdom no calcula layout: el rect del <dialog> se simula para poder
+   *  distinguir "dentro del padding" de "backdrop real" (ver Hoja.tsx). */
+  function mockearRectDialogo(dialog: Element): void {
+    vi.spyOn(dialog, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      right: 390,
+      top: 400,
+      bottom: 844,
+      width: 390,
+      height: 444,
+      x: 0,
+      y: 400,
+      toJSON() {},
+    } as DOMRect);
+  }
+
   it("tocar fuera de la hoja (backdrop) la cierra sin crear nada", () => {
     const onVolver = vi.fn();
     const onCrear = vi.fn();
     render(<HojaNuevoProducto abierta={true} areas={[]} onCrear={onCrear} onVolver={onVolver} />);
 
     fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Bolsas" } });
-    fireEvent.click(screen.getByRole("dialog"));
+    const dialog = screen.getByRole("dialog");
+    mockearRectDialogo(dialog);
+
+    fireEvent.pointerDown(dialog, { clientX: 195, clientY: 100 });
+    fireEvent.click(dialog, { clientX: 195, clientY: 100 });
 
     expect(onVolver).toHaveBeenCalledTimes(1);
     expect(onCrear).not.toHaveBeenCalled();
+  });
+
+  it("tocar el padding del diálogo (dentro de su propio rect) NO la cierra (bug de campo, ver Hoja.test.tsx)", () => {
+    const onVolver = vi.fn();
+    render(<HojaNuevoProducto abierta={true} areas={[]} onCrear={vi.fn()} onVolver={onVolver} />);
+
+    const dialog = screen.getByRole("dialog");
+    mockearRectDialogo(dialog);
+
+    fireEvent.pointerDown(dialog, { clientX: 195, clientY: 830 });
+    fireEvent.click(dialog, { clientX: 195, clientY: 830 });
+
+    expect(onVolver).not.toHaveBeenCalled();
+  });
+
+  it("un gesto que empieza dentro de la hoja y suelta fuera no la cierra", () => {
+    const onVolver = vi.fn();
+    render(<HojaNuevoProducto abierta={true} areas={[]} onCrear={vi.fn()} onVolver={onVolver} />);
+
+    const dialog = screen.getByRole("dialog");
+    mockearRectDialogo(dialog);
+
+    fireEvent.pointerDown(screen.getByText("Nuevo producto"));
+    fireEvent.click(dialog, { clientX: 195, clientY: 100 });
+
+    expect(onVolver).not.toHaveBeenCalled();
   });
 
   it("tocar dentro de la hoja no la cierra (control negativo del backdrop)", () => {

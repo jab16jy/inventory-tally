@@ -63,6 +63,9 @@ const CAMPO =
 
 export function HojaNuevoProducto({ abierta, areas, onCrear, onVolver }: HojaNuevoProductoProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  // Gesto de backdrop: true si el toque EMPEZÓ fuera del rect propio del
+  // <dialog> (ver comentario del onClick más abajo).
+  const gestoFueraRef = useRef(false);
   const [etiqueta, setEtiqueta] = useState("");
   const [areaId, setAreaId] = useState("");
   const [precio, setPrecio] = useState("");
@@ -128,11 +131,24 @@ export function HojaNuevoProducto({ abierta, areas, onCrear, onVolver }: HojaNue
       ref={dialogRef}
       onClose={onVolver}
       onCancel={onVolver}
-      // Mismo cierre por backdrop que Hoja.tsx: sólo cierra cuando el toque
-      // cae fuera del contenido. Sin pérdida: el formulario sólo se resetea
-      // al abrir, no al cerrar.
+      // Mismo cierre por backdrop que Hoja.tsx, con la MISMA corrección
+      // geométrica y el mismo razonamiento (ver el comentario largo ahí): el
+      // padding del <dialog> también deja `e.target === e.currentTarget`,
+      // así que hace falta geometría (dentro/fuera del rect propio) y un
+      // gesto que empiece Y termine fuera para cerrar.
+      onPointerDown={(e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        gestoFueraRef.current =
+          e.target === e.currentTarget &&
+          (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom);
+      }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onVolver();
+        const r = e.currentTarget.getBoundingClientRect();
+        const fuera =
+          e.target === e.currentTarget &&
+          (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom);
+        if (gestoFueraRef.current && fuera) onVolver();
+        gestoFueraRef.current = false;
       }}
       aria-label="Nuevo producto"
       className="fixed inset-x-0 top-auto bottom-0 m-0 w-full max-w-md rounded-t-placa border-t border-borde bg-placa-alta p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop:bg-fondo/70 open:flex open:flex-col open:gap-3"
