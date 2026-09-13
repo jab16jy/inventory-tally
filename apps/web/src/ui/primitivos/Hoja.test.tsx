@@ -1,8 +1,9 @@
 // Bottom sheet sobre <dialog> nativo con teclado numérico (plan §3/§5): el
 // camino PRINCIPAL de captura es tocar la fila, no los botones −/+.
 //
-// ADR-24 (conteo por tandas): "Agrupar" ya no cierra la Hoja — reemplaza a
-// "Guardar" y "onConfirmar". El display arranca siempre en "0"; lo ya
+// ADR-24 (conteo por tandas), revertido en el punto de cierre: "Agrupar"
+// reemplaza a "Guardar"/"onConfirmar" y ahora SÍ cierra la Hoja (onVolver),
+// igual que ese "Guardar" original. El display arranca siempre en "0"; lo ya
 // contado se lee en la línea "Tu conteo: N".
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -129,8 +130,9 @@ describe("Hoja", () => {
     expect(screen.getByTestId("hoja-valor")).toHaveTextContent("0");
   });
 
-  it('teclear 50 y tocar "Agrupar" llama onAgrupar(50), el display vuelve a 0 y la hoja sigue abierta', () => {
+  it('teclear 50 y tocar "Agrupar" llama onAgrupar(50) y cierra la hoja (onVolver)', () => {
     const onAgrupar = vi.fn();
+    const onVolver = vi.fn();
     render(
       <Hoja
         abierta={true}
@@ -139,7 +141,7 @@ describe("Hoja", () => {
         partidas={[]}
         onAgrupar={onAgrupar}
         onBorrarPartida={() => {}}
-        onVolver={() => {}}
+        onVolver={onVolver}
       />,
     );
 
@@ -150,9 +152,8 @@ describe("Hoja", () => {
     fireEvent.click(screen.getByRole("button", { name: /agrupar/i }));
 
     expect(onAgrupar).toHaveBeenCalledWith(50);
-    expect(screen.getByTestId("hoja-valor")).toHaveTextContent("0");
-    // Sigue abierta: el diálogo no recibe ninguna orden de cierre.
-    expect(screen.getByText("$5.000")).toBeVisible();
+    // Para otra tanda de la misma categoría, el cajero vuelve a seleccionarla.
+    expect(onVolver).toHaveBeenCalledOnce();
   });
 
   it("borrar dígito quita el último y nunca deja el campo vacío", () => {

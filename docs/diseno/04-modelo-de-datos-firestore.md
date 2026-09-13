@@ -211,8 +211,9 @@ sin colisión ([ADR-23](13-decisiones-adr.md#adr-23)).**
 ```
 
 `partidas?: Partida[]` es el ledger de tandas agrupadas por el cajero ([ADR-24](13-decisiones-adr.md#adr-24)):
-cuenta en tandas, teclea 50, agrupa, el contador se reinicia, teclea 30, agrupa de nuevo, y
-`cantidad` queda en 80 con dos entradas en `partidas`. Opcional — los aportes viejos no lo
+cuenta en tandas, teclea 50, agrupa (la Hoja se cierra — [ADR-26](13-decisiones-adr.md#adr-26)),
+reabre la misma categoría, teclea 30, agrupa de nuevo, y `cantidad` queda en 80 con dos
+entradas en `partidas`. Opcional — los aportes viejos no lo
 tienen y siguen siendo válidos — y sin `registradoEn` por elemento (Firestore prohíbe
 sentinelas `FieldValue` dentro de un array). Invariante: `suma(partidas) <= cantidad`, nunca
 `==` — los toques sueltos del stepper −/+ mueven `cantidad` sin tocar `partidas`. Cada tanda

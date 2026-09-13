@@ -845,7 +845,7 @@ deliberadamente.
 
 ## ADR-24 {#adr-24}
 
-### El ledger de tandas agrupadas vive como array en el propio `Aporte`, con escritura atómica por deltas y captura única por Hoja
+### El ledger de tandas agrupadas vive como array en el propio `Aporte`, con escritura atómica por deltas y captura única por Hoja — punto de cierre parcialmente superseded por [ADR-26](#adr-26)
 
 **Contexto.** El cajero cuenta en tandas: teclea 50 en la calculadora, lo agrupa, el
 contador se reinicia, teclea 30, lo agrupa, y la categoría queda en 80. Cada tanda
@@ -935,6 +935,36 @@ acotan qué puede borrarse, y el control de a quién se le entrega una credencia
 **Detonante de reevaluación:** que el proyecto acepte costo recurrente, que el volumen de
 datos crezca hasta que un borrado accidental deje de ser recuperable a mano, o que se
 verifique que el export a Cloud Storage cabe de verdad en el nivel gratuito.
+
+---
+
+## ADR-26 {#adr-26}
+
+### Agrupar cierra la Hoja — supersede parcial de [ADR-24](#adr-24)
+
+**Contexto.** [ADR-24](#adr-24) dejaba la Hoja abierta tras "Agrupar" para encadenar
+varias tandas de la misma categoría sin volver a tocar la fila. El cliente pidió lo
+contrario en producción: que agrupar cierre la calculadora y, si el cajero quiere agregar
+otra tanda o borrar la anterior, vuelva a seleccionar esa categoría desde la lista. No es
+una discusión de UX abierta — es un requisito explícito del cliente.
+
+**Decisión.** `Hoja.tsx: agruparTanda()` llama a `onVolver()` después de `onAgrupar(...)`,
+igual que hacía el "Guardar" original anterior a ADR-24. El ledger `partidas` y la
+papelera no cambian: cada tanda se sigue registrando con `agregarPartida`/`quitarPartida`
+([ADR-24](#adr-24) punto 2), y al reabrir la categoría el cajero ve las tandas previas
+listas para borrar o sumar una nueva.
+
+| Alternativa | Por qué se descartó |
+| --- | --- |
+| Mantener la Hoja abierta y sumar un botón "Listo" aparte para cerrarla | El cliente pidió explícitamente que Agrupar sea la acción que cierra; un botón adicional agrega un toque que no pidió |
+| Cerrar sólo tras la primera tanda y dejarla abierta en las siguientes | Comportamiento inconsistente entre la primera tanda y las demás, sin ninguna ventaja medida |
+
+**Consecuencias.** ✅ Coincide con el pedido explícito del cliente · ⚠️ Agregar varias
+tandas a la misma categoría exige volver a tocar la fila cada vez (antes no) · ✅ Cero
+cambios en el modelo de datos (`Aporte.partidas`) ni en las Security Rules.
+
+**Detonante de reevaluación:** si el cliente reporta que reabrir la categoría para cada
+tanda es demasiada fricción en la práctica.
 
 ---
 

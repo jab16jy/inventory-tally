@@ -92,19 +92,24 @@ describe('ConteoScreen · filtro "sólo pendientes" (F2, doc 10 §2)', () => {
 });
 
 describe("ConteoScreen · Hoja con teclado numérico y conteo por tandas (ADR-24)", () => {
-  it("agrupar 50 y luego 30 en la MISMA categoría deja Tú: 80", async () => {
+  it("agrupar cierra la Hoja; agrupar 50 y luego 30 en la MISMA categoría (reabriéndola) deja Tú: 80", async () => {
     const repo = repoConTresCategorias();
     renderConteoScreen(repo);
 
     fireEvent.click(screen.getByRole("button", { name: /contar \$1\.000/i }));
-    const hoja = screen.getByRole("dialog", { name: /contar \$1\.000/i });
+    let hoja = screen.getByRole("dialog", { name: /contar \$1\.000/i });
 
     fireEvent.click(within(hoja).getByRole("button", { name: "5" }));
     fireEvent.click(within(hoja).getByRole("button", { name: "0" }));
     fireEvent.click(within(hoja).getByRole("button", { name: /agrupar/i }));
 
     expect(await screen.findByText(/tú: 50/i)).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
+    // Segunda tanda en la MISMA categoría: hay que reabrirla — agrupar ya
+    // no la deja abierta para encadenar tandas (pedido de campo).
+    fireEvent.click(screen.getByRole("button", { name: /contar \$1\.000/i }));
+    hoja = screen.getByRole("dialog", { name: /contar \$1\.000/i });
     fireEvent.click(within(hoja).getByRole("button", { name: "3" }));
     fireEvent.click(within(hoja).getByRole("button", { name: "0" }));
     fireEvent.click(within(hoja).getByRole("button", { name: /agrupar/i }));
@@ -112,7 +117,7 @@ describe("ConteoScreen · Hoja con teclado numérico y conteo por tandas (ADR-24
     expect(await screen.findByText(/tú: 80/i)).toBeInTheDocument();
   });
 
-  it("agrupar NO auto-avanza de categoría: la Hoja sigue abierta sobre la misma fila", () => {
+  it("agrupar cierra la Hoja sin auto-avanzar a la siguiente categoría pendiente", () => {
     const repo = repoConTresCategorias();
     renderConteoScreen(repo);
 
@@ -122,10 +127,9 @@ describe("ConteoScreen · Hoja con teclado numérico y conteo por tandas (ADR-24
     fireEvent.click(within(hoja).getByRole("button", { name: "7" }));
     fireEvent.click(within(hoja).getByRole("button", { name: /agrupar/i }));
 
-    // Sigue siendo el mismo diálogo, sobre la misma categoría — nunca el de
-    // la siguiente pendiente ($2.000).
-    expect(screen.getByRole("dialog", { name: /contar \$1\.000/i })).toBeVisible();
-    expect(screen.queryByRole("dialog", { name: /contar \$2\.000/i })).not.toBeInTheDocument();
+    // Ningún diálogo queda abierto: ni el mismo, ni el de la siguiente
+    // pendiente ($2.000) por un supuesto auto-avance.
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("borrar la tanda de 50 deja Tú: 30", async () => {
@@ -133,16 +137,22 @@ describe("ConteoScreen · Hoja con teclado numérico y conteo por tandas (ADR-24
     renderConteoScreen(repo);
 
     fireEvent.click(screen.getByRole("button", { name: /contar \$1\.000/i }));
-    const hoja = screen.getByRole("dialog", { name: /contar \$1\.000/i });
-
+    let hoja = screen.getByRole("dialog", { name: /contar \$1\.000/i });
     fireEvent.click(within(hoja).getByRole("button", { name: "5" }));
     fireEvent.click(within(hoja).getByRole("button", { name: "0" }));
     fireEvent.click(within(hoja).getByRole("button", { name: /agrupar/i }));
+    expect(await screen.findByText(/tú: 50/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /contar \$1\.000/i }));
+    hoja = screen.getByRole("dialog", { name: /contar \$1\.000/i });
     fireEvent.click(within(hoja).getByRole("button", { name: "3" }));
     fireEvent.click(within(hoja).getByRole("button", { name: "0" }));
     fireEvent.click(within(hoja).getByRole("button", { name: /agrupar/i }));
     expect(await screen.findByText(/tú: 80/i)).toBeInTheDocument();
 
+    // Reabrir para borrar: ya no queda abierta tras la última tanda.
+    fireEvent.click(screen.getByRole("button", { name: /contar \$1\.000/i }));
+    hoja = screen.getByRole("dialog", { name: /contar \$1\.000/i });
     fireEvent.click(within(hoja).getByRole("button", { name: "Borrar tanda de 50" }));
     fireEvent.click(within(hoja).getByRole("button", { name: /sí, borrar/i }));
 

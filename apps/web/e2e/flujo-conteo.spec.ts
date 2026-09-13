@@ -52,32 +52,36 @@ test.describe("flujo de conteo del cajero", () => {
     await hoja.getByRole("button", { name: "2", exact: true }).click();
     await expect(hoja.getByTestId("hoja-valor")).toHaveText("12");
 
+    // Agrupar CIERRA la Hoja (pedido de campo, revierte el punto de cierre
+    // de ADR-24): para otra tanda de la misma categoría el cajero vuelve a
+    // tocar la fila. El ledger `partidas` sigue acumulando igual que antes.
     await hoja.getByRole("button", { name: "Agrupar", exact: true }).click();
-
-    // Agrupar NO cierra la Hoja ni avanza de categoría (ADR-24, "el corazón
-    // de la feature" es quedarse en la misma categoría para la próxima
-    // tanda): sigue siendo el MISMO diálogo, "Contar $500". La aserción
-    // vieja sólo pedía "un diálogo cualquiera visible", que hubiera pasado
-    // igual si el comportamiento real fuera avanzar a la siguiente
-    // pendiente — no probaba nada (AGENTS.md §2).
-    await expect(page.getByRole("dialog", { name: "Contar $500" })).toBeVisible();
-    await expect(hoja.getByTestId("hoja-valor")).toHaveText("0");
+    await expect(page.getByRole("dialog")).toBeHidden();
     await expect(page.getByText("Tú: 12")).toBeVisible();
 
-    // Segunda tanda en la MISMA categoría, contra las reglas de Firestore
-    // reales (no el fake de los tests unitarios): la fila debe mostrar la
-    // SUMA, 12 + 30 = 42.
-    await hoja.getByRole("button", { name: "3", exact: true }).click();
-    await hoja.getByRole("button", { name: "0", exact: true }).click();
-    await hoja.getByRole("button", { name: "Agrupar", exact: true }).click();
-    await expect(hoja.getByTestId("hoja-valor")).toHaveText("0");
+    // Segunda tanda en la MISMA categoría: hay que reabrirla. Contra las
+    // reglas de Firestore reales (no el fake de los tests unitarios), la
+    // fila debe mostrar la SUMA, 12 + 30 = 42.
+    await page.getByRole("button", { name: "Contar $500" }).click();
+    const hoja2 = page.getByRole("dialog", { name: "Contar $500" });
+    await expect(hoja2).toBeVisible();
+    await expect(hoja2.getByText("Tu conteo: 12")).toBeVisible();
+
+    await hoja2.getByRole("button", { name: "3", exact: true }).click();
+    await hoja2.getByRole("button", { name: "0", exact: true }).click();
+    await hoja2.getByRole("button", { name: "Agrupar", exact: true }).click();
+    await expect(page.getByRole("dialog")).toBeHidden();
     await expect(page.getByText("Tú: 42")).toBeVisible();
 
     // Borrar la tanda de 12 desde la papelera, con su confirmación "Sí,
-    // borrar": la fila baja a 30, la cantidad de la tanda que queda.
-    await hoja.getByRole("button", { name: "Borrar tanda de 12", exact: true }).click();
-    await hoja.getByRole("button", { name: "Sí, borrar", exact: true }).click();
+    // borrar": la fila baja a 30, la cantidad de la tanda que queda. Borrar
+    // una tanda NO cierra la Hoja (a diferencia de agrupar).
+    await page.getByRole("button", { name: "Contar $500" }).click();
+    const hoja3 = page.getByRole("dialog", { name: "Contar $500" });
+    await hoja3.getByRole("button", { name: "Borrar tanda de 12", exact: true }).click();
+    await hoja3.getByRole("button", { name: "Sí, borrar", exact: true }).click();
     await expect(page.getByText("Tú: 30")).toBeVisible();
+    await expect(hoja3).toBeVisible();
 
     await page.getByRole("button", { name: "Volver" }).click();
     await expect(page.getByRole("dialog")).toBeHidden();

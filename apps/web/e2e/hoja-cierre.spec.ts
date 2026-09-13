@@ -47,6 +47,7 @@ test.describe("Hoja · cierre por backdrop (issue de campo)", () => {
 
     const agrupar = hoja.getByRole("button", { name: "Agrupar", exact: true });
     const cajaAgrupar = (await agrupar.boundingBox())!;
+    const cajaHoja = (await hoja.boundingBox())!;
 
     // 14px bajo la tecla "Agrupar": franja del padding inferior del <dialog>
     // (p-4 + safe-area), superficie visible de la calculadora.
@@ -56,21 +57,21 @@ test.describe("Hoja · cierre por backdrop (issue de campo)", () => {
     );
     expect(await hoja.evaluate((d: HTMLDialogElement) => d.open)).toBe(true);
 
-    // 6px a la derecha de la tecla: mismo padding, borde lateral. (No
-    // asertamos aquí que "50" sobreviva: Chromium puede ajustar un toque
-    // ambiguo cercano al control clicable más próximo —"Agrupar", ya
-    // habilitado—, y eso es una cuestión de hit-testing del navegador
-    // aparte del bug que este test cubre: que el <dialog> NO reciba el
-    // toque como backdrop.)
-    await page.touchscreen.tap(
-      cajaAgrupar.x + cajaAgrupar.width + 6,
-      cajaAgrupar.y + cajaAgrupar.height / 2,
-    );
+    // Margen izquierdo de la hoja, a la altura de la fila de Agrupar: mismo
+    // padding lateral que el reporte de campo original ("o el margen
+    // izquierdo"), pero lejos de cualquier tecla — Agrupar queda en la
+    // esquina INFERIOR DERECHA de la grilla — para no depender de que
+    // Chromium ajuste un toque ambiguo hacia el control clicable más
+    // cercano. Desde que Agrupar cierra la Hoja (pedido de campo), un toque
+    // que sí llegara a activarla haría fallar esta aserción por una razón
+    // correcta (agrupó de verdad), no por el bug de backdrop que este test
+    // cubre — de ahí que el punto de sondeo se aleje del botón.
+    await page.touchscreen.tap(cajaHoja.x + 6, cajaAgrupar.y + cajaAgrupar.height / 2);
     expect(await hoja.evaluate((d: HTMLDialogElement) => d.open)).toBe(true);
+    await expect(hoja.getByTestId("hoja-valor")).toHaveText("50");
 
     // Y el cierre por backdrop de verdad —tocar claramente por encima de la
     // hoja— sigue funcionando: el arreglo no lo puede sacrificar.
-    const cajaHoja = (await hoja.boundingBox())!;
     await page.touchscreen.tap(195, cajaHoja.y - 40);
     expect(await hoja.evaluate((d: HTMLDialogElement) => d.open)).toBe(false);
   });

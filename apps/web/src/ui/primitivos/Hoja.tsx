@@ -9,10 +9,12 @@
 // §4). "Volver", nunca "Cerrar": la pantalla de conteo no puede tener un botón
 // cuyo nombre accesible matchee /cerrar|descartar/i.
 //
-// ADR-24 (conteo por tandas): el cajero teclea una tanda, toca "Agrupar", y
-// la Hoja NO se cierra — el display vuelve a "0" listo para la siguiente
-// tanda de la MISMA categoría. Cada tanda agrupada queda en `partidas` y se
-// lista arriba del teclado con su propia papelera.
+// ADR-24 (conteo por tandas), revertido en el punto de cierre por pedido de
+// campo: el cajero teclea una tanda y toca "Agrupar" — la Hoja SE CIERRA
+// (mismo `onVolver` que "Volver"); para otra tanda de la misma categoría
+// vuelve a seleccionarla desde la lista. Cada tanda agrupada queda en
+// `partidas` igual que antes, y se lista arriba del teclado con su propia
+// papelera la próxima vez que se abra esa categoría.
 //
 // F4-A1 (doc 10 §10, "cantidad absurda por dedo torpe") añade la
 // confirmación SUAVE cuando lo tecleado supera 10× el promedio de la
@@ -50,7 +52,8 @@ export interface HojaProps {
    */
   readonly promedioCategoria?: number;
   /** Agrupa la tanda tecleada: sube `cantidad` y agrega una `Partida` al
-   *  ledger. La Hoja NO se cierra tras esto — es el corazón de la feature. */
+   *  ledger. La Hoja se cierra tras esto (llama a `onVolver`); para agregar
+   *  otra tanda a la misma categoría el cajero vuelve a seleccionarla. */
   readonly onAgrupar: (cantidad: number) => void;
   /** Manda una tanda a la papelera (ADR-24 / Issue #91). */
   readonly onBorrarPartida: (partida: Partida) => void;
@@ -125,6 +128,7 @@ export function Hoja({
     setValor("0");
     setTocado(false);
     setConfirmacion(null);
+    onVolver();
   }
 
   function tecla(t: (typeof TECLAS)[number]): void {

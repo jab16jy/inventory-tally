@@ -190,6 +190,7 @@ flowchart LR
     C --> D["Agrupar tanda"]
     D --> E["Escritura atómica · delta + arrayUnion"]
     E --> F["Aporte propio al instante"]
+    E --> H["Hoja se cierra (ADR-26)"]
     E -.->|"en segundo plano"| G["Sincroniza → trigger → total del equipo"]
 ```
 
@@ -197,7 +198,9 @@ Tocar la fila abre la **Hoja** (teclado numérico y desglose de tandas). Cada ap
 como una tanda en el ledger `partidas` (`deltaCantidad` + `agregarPartida`), y cada borrado
 retira la partida exacta (`quitarPartida` vía `arrayRemove`). El stepper `−`/`+` fue
 eliminado (ADR-24, issue #90) para blindar la invariante `cantidad === suma(partidas)`:
-ningún aporte puede existir sin su correspondiente tanda explicada en el ledger.
+ningún aporte puede existir sin su correspondiente tanda explicada en el ledger. "Agrupar"
+cierra la Hoja (ADR-26, pedido del cliente): para otra tanda o para borrar una de la misma
+categoría, el cajero vuelve a tocar la fila.
 
 ### Catálogo desde el conteo (ADR-21)
 
