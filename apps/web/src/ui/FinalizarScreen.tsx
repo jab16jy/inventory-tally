@@ -32,14 +32,9 @@ import { Icono } from "./primitivos/Icono.js";
 
 export interface FinalizarScreenProps {
   readonly auth: Auth;
-  // issue #40: "Salir" (variante A, decidida vía /prototype) entra por prop,
-  // igual que en SucursalesScreen/PrepararScreen/AdminLayout. Distinto de
-  // "Confirmar y salir": ese botón exige listo === true; éste sale sin
-  // confirmar nada, para el cajero que entró por error o quiere volver luego.
-  readonly onSalir: () => void | Promise<void>;
 }
 
-export function FinalizarScreen({ auth, onSalir }: FinalizarScreenProps) {
+export function FinalizarScreen({ auth }: FinalizarScreenProps) {
   const { sesionId = "" } = useParams<{ sesionId: string }>();
   const repo = useConteoRepository();
   const navigate = useNavigate();
@@ -99,7 +94,6 @@ export function FinalizarScreen({ auth, onSalir }: FinalizarScreenProps) {
           si ya se envió todo— es lo que debe pesar aquí. */}
       <CabeceraCajero
         titulo="Finalizar tu conteo"
-        onSalir={onSalir}
         onVolverAdmin={esAdmin ? () => navigate("/admin") : undefined}
       />
 

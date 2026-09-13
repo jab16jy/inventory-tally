@@ -1,6 +1,6 @@
 // apps/web/src/ui/FinalizarScreen.test.tsx (F3-B, doc 11 §6, RF-16)
 import { FakeConteoRepository } from "@conteo/data";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ConteoRepositoryProvider } from "../state/repositorio-contexto.js";
@@ -42,14 +42,14 @@ function lineaBase(
   };
 }
 
-function renderPantalla(repo: FakeConteoRepository, sesionId = "ses_1", onSalir = vi.fn()) {
+function renderPantalla(repo: FakeConteoRepository, sesionId = "ses_1") {
   return render(
     <MemoryRouter initialEntries={[`/conteo/${sesionId}/finalizar`]}>
       <ConteoRepositoryProvider repo={repo}>
         <Routes>
           <Route
             path="/conteo/:sesionId/finalizar"
-            element={<FinalizarScreen auth={{} as never} onSalir={onSalir} />}
+            element={<FinalizarScreen auth={{} as never} />}
           />
           <Route path="/sucursales" element={<p>Pantalla de sucursales</p>} />
           <Route path="/admin" element={<p>Pantalla de admin</p>} />
@@ -148,21 +148,11 @@ describe("FinalizarScreen (F3-B, doc 11 §6)", () => {
     expect(await screen.findByText("Pantalla de sucursales")).toBeInTheDocument();
   });
 
-  it("ofrece un control de salida en la cabecera, distinto de 'Confirmar y salir'", () => {
-    const onSalir = vi.fn();
-    renderPantalla(
-      new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" }),
-      "ses_1",
-      onSalir,
-    );
+  it("no ofrece ningún control de salir/cerrar sesión en la cabecera (sólo 'Confirmar y salir')", () => {
+    renderPantalla(new FakeConteoRepository({ uid: "uid_ana", nombre: "Ana Ramírez" }));
 
-    const boton = screen.getByRole("button", { name: /^salir$/i });
+    expect(screen.queryByRole("button", { name: /^salir$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /cerrar sesión/i })).not.toBeInTheDocument();
-
-    fireEvent.click(boton);
-    const dialogo = screen.getByRole("dialog");
-    fireEvent.click(within(dialogo).getByRole("button", { name: /^salir$/i }));
-    expect(onSalir).toHaveBeenCalledTimes(1);
   });
 
   it("si la confirmación falla, NO saca al cajero de la sesión y lo dice", async () => {

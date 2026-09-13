@@ -153,7 +153,7 @@ export function AppRouter(): ReactNode {
           path="/conteo/:sesionId/finalizar"
           element={
             <RequireAuth>
-              <FinalizarScreen auth={auth} onSalir={() => signOut(auth)} />
+              <FinalizarScreen auth={auth} />
             </RequireAuth>
           }
         />
