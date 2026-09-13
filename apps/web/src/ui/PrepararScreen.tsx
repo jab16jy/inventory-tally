@@ -39,12 +39,9 @@ const PASOS = [
 
 export interface PrepararScreenProps {
   readonly auth: Auth;
-  // issue #40: "Salir" (variante A, decidida vía /prototype) entra por prop,
-  // igual que en SucursalesScreen/AdminLayout.
-  readonly onSalir: () => void | Promise<void>;
 }
 
-export function PrepararScreen({ auth, onSalir }: PrepararScreenProps) {
+export function PrepararScreen({ auth }: PrepararScreenProps) {
   // Mismo valor por defecto que ConteoScreen y por la misma razón: no
   // romper las reglas de hooks con un return condicional antes de los
   // hooks de estado — la ruta siempre provee :sesionId al montar.
@@ -91,7 +88,6 @@ export function PrepararScreen({ auth, onSalir }: PrepararScreenProps) {
           necesite. */}
       <CabeceraCajero
         titulo="Antes de empezar"
-        onSalir={onSalir}
         onVolverAdmin={esAdmin ? () => navigate("/admin") : undefined}
       />
 

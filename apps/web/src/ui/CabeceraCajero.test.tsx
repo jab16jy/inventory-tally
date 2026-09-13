@@ -30,6 +30,12 @@ describe("CabeceraCajero (issue #40)", () => {
     expect(onSalir).toHaveBeenCalledTimes(1);
   });
 
+  it("sin onSalir no muestra ningún control de salida", () => {
+    render(<CabeceraCajero titulo="Antes de empezar" />);
+
+    expect(screen.queryByRole("button", { name: /^salir$/i })).not.toBeInTheDocument();
+  });
+
   it("sin onVolverAdmin no muestra ningún control de vuelta al panel", () => {
     render(<CabeceraCajero titulo="Sucursales" onSalir={vi.fn()} />);
 

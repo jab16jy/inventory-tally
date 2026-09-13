@@ -9,7 +9,10 @@ import { BotonSalir } from "./BotonSalir.js";
 
 export interface CabeceraCajeroProps {
   readonly titulo: ReactNode;
-  readonly onSalir: () => void | Promise<void>;
+  // Opcional: PrepararScreen (elegir área, antes de empezar a contar) no la
+  // pasa — un toque accidental ahí no debe poder cerrarle la sesión al
+  // cajero antes de que arranque el conteo.
+  readonly onSalir?: () => void | Promise<void>;
   // Sólo un admin que entró a contar lo recibe informado: vuelve al panel
   // sin cerrar sesión. Sin diálogo — a diferencia de Salir (issue #72/ADR-19),
   // no pierde nada.
@@ -33,7 +36,7 @@ export function CabeceraCajero({ titulo, onSalir, onVolverAdmin }: CabeceraCajer
             Volver al panel
           </button>
         )}
-        <BotonSalir onSalir={onSalir} />
+        {onSalir && <BotonSalir onSalir={onSalir} />}
       </div>
     </header>
   );

@@ -137,7 +137,7 @@ export function AppRouter(): ReactNode {
           path="/conteo/:sesionId/preparar"
           element={
             <RequireAuth>
-              <PrepararScreen auth={auth} onSalir={() => signOut(auth)} />
+              <PrepararScreen auth={auth} />
             </RequireAuth>
           }
         />

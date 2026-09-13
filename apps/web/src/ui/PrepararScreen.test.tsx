@@ -1,6 +1,6 @@
 // apps/web/src/ui/PrepararScreen.test.tsx (F3-B, doc 11 §3, plan §5)
 import { FakeConteoRepository } from "@conteo/data";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ConteoRepositoryProvider } from "../state/repositorio-contexto.js";
@@ -36,14 +36,14 @@ function lineaBase(categoriaId: string, etiqueta: string, valorUnitario: number)
   };
 }
 
-function renderPantalla(repo: FakeConteoRepository, sesionId = "ses_1", onSalir = vi.fn()) {
+function renderPantalla(repo: FakeConteoRepository, sesionId = "ses_1") {
   return render(
     <MemoryRouter initialEntries={[`/conteo/${sesionId}/preparar`]}>
       <ConteoRepositoryProvider repo={repo}>
         <Routes>
           <Route
             path="/conteo/:sesionId/preparar"
-            element={<PrepararScreen auth={{} as never} onSalir={onSalir} />}
+            element={<PrepararScreen auth={{} as never} />}
           />
           <Route path="/conteo/:sesionId" element={<p>Pantalla de conteo</p>} />
           <Route path="/admin" element={<p>Pantalla de admin</p>} />
@@ -171,17 +171,11 @@ describe("PrepararScreen (F3-B, doc 11 §3)", () => {
     expect(localStorage.getItem("areaActiva:ses_area_2")).toBe("area_aseo");
   });
 
-  it("ofrece un control de salida visible que no se llama 'Cerrar sesión'", () => {
-    const onSalir = vi.fn();
-    renderPantalla(new FakeConteoRepository(), "ses_1", onSalir);
+  it("no ofrece ningún control para cerrar sesión antes de empezar a contar", () => {
+    renderPantalla(new FakeConteoRepository());
 
-    const boton = screen.getByRole("button", { name: /^salir$/i });
+    expect(screen.queryByRole("button", { name: /^salir$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /cerrar sesión/i })).not.toBeInTheDocument();
-
-    fireEvent.click(boton);
-    const dialogo = screen.getByRole("dialog");
-    fireEvent.click(within(dialogo).getByRole("button", { name: /^salir$/i }));
-    expect(onSalir).toHaveBeenCalledTimes(1);
   });
 
   it("un admin ve 'Volver al panel' y navega a /admin sin cerrar sesión", async () => {
