@@ -19,7 +19,7 @@ igual).
 
 ## 2. Actores
 
-El sistema tiene exactamente **dos roles**.
+El sistema tiene **tres roles**: dos alcances de administración y uno operativo.
 
 ```mermaid
 flowchart TD
@@ -27,6 +27,10 @@ flowchart TD
     ADMIN --> G2["Abrir y cerrar sesiones de conteo"]
     ADMIN --> G3["Dashboard analítico y auditoría"]
     ADMIN --> G4["Contar (también puede)"]
+
+    ADMINSUC["🏬 Admin de sucursal"] --> S1["Gestionar cajeros y categorías de SU sucursal"]
+    ADMINSUC --> S2["Abrir/cerrar sesión y ver auditoría de SU sucursal"]
+    ADMINSUC -.->|"❌"| Y["Comparativo entre sucursales · Otras sucursales · Sucursales/áreas"]
 
     CAJ["🧑‍💼 Cajero"] --> W1["Ver sus sucursales asignadas"]
     CAJ --> W2["Registrar su aporte de conteo"]
@@ -41,29 +45,34 @@ flowchart TD
 > ([ADR-21](13-decisiones-adr.md#adr-21)).
 
 > **Nota de terminología.** En la v1 este rol se llamaba "trabajador". En la v2 se
-> unifica bajo **cajero**, que es quien realiza el conteo. No existe un tercer rol.
+> unifica bajo **cajero**, que es quien realiza el conteo. **Admin de sucursal**
+> (`admin_sucursal`) es un administrador acotado a EXACTAMENTE una sucursal — mismas
+> capacidades que el Administrador dentro de esa sucursal, ninguna fuera de ella
+> ([ADR-27](13-decisiones-adr.md#adr-27)). Esta tabla documenta el diseño completo del rol;
+> el rollout llega por slices — a la fecha de esta doc sólo el alcance de LECTURA
+> (historicos, resumen, auditoría, usuarios) está implementado en `infra/firestore.rules`.
 
 ### Matriz de permisos
 
-| Capacidad                                                     | Cajero | Administrador |
-| ------------------------------------------------------------- | :----: | :-----------: |
-| Iniciar sesión                                                |   ✅   |      ✅       |
-| Ver sucursales asignadas                                      |   ✅   |  ✅ (todas)   |
-| Registrar aporte de conteo                                    |   ✅   |      ✅       |
-| Ver total de unidades del equipo                              |   ✅   |      ✅       |
-| **Dashboard operativo** (avance, pendientes, sincronización)  |   ✅   |      ✅       |
-| **Ver valor monetario del inventario**                        |   ❌   |      ✅       |
-| **Dashboard analítico** (subtotales, participación, gráficas) |   ❌   |      ✅       |
-| Comparativo entre sucursales                                  |   ❌   |      ✅       |
-| Abrir / cerrar sesión de conteo                               |   ❌   |      ✅       |
-| Gestionar cajeros y sucursales                                |   ❌   |      ✅       |
-| **Crear una categoría/producto durante su conteo abierto**    |   ✅   |      ✅       |
-| **Vincular un área existente a una categoría _sin área_, durante su conteo** |   ✅   |      ✅       |
-| Editar, desactivar o borrar categorías                        |   ❌   |      ✅       |
-| Crear o gestionar áreas                                       |   ❌   |      ✅       |
-| Fijar el precio (`valor`) de una categoría                    |   ❌   |      ✅       |
-| Ver auditoría (acotada a sus sucursales asignadas, #45)       |   ✅   |  ✅ (todas)   |
-| Editar o borrar auditoría                                     |   ❌   |  ❌ (nadie)   |
+| Capacidad                                                     | Cajero | Admin de sucursal | Administrador |
+| ------------------------------------------------------------- | :----: | :----------------: | :-----------: |
+| Iniciar sesión                                                |   ✅   |         ✅          |      ✅       |
+| Ver sucursales asignadas                                      |   ✅   |    ✅ (la suya)     |  ✅ (todas)   |
+| Registrar aporte de conteo                                    |   ✅   |         ✅          |      ✅       |
+| Ver total de unidades del equipo                              |   ✅   |         ✅          |      ✅       |
+| **Dashboard operativo** (avance, pendientes, sincronización)  |   ✅   |         ✅          |      ✅       |
+| **Ver valor monetario del inventario**                        |   ❌   |   ✅ (su sucursal)  |      ✅       |
+| **Dashboard analítico** (subtotales, participación, gráficas) |   ❌   |   ✅ (su sucursal)  |      ✅       |
+| Comparativo entre sucursales                                  |   ❌   |         ❌          |      ✅       |
+| Abrir / cerrar sesión de conteo                               |   ❌   |   ✅ (su sucursal)  |      ✅       |
+| Gestionar cajeros y sucursales                                |   ❌   | ✅ cajeros de su sucursal · ❌ sucursales |      ✅       |
+| **Crear una categoría/producto durante su conteo abierto**    |   ✅   |         ✅          |      ✅       |
+| **Vincular un área existente a una categoría _sin área_, durante su conteo** |   ✅   |         ✅          |      ✅       |
+| Editar, desactivar o borrar categorías                        |   ❌   | ✅ (exclusivas de su sucursal) |      ✅       |
+| Crear o gestionar áreas                                       |   ❌   |         ❌          |      ✅       |
+| Fijar el precio (`valor`) de una categoría                    |   ❌   |   ✅ (su sucursal)  |      ✅       |
+| Ver auditoría (acotada a sus sucursales asignadas, #45)       |   ✅   |   ✅ (su sucursal)  |  ✅ (todas)   |
+| Editar o borrar auditoría                                     |   ❌   |         ❌          |  ❌ (nadie)   |
 
 > **Por qué el cajero no ve dinero.** En muchos negocios el valor total del inventario
 > es información sensible que no corresponde al personal de mostrador. El cajero ve
