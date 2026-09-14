@@ -6,9 +6,10 @@
 import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { HttpsError } from "firebase-functions/v2/https";
+import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { abrirSesionImpl } from "../../src/callables/abrir-sesion.js";
+import { abrirSesion, abrirSesionImpl } from "../../src/callables/abrir-sesion.js";
+import type { AbrirSesionInput } from "@conteo/contracts";
 
 if (getApps().length === 0) {
   initializeApp({ projectId: "demo-conteo-eficiente" });
@@ -231,5 +232,82 @@ describe("abrirSesionImpl", () => {
     const eventos = await db.collection("auditoria").where("sesionId", "==", sesionId).get();
     expect(eventos.size).toBe(1);
     expect(eventos.docs[0]?.get("tipo")).toBe("SESION_ABIERTA");
+  });
+});
+
+// Probado a través de `abrirSesion.run(req)` (el wrapper `onCall`, D5) y no
+// sólo de `abrirSesionImpl`: una callable que olvidara llamar al gate de
+// autorización pasaría igual si sólo se probara el Impl.
+function reqAbrirSesion(
+  rol: string,
+  sucursales: readonly string[] | undefined,
+  sucursalId: string,
+): CallableRequest<AbrirSesionInput> {
+  return {
+    data: { sucursalId },
+    auth: { uid: "uid_x", token: { rol, sucursales } },
+  } as unknown as CallableRequest<AbrirSesionInput>;
+}
+
+describe("abrirSesion — autorización de sucursal (D1/D2, S2a)", () => {
+  it("admin_sucursal abre sesión en su propia sucursal (afirmativo)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    await crearSucursal(sucursalId);
+
+    const resultado = await abrirSesion.run(
+      reqAbrirSesion("admin_sucursal", [sucursalId], sucursalId),
+    );
+
+    const sesion = await db.doc(`sesiones/${resultado.sesionId}`).get();
+    expect(sesion.get("sucursalId")).toBe(sucursalId);
+  });
+
+  it("admin_sucursal no puede abrir sesión en otra sucursal (negativo)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const otraSucursalId = `suc_${randomUUID()}`;
+    await crearSucursal(sucursalId);
+
+    await expect(
+      abrirSesion.run(reqAbrirSesion("admin_sucursal", [otraSucursalId], sucursalId)),
+    ).rejects.toThrow(HttpsError);
+
+    const sucursal = await db.doc(`sucursales/${sucursalId}`).get();
+    expect(sucursal.get("sesionAbiertaId")).toBeNull();
+  });
+
+  it("admin_sucursal con claim malformado (0 sucursales) es rechazado (negativo)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    await crearSucursal(sucursalId);
+
+    await expect(abrirSesion.run(reqAbrirSesion("admin_sucursal", [], sucursalId))).rejects.toThrow(
+      HttpsError,
+    );
+
+    const sucursal = await db.doc(`sucursales/${sucursalId}`).get();
+    expect(sucursal.get("sesionAbiertaId")).toBeNull();
+  });
+
+  it("admin_sucursal con claim malformado (2+ sucursales) es rechazado (negativo)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    await crearSucursal(sucursalId);
+
+    await expect(
+      abrirSesion.run(
+        reqAbrirSesion("admin_sucursal", [sucursalId, `suc_${randomUUID()}`], sucursalId),
+      ),
+    ).rejects.toThrow(HttpsError);
+
+    const sucursal = await db.doc(`sucursales/${sucursalId}`).get();
+    expect(sucursal.get("sesionAbiertaId")).toBeNull();
+  });
+
+  it("admin (Gerente) no se ve afectado (regresión)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    await crearSucursal(sucursalId);
+
+    const resultado = await abrirSesion.run(reqAbrirSesion("admin", undefined, sucursalId));
+
+    const sesion = await db.doc(`sesiones/${resultado.sesionId}`).get();
+    expect(sesion.get("sucursalId")).toBe(sucursalId);
   });
 });
