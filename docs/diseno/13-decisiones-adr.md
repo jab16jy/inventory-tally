@@ -968,6 +968,44 @@ tanda es demasiada fricción en la práctica.
 
 ---
 
+## ADR-27 {#adr-27}
+
+### Rol `admin_sucursal` — administrador acotado a UNA sucursal
+
+**Contexto.** `admin` es todo-o-nada: 20 callables y 4 reglas lo tratan como bypass total.
+El negocio necesita un gerente de UNA sucursal (productos, cajeros, sesiones de esa
+sucursal) sin ver otras sucursales ni el comparativo entre ellas. Hoy la única opción es
+dar acceso completo.
+
+**Decisión.** `RolUsuario` gana `"admin_sucursal"`, con cardinalidad exacta de 1
+`sucursalesAsignadas` forzada en el esquema donde `rol` y `sucursalesAsignadas` viajan
+juntos. No hay middleware: el gate de rol devuelve un **alcance** (`AlcanceAdmin`, `null` =
+Gerente | `string` = la única sucursal), y cada chequeo se reduce a un único predicado:
+"los recursos de la sucursal son exactamente `[alcance]`". En reglas, `esAdminSucursal()`
+exige claim `rol == 'admin_sucursal'` con `sucursales.size() == 1` — 0 o 2+ sucursales
+falla cerrado, nunca hereda alcance total. `puedeVerSucursal()` excluye a propósito al
+cajero: `historicos`/`resumen` (dinero) y el alcance nuevo de `auditoria`/`usuarios` sólo
+se abren para `admin` y `admin_sucursal` (D6, design.md). Esta ADR y doc 01 se documentan
+en la S1 del rollout (rules read scope), antes de que las callables de sesión/categoría/
+cajero (S2-S4) implementen su parte del mismo alcance — ver design.md, Migration/Rollout.
+
+| Alternativa | Por qué se descartó |
+| --- | --- |
+| Middleware genérico de autorización | Fuera de alcance (proposal.md); el gate por callable ya reutiliza `autorizacionDe` existente |
+| `puedeVerSucursal` incluye también al cajero | Abriría `historicos`/`resumen` (dinero) a cajeros — reabre A-10/I-9, que el propio spec exige mantener cerrado |
+| Alcance opcional (`alcance = null` por defecto) en las callables que lo requieren | Un wire olvidado otorgaría en silencio alcance de Gerente (fail-open); un parámetro requerido hace que TypeScript marque el olvido como error de compilación, no como fuga de autorización |
+
+**Consecuencias.** ✅ Un admin_sucursal mal formado (0 o 2+ sucursales) queda sin acceso, no
+con acceso total · ✅ El cajero no gana visibilidad nueva en ningún recurso monetario ·
+⚠️ Los eventos `USUARIO_*`/`CATEGORIA_*` sin `sucursalId` denormalizado siguen ilegibles
+para admin_sucursal, igual que hoy para el cajero (ticket #45/ADR-21) · ✅ Cero migración de
+datos: un claim `admin_sucursal` revertido se trata como no-admin.
+
+**Detonante de reevaluación:** si el negocio pide un admin_sucursal con más de una
+sucursal asignada (el diseño actual fuerza cardinalidad 1 por contrato).
+
+---
+
 ## Evolución del diseño
 
 ```mermaid

@@ -37,7 +37,7 @@ erDiagram
         string uid PK
         string nombre
         string correo
-        string rol "admin | cajero"
+        string rol "admin | admin_sucursal | cajero"
         array sucursalesAsignadas
         bool activo
     }
