@@ -57,10 +57,10 @@ sequenceDiagram
 existe para la UI. Si una regla dependiera de leerlo, un atacante que lograra escribirlo
 escalaría privilegios, y cada evaluación costaría una lectura.
 
-| Claim        | Contenido               | Origen                             |
-| ------------ | ----------------------- | ---------------------------------- |
-| `rol`        | `"admin"` \| `"cajero"` | `crearCajero` / `actualizarCajero` |
-| `sucursales` | array de IDs (máx. 10)  | ídem                               |
+| Claim        | Contenido                                      | Origen                             |
+| ------------ | ------------------------------------------------ | ---------------------------------- |
+| `rol`        | `"admin"` \| `"admin_sucursal"` \| `"cajero"`  | `crearCajero` / `actualizarCajero` |
+| `sucursales` | array de IDs (máx. 10; `admin_sucursal` exige exactamente 1, [ADR-27](13-decisiones-adr.md#adr-27)) | ídem                               |
 
 ### Política de contraseñas
 
@@ -100,6 +100,23 @@ service cloud.firestore {
     function esCajero()     { return autenticado() && request.auth.token.rol == 'cajero'; }
     function miUid()        { return request.auth.uid; }
 
+    // ADR-27: admin_sucursal válido sólo con EXACTAMENTE 1 sucursal en el
+    // claim; 0 o 2+ falla cerrado (nunca hereda alcance total).
+    function esAdminSucursal() {
+      return autenticado() && request.auth.token.rol == 'admin_sucursal'
+        && request.auth.token.sucursales.size() == 1;
+    }
+    // D6: excluye a propósito al cajero — historicos/resumen/auditoria
+    // monetarios siguen fuera de su alcance (A-10/I-9).
+    function puedeVerSucursal(sucursalId) {
+      return esAdmin() || (esAdminSucursal() && sucursalId in request.auth.token.sucursales);
+    }
+    // usuarios get/list: admin_sucursal ve sólo quien comparte su sucursal.
+    function veUsuario() {
+      return esAdminSucursal()
+        && request.auth.token.sucursales[0] in resource.data.sucursalesAsignadas;
+    }
+
     function tieneSucursal(sucursalId) {
       return esAdmin() || sucursalId in request.auth.token.sucursales;
     }
@@ -112,8 +129,8 @@ service cloud.firestore {
 
     // ─────────── usuarios ───────────
     match /usuarios/{uid} {
-      allow get:  if autenticado() && (uid == miUid() || esAdmin());
-      allow list: if esAdmin();
+      allow get:  if autenticado() && (uid == miUid() || esAdmin() || veUsuario());
+      allow list: if esAdmin() || veUsuario();
       allow write: if false;                              // ← A-5
     }
 
@@ -125,7 +142,7 @@ service cloud.firestore {
 
     // ─────────── históricos (MONETARIO) ───────────
     match /sucursales/{sucursalId}/historicos/{sesionId} {
-      allow read:  if esAdmin();                          // ← A-10
+      allow read:  if puedeVerSucursal(sucursalId);       // ← A-10 · D6
       allow write: if false;
     }
 
@@ -183,7 +200,7 @@ service cloud.firestore {
 
     // ─────────── resumen: MONETARIO, sólo admin ───────────
     match /sesiones/{sesionId}/resumen/{docId} {
-      allow read:  if esAdmin();                          // ← A-10 · I-9
+      allow read:  if puedeVerSucursal(sesion(sesionId).sucursalId); // ← A-10 · I-9 · D6
       allow write: if false;
     }
 
@@ -216,7 +233,8 @@ service cloud.firestore {
 
     // ─────────── auditoría: INMUTABLE ───────────
     match /auditoria/{eventoId} {
-      allow read:  if esAdmin();
+      allow read:  if puedeVerSucursal(resource.data.sucursalId)
+                      || (esCajero() && tieneSucursal(resource.data.sucursalId)); // D6
       allow write: if false;                              // ← A-2, sin excepciones
     }
 

@@ -75,7 +75,15 @@ beforeEach(async () => {
     const db = contexto.firestore();
 
     await db.doc("usuarios/uid_admin").set({ nombre: "Admin", rol: "admin" });
-    await db.doc("usuarios/uid_ana").set({ nombre: "Ana Ramírez", rol: "cajero" });
+    // sucursalesAsignadas: Ana comparte suc_norte y suc_sur (ver historial más
+    // abajo) — target del caso afirmativo de D6 (get compartido).
+    await db
+      .doc("usuarios/uid_ana")
+      .set({ nombre: "Ana Ramírez", rol: "cajero", sucursalesAsignadas: ["suc_norte", "suc_sur"] });
+    // Sólo suc_sur: target del caso negativo de D6 (get de otra sucursal).
+    await db
+      .doc("usuarios/uid_luis")
+      .set({ nombre: "Luis Pérez", rol: "cajero", sucursalesAsignadas: ["suc_sur"] });
 
     await db.doc("sucursales/suc_norte").set({ nombre: "Sucursal Norte", sesionAbiertaId: "ses1" });
     await db.doc("sucursales/suc_sur").set({ nombre: "Sucursal Sur", sesionAbiertaId: null });
@@ -186,6 +194,8 @@ beforeEach(async () => {
 const cajero = (uid: string, sucursales: string[]) =>
   testEnv.authenticatedContext(uid, { rol: "cajero", sucursales });
 const admin = () => testEnv.authenticatedContext("uid_admin", { rol: "admin" });
+const adminSucursal = (uid: string, sucursales: string[]) =>
+  testEnv.authenticatedContext(uid, { rol: "admin_sucursal", sucursales });
 
 describe("A-1 · líneas de sólo lectura para el cliente", () => {
   it("un cajero NO puede escribir lineas/{categoriaId}", async () => {
@@ -715,5 +725,141 @@ describe("historial del cajero · sesiones acotadas por participantes + sucursal
         .where("sucursalId", "in", ["suc_norte", "suc_sur"])
         .get(),
     );
+  });
+});
+
+// D6 (design.md) · alcance de lectura de admin_sucursal: historicos, resumen,
+// auditoria y usuarios sólo dentro de la única sucursal del claim. Nunca
+// cajero (D6 excluye explícitamente el rol cajero de puedeVerSucursal).
+describe("D6 · admin_sucursal — alcance de lectura (S1)", () => {
+  describe("usuarios · get y list", () => {
+    it("RED · máxima fuga: admin_sucursal NO puede listar usuarios sin filtro", async () => {
+      await assertFails(
+        adminSucursal("uid_gerente_norte", ["suc_norte"]).firestore().collection("usuarios").get(),
+      );
+    });
+
+    it("admin_sucursal SÍ lista usuarios filtrando por su propia sucursal", async () => {
+      await assertSucceeds(
+        adminSucursal("uid_gerente_norte", ["suc_norte"])
+          .firestore()
+          .collection("usuarios")
+          .where("sucursalesAsignadas", "array-contains", "suc_norte")
+          .get(),
+      );
+    });
+
+    it("admin_sucursal NO lista usuarios filtrando por otra sucursal", async () => {
+      await assertFails(
+        adminSucursal("uid_gerente_norte", ["suc_norte"])
+          .firestore()
+          .collection("usuarios")
+          .where("sucursalesAsignadas", "array-contains", "suc_sur")
+          .get(),
+      );
+    });
+
+    it("admin_sucursal SÍ obtiene un usuario que comparte su sucursal", async () => {
+      await assertSucceeds(
+        adminSucursal("uid_gerente_norte", ["suc_norte"]).firestore().doc("usuarios/uid_ana").get(),
+      );
+    });
+
+    it("admin_sucursal NO obtiene un usuario de otra sucursal únicamente", async () => {
+      await assertFails(
+        adminSucursal("uid_gerente_norte", ["suc_norte"])
+          .firestore()
+          .doc("usuarios/uid_luis")
+          .get(),
+      );
+    });
+
+    it("Gerente sigue listando y leyendo cualquier usuario (regresión)", async () => {
+      await assertSucceeds(admin().firestore().collection("usuarios").get());
+      await assertSucceeds(admin().firestore().doc("usuarios/uid_luis").get());
+    });
+
+    it("cajero sigue sin poder listar usuarios (regresión)", async () => {
+      await assertFails(cajero("uid_ana", ["suc_norte"]).firestore().collection("usuarios").get());
+    });
+  });
+
+  describe("historicos y resumen (monetario)", () => {
+    it("admin_sucursal SÍ lee historicos de su propia sucursal", async () => {
+      await assertSucceeds(
+        adminSucursal("uid_gerente_norte", ["suc_norte"])
+          .firestore()
+          .doc("sucursales/suc_norte/historicos/ses1")
+          .get(),
+      );
+    });
+
+    it("admin_sucursal NO lee historicos de otra sucursal", async () => {
+      await assertFails(
+        adminSucursal("uid_gerente_norte", ["suc_norte"])
+          .firestore()
+          .doc("sucursales/suc_sur/historicos/ses1")
+          .get(),
+      );
+    });
+
+    it("admin_sucursal SÍ lee el resumen de una sesión de su sucursal", async () => {
+      await assertSucceeds(
+        adminSucursal("uid_gerente_norte", ["suc_norte"])
+          .firestore()
+          .doc("sesiones/ses1/resumen/actual")
+          .get(),
+      );
+    });
+
+    it("admin_sucursal NO lee el resumen de una sesión de otra sucursal", async () => {
+      await assertFails(
+        adminSucursal("uid_gerente_norte", ["suc_norte"])
+          .firestore()
+          .doc("sesiones/ses_sur/resumen/actual")
+          .get(),
+      );
+    });
+  });
+
+  describe("auditoría", () => {
+    it("admin_sucursal SÍ lee un evento de auditoría de su propia sucursal", async () => {
+      await assertSucceeds(
+        adminSucursal("uid_gerente_norte", ["suc_norte"]).firestore().doc("auditoria/e_suc").get(),
+      );
+    });
+
+    it("admin_sucursal SÍ lista la auditoría filtrando por su propia sucursal", async () => {
+      await assertSucceeds(
+        adminSucursal("uid_gerente_norte", ["suc_norte"])
+          .firestore()
+          .collection("auditoria")
+          .where("sucursalId", "==", "suc_norte")
+          .get(),
+      );
+    });
+
+    it("admin_sucursal NO lee un evento de auditoría de otra sucursal", async () => {
+      await assertFails(
+        adminSucursal("uid_gerente_sur", ["suc_sur"]).firestore().doc("auditoria/e_suc").get(),
+      );
+    });
+  });
+
+  describe("claim malformado (0 o 2+ sucursales) — falla cerrado", () => {
+    it("0 sucursales: NO lee nada acotado por puedeVerSucursal", async () => {
+      await assertFails(
+        adminSucursal("uid_x", []).firestore().doc("sucursales/suc_norte/historicos/ses1").get(),
+      );
+    });
+
+    it("2+ sucursales: NO lee nada acotado, aunque incluya la sucursal objetivo", async () => {
+      await assertFails(
+        adminSucursal("uid_y", ["suc_norte", "suc_sur"])
+          .firestore()
+          .doc("sucursales/suc_norte/historicos/ses1")
+          .get(),
+      );
+    });
   });
 });
