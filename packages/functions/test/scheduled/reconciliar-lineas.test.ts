@@ -17,10 +17,10 @@ const db = getFirestore();
 // por cada una, toda su subcolección `lineas` — un N+1 sobre el estado global.
 // Sin esta limpieza, las sesiones de un test seguían vivas para el siguiente y
 // el archivo se hacía más lento con cada caso, hasta que el único test que
-// llama a reconciliar DOS veces (el no-op) excedía el timeout de 5 s. El resto
-// de los archivos de `packages/functions/test` ya limpiaban así; éste era el
-// que faltaba, y era latente: cualquier archivo nuevo que creara sesiones
-// abiertas en paralelo lo empujaba por encima del borde.
+// llama a reconciliar DOS veces (el no-op) excedía el timeout de 5 s. Lo mismo
+// vale entre archivos: corren en secuencia (`fileParallelism: false`) sobre el
+// mismo emulador, así que cualquier archivo que deje sesiones abiertas antes de
+// éste lo empuja por encima del borde (#98: abrir-sesion.test.ts lo hacía).
 const sesionesCreadas: string[] = [];
 
 afterEach(async () => {
