@@ -1,7 +1,7 @@
 import { onCall } from "firebase-functions/v2/https";
 import { FieldValue, getFirestore, type Firestore } from "firebase-admin/firestore";
 import { crearCategoriaSchema, type CrearCategoriaInput } from "@conteo/contracts";
-import { exigirAdmin } from "../lib/exigir-admin.js";
+import { exigirAdminDeSucursal, exigirExclusivaDeSucursal } from "../lib/exigir-admin.js";
 import { validar } from "../lib/validar.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 
@@ -35,7 +35,10 @@ export async function crearCategoriaImpl(
 }
 
 export const crearCategoria = onCall({ region: "us-central1" }, async (req) => {
-  exigirAdmin(req);
+  const alcance = exigirAdminDeSucursal(req);
   const datos = validar(req.data, crearCategoriaSchema);
+  // D2/S3a: admin_sucursal sólo crea categorías EXCLUSIVAS de su sucursal
+  // (global o compartida se rechaza; Gerente no tiene restricción).
+  exigirExclusivaDeSucursal(alcance, datos.sucursalesAsignadas);
   return crearCategoriaImpl(getFirestore(), req.auth!.uid, datos);
 });

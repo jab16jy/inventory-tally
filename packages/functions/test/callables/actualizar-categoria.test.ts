@@ -9,8 +9,13 @@
 import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { describe, expect, it, afterEach } from "vitest";
-import { actualizarCategoriaImpl } from "../../src/callables/actualizar-categoria.js";
+import {
+  actualizarCategoria,
+  actualizarCategoriaImpl,
+} from "../../src/callables/actualizar-categoria.js";
+import type { ActualizarCategoriaInput } from "@conteo/contracts";
 
 if (getApps().length === 0) {
   initializeApp({ projectId: "demo-conteo-eficiente" });
@@ -64,14 +69,19 @@ describe("actualizarCategoriaImpl", () => {
     const categoriaId = await sembrarCategoria();
     const etiquetaNueva = `Categoría ${randomUUID()}`;
 
-    const resultado = await actualizarCategoriaImpl(db, "uid_admin", {
-      categoriaId,
-      etiqueta: etiquetaNueva,
-      valor: 2000,
-      orden: 2,
-      areaIds: ["area_aseo", "area_bebidas"],
-      sucursalesAsignadas: ["suc_norte"],
-    });
+    const resultado = await actualizarCategoriaImpl(
+      db,
+      "uid_admin",
+      {
+        categoriaId,
+        etiqueta: etiquetaNueva,
+        valor: 2000,
+        orden: 2,
+        areaIds: ["area_aseo", "area_bebidas"],
+        sucursalesAsignadas: ["suc_norte"],
+      },
+      null,
+    );
 
     expect(resultado.actualizada).toBe(true);
     const categoria = await db.doc(`categoriasValor/${categoriaId}`).get();
@@ -94,12 +104,17 @@ describe("actualizarCategoriaImpl", () => {
     const antes = await db.doc(`categoriasValor/${categoriaId}`).get();
     const creadaEnAntes = antes.get("creadaEn");
 
-    await actualizarCategoriaImpl(db, "uid_admin", {
-      categoriaId,
-      etiqueta: "Otra etiqueta",
-      valor: 500,
-      orden: 3,
-    });
+    await actualizarCategoriaImpl(
+      db,
+      "uid_admin",
+      {
+        categoriaId,
+        etiqueta: "Otra etiqueta",
+        valor: 500,
+        orden: 3,
+      },
+      null,
+    );
 
     const despues = await db.doc(`categoriasValor/${categoriaId}`).get();
     expect(despues.get("activa")).toBe(false);
@@ -108,12 +123,17 @@ describe("actualizarCategoriaImpl", () => {
 
   it("falla con not-found si la categoría no existe", async () => {
     await expect(
-      actualizarCategoriaImpl(db, "uid_admin", {
-        categoriaId: `cat_inexistente_${randomUUID()}`,
-        etiqueta: "Lo que sea",
-        valor: 100,
-        orden: 1,
-      }),
+      actualizarCategoriaImpl(
+        db,
+        "uid_admin",
+        {
+          categoriaId: `cat_inexistente_${randomUUID()}`,
+          etiqueta: "Lo que sea",
+          valor: 100,
+          orden: 1,
+        },
+        null,
+      ),
     ).rejects.toMatchObject({ code: "not-found" });
   });
 
@@ -123,12 +143,17 @@ describe("actualizarCategoriaImpl", () => {
       sucursalesAsignadas: ["suc_norte"],
     });
 
-    await actualizarCategoriaImpl(db, "uid_admin", {
-      categoriaId,
-      etiqueta: "Global de nuevo",
-      valor: 700,
-      orden: 4,
-    });
+    await actualizarCategoriaImpl(
+      db,
+      "uid_admin",
+      {
+        categoriaId,
+        etiqueta: "Global de nuevo",
+        valor: 700,
+        orden: 4,
+      },
+      null,
+    );
 
     const categoria = await db.doc(`categoriasValor/${categoriaId}`).get();
     expect(categoria.data()).not.toHaveProperty("areaIds");
@@ -140,16 +165,141 @@ describe("actualizarCategoriaImpl", () => {
     const sesionId = `ses_${randomUUID()}`;
     await sembrarLineaDeSesion(sesionId, categoriaId, 1000);
 
-    await actualizarCategoriaImpl(db, "uid_admin", {
-      categoriaId,
-      etiqueta: "Precio subió a mitad de conteo",
-      valor: 5000,
-      orden: 1,
-    });
+    await actualizarCategoriaImpl(
+      db,
+      "uid_admin",
+      {
+        categoriaId,
+        etiqueta: "Precio subió a mitad de conteo",
+        valor: 5000,
+        orden: 1,
+      },
+      null,
+    );
 
     const linea = await db.doc(`sesiones/${sesionId}/lineas/${categoriaId}`).get();
     expect(linea.get("valorUnitario")).toBe(1000); // sin cambios, congelado al abrir
     const categoria = await db.doc(`categoriasValor/${categoriaId}`).get();
     expect(categoria.get("valor")).toBe(5000); // el catálogo sí cambió
+  });
+});
+
+// Probado a través de `actualizarCategoria.run(req)` (el wrapper `onCall`,
+// D5) y no sólo de `actualizarCategoriaImpl`: una callable que olvidara
+// pasar el `alcance` pasaría igual si sólo se probara el Impl directamente.
+function reqActualizarCategoria(
+  rol: string,
+  sucursales: readonly string[] | undefined,
+  categoriaId: string,
+  sucursalesAsignadas?: readonly string[],
+  etiqueta: string = `Categoría ${randomUUID()}`,
+): CallableRequest<ActualizarCategoriaInput> {
+  return {
+    // spread condicional: una clave presente con valor `undefined` no es lo
+    // mismo para zod que la clave ausente — así se simula el payload real.
+    data: {
+      categoriaId,
+      etiqueta,
+      valor: 999,
+      orden: 1,
+      ...(sucursalesAsignadas !== undefined && { sucursalesAsignadas }),
+    },
+    auth: { uid: "uid_x", token: { rol, sucursales } },
+  } as unknown as CallableRequest<ActualizarCategoriaInput>;
+}
+
+describe("actualizarCategoria — autorización de sucursal (D2, S3a)", () => {
+  it("admin_sucursal actualiza una categoría de su exclusiva propiedad (afirmativo)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const categoriaId = await sembrarCategoria({ sucursalesAsignadas: [sucursalId] });
+    const etiquetaNueva = `Categoría ${randomUUID()}`;
+
+    const resultado = await actualizarCategoria.run({
+      data: {
+        categoriaId,
+        etiqueta: etiquetaNueva,
+        valor: 1500,
+        orden: 2,
+        sucursalesAsignadas: [sucursalId],
+      },
+      auth: { uid: "uid_x", token: { rol: "admin_sucursal", sucursales: [sucursalId] } },
+    } as unknown as CallableRequest<ActualizarCategoriaInput>);
+
+    expect(resultado.actualizada).toBe(true);
+    const categoria = await db.doc(`categoriasValor/${categoriaId}`).get();
+    expect(categoria.get("etiqueta")).toBe(etiquetaNueva);
+  });
+
+  it(
+    "admin_sucursal que omite sucursalesAsignadas al actualizar su propia categoría es " +
+      "rechazado, sin cambios (negativo: el input omitido borraría el campo y la volvería " +
+      "global — D2 exige la misma exclusividad que crearCategoria, no sólo la del valor guardado)",
+    async () => {
+      const sucursalId = `suc_${randomUUID()}`;
+      const categoriaId = await sembrarCategoria({ sucursalesAsignadas: [sucursalId] });
+
+      await expect(
+        actualizarCategoria.run(
+          reqActualizarCategoria("admin_sucursal", [sucursalId], categoriaId, undefined),
+        ),
+      ).rejects.toThrow(HttpsError);
+
+      const categoria = await db.doc(`categoriasValor/${categoriaId}`).get();
+      expect(categoria.get("sucursalesAsignadas")).toEqual([sucursalId]); // sin cambios
+    },
+  );
+
+  it("admin_sucursal no puede actualizar una categoría global (negativo, sin cambios)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const categoriaId = await sembrarCategoria();
+    const etiquetaOriginal = (await db.doc(`categoriasValor/${categoriaId}`).get()).get("etiqueta");
+
+    await expect(
+      actualizarCategoria.run(
+        reqActualizarCategoria("admin_sucursal", [sucursalId], categoriaId, [sucursalId]),
+      ),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+
+    const categoria = await db.doc(`categoriasValor/${categoriaId}`).get();
+    expect(categoria.get("etiqueta")).toBe(etiquetaOriginal);
+  });
+
+  it("admin_sucursal no puede actualizar una categoría compartida (negativo, sin cambios)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const otraSucursalId = `suc_${randomUUID()}`;
+    const categoriaId = await sembrarCategoria({
+      sucursalesAsignadas: [sucursalId, otraSucursalId],
+    });
+    const etiquetaOriginal = (await db.doc(`categoriasValor/${categoriaId}`).get()).get("etiqueta");
+
+    await expect(
+      actualizarCategoria.run(
+        reqActualizarCategoria("admin_sucursal", [sucursalId], categoriaId, [sucursalId]),
+      ),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+
+    const categoria = await db.doc(`categoriasValor/${categoriaId}`).get();
+    expect(categoria.get("etiqueta")).toBe(etiquetaOriginal);
+  });
+
+  it("admin_sucursal con claim malformado (0 sucursales) es rechazado (negativo)", async () => {
+    const categoriaId = await sembrarCategoria({ sucursalesAsignadas: [`suc_${randomUUID()}`] });
+
+    await expect(
+      actualizarCategoria.run(reqActualizarCategoria("admin_sucursal", [], categoriaId)),
+    ).rejects.toThrow(HttpsError);
+  });
+
+  it("admin (Gerente) no se ve afectado (regresión)", async () => {
+    const categoriaId = await sembrarCategoria();
+    const etiquetaNueva = `Categoría ${randomUUID()}`;
+
+    const resultado = await actualizarCategoria.run(
+      reqActualizarCategoria("admin", undefined, categoriaId, undefined, etiquetaNueva),
+    );
+
+    expect(resultado.actualizada).toBe(true);
+    const categoria = await db.doc(`categoriasValor/${categoriaId}`).get();
+    expect(categoria.get("etiqueta")).toBe(etiquetaNueva);
   });
 });
