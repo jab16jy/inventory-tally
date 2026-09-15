@@ -1,4 +1,5 @@
 import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
+import type { Auth } from "firebase-admin/auth";
 import { autorizacionDe } from "./exigir-cajero-de-sesion.js";
 
 /**
@@ -47,4 +48,50 @@ export function exigirExclusivaDeSucursal(alcance: AlcanceAdmin, sucursales: unk
   if (!Array.isArray(sucursales) || sucursales.length !== 1 || sucursales[0] !== alcance) {
     throw new HttpsError("permission-denied", "No tienes acceso a esta sucursal.");
   }
+}
+
+/**
+ * exigirCajeroDeAlcance — anti-escalada (D3): un `admin_sucursal` sólo puede
+ * asignar rol `cajero` en exactamente su propia sucursal. Gerente
+ * (`alcance === null`) no tiene restricción.
+ */
+export function exigirCajeroDeAlcance(
+  alcance: AlcanceAdmin,
+  rol: unknown,
+  sucursales: unknown,
+): void {
+  if (alcance === null) {
+    return;
+  }
+  if (rol !== "cajero") {
+    throw new HttpsError("permission-denied", "Sólo puedes asignar el rol cajero.");
+  }
+  exigirExclusivaDeSucursal(alcance, sucursales);
+}
+
+/**
+ * exigirCajeroObjetivo — D3: la autorización sobre el OBJETIVO de
+ * actualizar/desactivar/reactivar/eliminarCajero se decide sobre sus custom
+ * claims de Auth (doc 09 §2), nunca sobre `usuarios/{uid}`. `alcance ===
+ * null` (Gerente) no restringe y NO lee Auth — evita una llamada innecesaria
+ * y deja probar el no-op sin depender del estado del emulador.
+ */
+export async function exigirCajeroObjetivo(
+  auth: Auth,
+  alcance: AlcanceAdmin,
+  uid: string,
+): Promise<void> {
+  if (alcance === null) {
+    return;
+  }
+  let objetivo;
+  try {
+    objetivo = await auth.getUser(uid);
+  } catch (error) {
+    if ((error as { code?: string }).code === "auth/user-not-found") {
+      throw new HttpsError("not-found", "Cajero inexistente");
+    }
+    throw error;
+  }
+  exigirCajeroDeAlcance(alcance, objetivo.customClaims?.rol, objetivo.customClaims?.sucursales);
 }
