@@ -31,3 +31,32 @@ describe("actualizarCajeroSchema (design.md D-6: reemplazo total, no parche parc
     expect(resultado.success).toBe(false);
   });
 });
+
+describe("actualizarCajeroSchema — cardinalidad de admin_sucursal (D3/D-6, S4-foundation)", () => {
+  it("acepta admin_sucursal con exactamente 1 sucursal asignada (afirmativo)", () => {
+    const resultado = actualizarCajeroSchema.safeParse({
+      ...valido,
+      rol: "admin_sucursal",
+      sucursalesAsignadas: ["suc_1"],
+    });
+    expect(resultado.success).toBe(true);
+  });
+
+  it("rechaza admin_sucursal sin ninguna sucursal asignada", () => {
+    const resultado = actualizarCajeroSchema.safeParse({
+      ...valido,
+      rol: "admin_sucursal",
+      sucursalesAsignadas: [],
+    });
+    expect(resultado.success).toBe(false);
+  });
+
+  it("rechaza admin_sucursal con más de una sucursal asignada", () => {
+    const resultado = actualizarCajeroSchema.safeParse({
+      ...valido,
+      rol: "admin_sucursal",
+      sucursalesAsignadas: ["suc_1", "suc_2"],
+    });
+    expect(resultado.success).toBe(false);
+  });
+});

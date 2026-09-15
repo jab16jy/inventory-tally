@@ -67,3 +67,32 @@ describe("crearCajeroSchema (doc 07 §3, doc 08 §3)", () => {
     expect(resultado.success).toBe(true);
   });
 });
+
+describe("crearCajeroSchema — cardinalidad de admin_sucursal (D3/D-6, S4-foundation)", () => {
+  it("acepta admin_sucursal con exactamente 1 sucursal asignada (afirmativo)", () => {
+    const resultado = crearCajeroSchema.safeParse({
+      ...valido,
+      rol: "admin_sucursal",
+      sucursalesAsignadas: ["suc_norte"],
+    });
+    expect(resultado.success).toBe(true);
+  });
+
+  it("rechaza admin_sucursal sin ninguna sucursal asignada", () => {
+    const resultado = crearCajeroSchema.safeParse({
+      ...valido,
+      rol: "admin_sucursal",
+      sucursalesAsignadas: [],
+    });
+    expect(resultado.success).toBe(false);
+  });
+
+  it("rechaza admin_sucursal con más de una sucursal asignada", () => {
+    const resultado = crearCajeroSchema.safeParse({
+      ...valido,
+      rol: "admin_sucursal",
+      sucursalesAsignadas: ["suc_norte", "suc_centro"],
+    });
+    expect(resultado.success).toBe(false);
+  });
+});
