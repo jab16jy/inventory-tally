@@ -1,7 +1,11 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { eliminarCategoriaSchema, type EliminarCategoriaInput } from "@conteo/contracts";
-import { exigirAdmin } from "../lib/exigir-admin.js";
+import {
+  exigirAdminDeSucursal,
+  exigirExclusivaDeSucursal,
+  type AlcanceAdmin,
+} from "../lib/exigir-admin.js";
 import { validar } from "../lib/validar.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 
@@ -23,6 +27,12 @@ import { registrarAuditoria } from "../lib/auditoria.js";
  * borrado sigue renderizando y sumando correctamente — nada del historial se
  * corrompe. No "arreglar" esto envolviendo el `count()` en la transacción.
  *
+ * D2/S3b: para `admin_sucursal` (`alcance !== null`), el chequeo de
+ * exclusividad corre en una pre-lectura ANTES del `count()` — el mensaje de
+ * "usada en N conteos" filtraría cuántos conteos referencian una categoría
+ * ajena a un llamador que de todos modos va a ser rechazado. Gerente
+ * (`alcance === null`) mantiene el orden original, sin la pre-lectura extra.
+ *
  * ponytail: el índice `fieldOverrides` de infra/firestore.indexes.json para
  * `lineas.categoriaId` debe declarar AMBOS scopes (COLLECTION y
  * COLLECTION_GROUP) — un override reemplaza el índice automático de
@@ -35,9 +45,18 @@ export async function eliminarCategoriaImpl(
   db: Firestore,
   ejecutadoPor: string,
   input: EliminarCategoriaInput,
+  alcance: AlcanceAdmin,
 ): Promise<{ categoriaId: string; eliminada: true }> {
   const { categoriaId } = input;
   const categoriaRef = db.doc(`categoriasValor/${categoriaId}`);
+
+  if (alcance !== null) {
+    const categoria = await categoriaRef.get();
+    if (!categoria.exists) {
+      throw new HttpsError("not-found", "Categoría inexistente");
+    }
+    exigirExclusivaDeSucursal(alcance, categoria.get("sucursalesAsignadas"));
+  }
 
   const usos = await db
     .collectionGroup("lineas")
@@ -57,6 +76,8 @@ export async function eliminarCategoriaImpl(
     if (!categoria.exists) {
       throw new HttpsError("not-found", "Categoría inexistente");
     }
+    // Revalida en la tx (TOCTOU): la pre-lectura sólo evita filtrar el conteo.
+    exigirExclusivaDeSucursal(alcance, categoria.get("sucursalesAsignadas"));
     tx.delete(categoriaRef);
     registrarAuditoria(tx, db, {
       tipo: "CATEGORIA_ELIMINADA",
@@ -69,7 +90,7 @@ export async function eliminarCategoriaImpl(
 }
 
 export const eliminarCategoria = onCall({ region: "us-central1" }, async (req) => {
-  exigirAdmin(req);
+  const alcance = exigirAdminDeSucursal(req);
   const datos = validar(req.data, eliminarCategoriaSchema);
-  return eliminarCategoriaImpl(getFirestore(), req.auth!.uid, datos);
+  return eliminarCategoriaImpl(getFirestore(), req.auth!.uid, datos, alcance);
 });
