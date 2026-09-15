@@ -486,6 +486,15 @@ siguiente vuelve a consultar por `ocurridoEn` y recoge lo que quedó.
 | Logging      | Estructurado con `sesionId` y `uid`; nunca contraseñas                    |
 | Secretos     | Ninguno en el código                                                      |
 
+> `cerrarSesion` (D4, ADR-27): gate en dos etapas. `exigirAdminDeSucursal(req)`
+> exige rol antes de cualquier lectura (`admin` o `admin_sucursal` con
+> exactamente 1 sucursal); devuelve el `alcance`. Inmediatamente después de
+> leer la sesión — y ANTES del estado, RF-16 (`verificarSincronizacion`), el
+> evento `CIERRE_BLOQUEADO` y la transacción de congelamiento —
+> `exigirExclusivaDeSucursal(alcance, [sesion.sucursalId])` rechaza a un
+> `admin_sucursal` cuya sucursal no coincide, sin ningún efecto secundario.
+> Gerente (`alcance === null`) queda exento de la segunda etapa.
+
 ### Invocación desde la app web
 
 ```typescript
