@@ -2,7 +2,7 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { type Auth, getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { eliminarCajeroSchema, type EliminarCajeroInput } from "@conteo/contracts";
-import { exigirAdmin } from "../lib/exigir-admin.js";
+import { exigirAdminDeSucursal, exigirCajeroObjetivo } from "../lib/exigir-admin.js";
 import { validar } from "../lib/validar.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 
@@ -140,7 +140,10 @@ export async function eliminarCajeroImpl(
 }
 
 export const eliminarCajero = onCall({ region: "us-central1" }, async (req) => {
-  exigirAdmin(req);
+  const alcance = exigirAdminDeSucursal(req);
   const datos = validar(req.data, eliminarCajeroSchema);
+  // D3/S4-eliminar: la autorización sobre el objetivo corre ANTES del count()
+  // de participaciones y de auth.deleteUser, dentro de eliminarCajeroImpl.
+  await exigirCajeroObjetivo(getAuth(), alcance, datos.uid);
   return eliminarCajeroImpl(getFirestore(), getAuth(), req.auth!.uid, datos);
 });
