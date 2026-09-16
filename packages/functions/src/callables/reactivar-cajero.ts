@@ -2,7 +2,7 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { type Auth, getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { reactivarCajeroSchema, type ReactivarCajeroInput } from "@conteo/contracts";
-import { exigirAdmin } from "../lib/exigir-admin.js";
+import { exigirAdminDeSucursal, exigirCajeroObjetivo } from "../lib/exigir-admin.js";
 import { validar } from "../lib/validar.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 
@@ -54,7 +54,12 @@ export async function reactivarCajeroImpl(
 }
 
 export const reactivarCajero = onCall({ region: "us-central1" }, async (req) => {
-  exigirAdmin(req);
+  const alcance = exigirAdminDeSucursal(req);
   const datos = validar(req.data, reactivarCajeroSchema);
+  // D3/S4-desactivar-reactivar: el objetivo debe ser ACTUALMENTE un cajero
+  // exclusivo de la sucursal del admin_sucursal (claims, nunca `usuarios/{uid}`).
+  // desactivarCajeroImpl nunca limpia claims, así que un objetivo ya
+  // desactivado sigue siendo legible aquí.
+  await exigirCajeroObjetivo(getAuth(), alcance, datos.uid);
   return reactivarCajeroImpl(getFirestore(), getAuth(), req.auth!.uid, datos);
 });
