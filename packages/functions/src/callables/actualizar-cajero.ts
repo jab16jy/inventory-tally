@@ -2,7 +2,11 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { type Auth, getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { actualizarCajeroSchema, type ActualizarCajeroInput } from "@conteo/contracts";
-import { exigirAdmin } from "../lib/exigir-admin.js";
+import {
+  exigirAdminDeSucursal,
+  exigirCajeroDeAlcance,
+  exigirCajeroObjetivo,
+} from "../lib/exigir-admin.js";
 import { validar } from "../lib/validar.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 
@@ -56,7 +60,12 @@ export async function actualizarCajeroImpl(
 }
 
 export const actualizarCajero = onCall({ region: "us-central1" }, async (req) => {
-  exigirAdmin(req);
+  const alcance = exigirAdminDeSucursal(req);
   const datos = validar(req.data, actualizarCajeroSchema);
+  // D3/S4-actualizar: anti-escalada de entrada + el objetivo debe ser
+  // ACTUALMENTE un cajero exclusivo de la sucursal del admin_sucursal (claims,
+  // nunca `usuarios/{uid}`).
+  exigirCajeroDeAlcance(alcance, datos.rol, datos.sucursalesAsignadas);
+  await exigirCajeroObjetivo(getAuth(), alcance, datos.uid);
   return actualizarCajeroImpl(getFirestore(), getAuth(), req.auth!.uid, datos);
 });
