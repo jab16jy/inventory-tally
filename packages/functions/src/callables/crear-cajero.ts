@@ -2,7 +2,7 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { type Auth, getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore, type Firestore } from "firebase-admin/firestore";
 import { crearCajeroSchema, type CrearCajeroInput } from "@conteo/contracts";
-import { exigirAdmin } from "../lib/exigir-admin.js";
+import { exigirAdminDeSucursal, exigirCajeroDeAlcance } from "../lib/exigir-admin.js";
 import { validar } from "../lib/validar.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 
@@ -73,7 +73,11 @@ export async function crearCajeroImpl(
 }
 
 export const crearCajero = onCall({ region: "us-central1" }, async (req) => {
-  exigirAdmin(req);
+  const alcance = exigirAdminDeSucursal(req);
   const datos = validar(req.data, crearCajeroSchema);
+  // D3/S4-crear: admin_sucursal sólo crea cajeros EXACTAMENTE de su sucursal
+  // (otro rol o sucursal se rechaza antes de escribir en Auth/Firestore;
+  // Gerente no tiene restricción).
+  exigirCajeroDeAlcance(alcance, datos.rol, datos.sucursalesAsignadas);
   return crearCajeroImpl(getFirestore(), getAuth(), req.auth!.uid, datos);
 });
