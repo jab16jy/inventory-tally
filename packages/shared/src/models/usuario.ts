@@ -5,7 +5,7 @@
  * `pwaInstalada` y `ultimoAccesoEn` no los escribe `crearCajero` (doc 08 §3):
  * se llenan después, desde el cliente. Por eso son opcionales aquí.
  */
-export type RolUsuario = "admin" | "cajero";
+export type RolUsuario = "admin" | "admin_sucursal" | "cajero";
 
 export interface Usuario {
   readonly uid: string;
