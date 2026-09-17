@@ -77,16 +77,21 @@ export class FirestoreAdminRepository implements AdminRepository {
   constructor(
     private readonly db: Firestore,
     private readonly functions: Functions,
+    // D7: null = Gerente (sin acotar, comportamiento intacto); string = alcance
+    // de un admin_sucursal — agrega el `where` que las reglas ya exigen (S1).
+    private readonly alcance: string | null = null,
   ) {}
 
   // ─────────── lecturas en vivo ───────────
 
   observarSesionesAbiertas(onChange: (sesiones: SesionConteo[]) => void): Unsubscribe {
-    // Índice existente sucursalId/estado/abiertaEn no hace falta aquí: sólo
-    // filtra por estado, campo único autoindexado (doc plan §2).
+    // Índice existente sucursalId/estado/abiertaEn no hace falta para
+    // Gerente: sólo filtra por estado, campo único autoindexado (doc plan
+    // §2). Con alcance, el índice compuesto ya existe (diseño §Client scope).
     const q = query(
       collection(this.db, "sesiones"),
       where("estado", "==", "abierta"),
+      ...(this.alcance !== null ? [where("sucursalId", "==", this.alcance)] : []),
       orderBy("abiertaEn", "desc"),
     );
     return onSnapshot(q, (snap) => {
@@ -164,13 +169,35 @@ export class FirestoreAdminRepository implements AdminRepository {
   }
 
   observarUsuarios(onChange: (usuarios: Usuario[]) => void): Unsubscribe {
-    const q = query(collection(this.db, "usuarios"), orderBy("nombre"));
+    // Con alcance: `array-contains` no admite `orderBy` de otro campo sin
+    // índice compuesto extra (diseño §Client scope) — se ordena en memoria.
+    const q =
+      this.alcance !== null
+        ? query(
+            collection(this.db, "usuarios"),
+            where("sucursalesAsignadas", "array-contains", this.alcance),
+          )
+        : query(collection(this.db, "usuarios"), orderBy("nombre"));
     return onSnapshot(q, (snap) => {
-      onChange(snap.docs.map((d) => usuarioDesdeDoc(d.id, d.data() as never)));
+      const usuarios = snap.docs.map((d) => usuarioDesdeDoc(d.id, d.data() as never));
+      onChange(
+        this.alcance !== null
+          ? [...usuarios].sort((a, b) => a.nombre.localeCompare(b.nombre))
+          : usuarios,
+      );
     });
   }
 
   observarSucursales(onChange: (sucursales: Sucursal[]) => void): Unsubscribe {
+    // Con alcance: un solo doc listener sobre la propia sucursal, en vez de
+    // la colección completa (diseño §Client scope).
+    if (this.alcance !== null) {
+      const alcance = this.alcance;
+      const ref = doc(this.db, "sucursales", alcance);
+      return onSnapshot(ref, (snap) => {
+        onChange(snap.exists() ? [sucursalDesdeDoc(alcance, snap.data() as never)] : []);
+      });
+    }
     // Colección completa, sin filtro: tieneSucursal() corta en esAdmin()
     // (infra/firestore.rules:16), así que este query SÍ pasa reglas para un
     // admin (doc plan §2) — a diferencia de ConteoRepository.observarSucursales,
@@ -184,7 +211,17 @@ export class FirestoreAdminRepository implements AdminRepository {
   observarCategorias(onChange: (categorias: CategoriaValor[]) => void): Unsubscribe {
     const q = query(collection(this.db, "categoriasValor"), orderBy("orden"));
     return onSnapshot(q, (snap) => {
-      onChange(snap.docs.map((d) => categoriaValorDesdeDoc(d.id, d.data() as never)));
+      const categorias = snap.docs.map((d) => categoriaValorDesdeDoc(d.id, d.data() as never));
+      // Con alcance: filtro en memoria, no en la query (diseño §Client
+      // scope) — global (sin `sucursalesAsignadas`) o incluida pasan.
+      onChange(
+        this.alcance !== null
+          ? categorias.filter(
+              (c) =>
+                !c.sucursalesAsignadas || c.sucursalesAsignadas.includes(this.alcance as string),
+            )
+          : categorias,
+      );
     });
   }
 
@@ -199,8 +236,11 @@ export class FirestoreAdminRepository implements AdminRepository {
   // ─────────── paginadas ───────────
 
   async listarSesiones(filtro: FiltroSesiones, cursor?: unknown): Promise<Pagina<SesionConteo>> {
+    // Con alcance: fuerza la propia sucursal, ignora filtro.sucursalId
+    // (diseño §Client scope) — no hay forma de "escapar" pidiendo otra.
+    const sucursalId = this.alcance ?? filtro.sucursalId;
     const clausulas = [
-      ...(filtro.sucursalId ? [where("sucursalId", "==", filtro.sucursalId)] : []),
+      ...(sucursalId ? [where("sucursalId", "==", sucursalId)] : []),
       ...(filtro.estado ? [where("estado", "==", filtro.estado)] : []),
     ];
     const base = query(collection(this.db, "sesiones"), ...clausulas, orderBy("abiertaEn", "desc"));
@@ -211,7 +251,13 @@ export class FirestoreAdminRepository implements AdminRepository {
     filtro: FiltroAuditoria,
     cursor?: unknown,
   ): Promise<Pagina<EventoAuditoria>> {
-    const clausulas = filtro ? [where(filtro.campo, "==", filtro.valor)] : [];
+    // Con alcance: agrega el propio sucursalId; un filtro sobre ese mismo
+    // campo se descarta para no duplicar el `where` (diseño §Client scope).
+    const filtroEfectivo = this.alcance !== null && filtro?.campo === "sucursalId" ? null : filtro;
+    const clausulas = [
+      ...(this.alcance !== null ? [where("sucursalId", "==", this.alcance)] : []),
+      ...(filtroEfectivo ? [where(filtroEfectivo.campo, "==", filtroEfectivo.valor)] : []),
+    ];
     const base = query(
       collection(this.db, "auditoria"),
       ...clausulas,
