@@ -290,22 +290,23 @@ describe("CajerosScreen · opción de rol acotada (S5c, anti-escalada)", () => {
     expect(screen.queryByRole("option", { name: /gerente/i })).not.toBeInTheDocument();
   });
 
-  it("mantiene ambas opciones de rol para Gerente (regresión)", () => {
+  it("ofrece las tres opciones de rol a Gerente, incluida Admin de sucursal", () => {
     const repo = new FakeAdminRepository();
     renderPantallaConRol(repo, "admin");
 
     fireEvent.click(screen.getByRole("button", { name: /nuevo cajero/i }));
 
-    expect(screen.getAllByRole("option")).toHaveLength(2);
+    expect(screen.getAllByRole("option")).toHaveLength(3);
     expect(screen.getByRole("option", { name: /gerente/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /admin de sucursal/i })).toBeInTheDocument();
   });
 
-  it("mantiene ambas opciones de rol sin contexto de Outlet (regresión, uso directo)", () => {
+  it("mantiene las tres opciones de rol sin contexto de Outlet (regresión, uso directo)", () => {
     const repo = new FakeAdminRepository();
     renderPantalla(repo);
 
     fireEvent.click(screen.getByRole("button", { name: /nuevo cajero/i }));
 
-    expect(screen.getAllByRole("option")).toHaveLength(2);
+    expect(screen.getAllByRole("option")).toHaveLength(3);
   });
 });

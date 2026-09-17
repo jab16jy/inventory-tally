@@ -26,6 +26,7 @@ const CAMPO =
 
 const ROLES: readonly { readonly valor: RolUsuario; readonly etiqueta: string }[] = [
   { valor: "cajero", etiqueta: etiquetaRol("cajero") },
+  { valor: "admin_sucursal", etiqueta: etiquetaRol("admin_sucursal") },
   { valor: "admin", etiqueta: etiquetaRol("admin") },
 ];
 
