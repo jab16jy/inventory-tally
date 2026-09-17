@@ -711,7 +711,7 @@ describe("AnalisisScreen (rediseño)", () => {
     const { container } = renderPantalla(repo);
     await screen.findByText("Sucursal Norte", { exact: false });
 
-    const resumen = container.querySelector('[data-seccion="resumen"]')!;
+    const resumen = container.querySelector<HTMLElement>('[data-seccion="resumen"]')!;
     const cards = [
       within(resumen).getByText("Valor contado").closest("div")!,
       within(resumen).getByText("Valor por unidad").closest("div")!,
