@@ -10,6 +10,7 @@ import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import type { ActualizarCategoriaPayload, CrearCategoriaPayload } from "@conteo/data";
 import { moneda } from "../../lib/formato.js";
 import { useAdminRepository } from "../../state/admin-contexto.js";
+import { useScrollAlAbrir } from "../../state/useScrollAlAbrir.js";
 import { Icono } from "../primitivos/Icono.js";
 import { Spinner } from "../primitivos/Spinner.js";
 import { Tabla, type ColumnaTabla } from "./Tabla.js";
@@ -95,6 +96,7 @@ export function CategoriasScreen() {
   // en un segundo clic con advertencia explícita, mismo criterio que
   // CajerosScreen.tsx para eliminarCajero.
   const [confirmandoEliminarId, setConfirmandoEliminarId] = useState<string | null>(null);
+  const formularioRef = useScrollAlAbrir<HTMLDivElement>(formulario !== null);
 
   function abrirCreacion(): void {
     setFormulario({ modo: "crear" });
@@ -302,14 +304,16 @@ export function CategoriasScreen() {
       )}
 
       {formulario && (
-        <FormularioCategoria
-          modo={formulario.modo}
-          categoria={formulario.modo === "editar" ? formulario.categoria : undefined}
-          error={errorFormulario}
-          onCancelar={cerrarFormulario}
-          onCrear={crear}
-          onEditar={editar}
-        />
+        <div ref={formularioRef}>
+          <FormularioCategoria
+            modo={formulario.modo}
+            categoria={formulario.modo === "editar" ? formulario.categoria : undefined}
+            error={errorFormulario}
+            onCancelar={cerrarFormulario}
+            onCrear={crear}
+            onEditar={editar}
+          />
+        </div>
       )}
 
       <Tabla

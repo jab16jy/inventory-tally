@@ -15,6 +15,7 @@ import type { ActualizarCajeroPayload, CrearCajeroPayload } from "@conteo/data";
 import { etiquetaRol } from "../../lib/etiqueta-rol.js";
 import { fecha } from "../../lib/formato.js";
 import { useAdminRepository } from "../../state/admin-contexto.js";
+import { useScrollAlAbrir } from "../../state/useScrollAlAbrir.js";
 import { Icono } from "../primitivos/Icono.js";
 import { Spinner } from "../primitivos/Spinner.js";
 import { Tabla, type ColumnaTabla } from "./Tabla.js";
@@ -88,6 +89,7 @@ export function CajerosScreen() {
   // que es un borrado permanente — no hace falta una segunda pantalla.
   const [confirmandoEliminarUid, setConfirmandoEliminarUid] = useState<string | null>(null);
   const [eliminandoUid, setEliminandoUid] = useState<string | null>(null);
+  const formularioRef = useScrollAlAbrir<HTMLDivElement>(formulario !== null);
 
   function abrirCreacion(): void {
     setFormulario({ modo: "crear" });
@@ -327,16 +329,18 @@ export function CajerosScreen() {
       )}
 
       {formulario && (
-        <FormularioCajero
-          modo={formulario.modo}
-          usuario={formulario.modo === "editar" ? formulario.usuario : undefined}
-          sucursales={sucursales}
-          roles={roles}
-          error={errorFormulario}
-          onCancelar={cerrarFormulario}
-          onCrear={crear}
-          onEditar={editar}
-        />
+        <div ref={formularioRef}>
+          <FormularioCajero
+            modo={formulario.modo}
+            usuario={formulario.modo === "editar" ? formulario.usuario : undefined}
+            sucursales={sucursales}
+            roles={roles}
+            error={errorFormulario}
+            onCancelar={cerrarFormulario}
+            onCrear={crear}
+            onEditar={editar}
+          />
+        </div>
       )}
 
       <Tabla

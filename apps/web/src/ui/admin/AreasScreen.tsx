@@ -11,6 +11,7 @@ import type {
   CrearAreaPayload,
 } from "@conteo/data";
 import { useAdminRepository } from "../../state/admin-contexto.js";
+import { useScrollAlAbrir } from "../../state/useScrollAlAbrir.js";
 import { Icono } from "../primitivos/Icono.js";
 import { Spinner } from "../primitivos/Spinner.js";
 import { Tabla, type ColumnaTabla } from "./Tabla.js";
@@ -80,6 +81,7 @@ export function AreasScreen({ onIrACategorias }: AreasScreenProps = {}) {
   // en un segundo clic con advertencia explícita, mismo criterio que
   // CajerosScreen.tsx para eliminarCajero.
   const [confirmandoEliminarId, setConfirmandoEliminarId] = useState<string | null>(null);
+  const formularioRef = useScrollAlAbrir<HTMLDivElement>(formulario !== null);
 
   function abrirCreacion(): void {
     setFormulario({ modo: "crear" });
@@ -298,24 +300,28 @@ export function AreasScreen({ onIrACategorias }: AreasScreenProps = {}) {
         </p>
       )}
 
-      {formulario && formulario.modo === "asignar" ? (
-        <FormularioAsignacion
-          area={formulario.area}
-          categorias={categorias}
-          cargandoCategorias={cargandoCategorias}
-          onCancelar={cerrarFormulario}
-          onExito={cerrarFormulario}
-        />
-      ) : formulario ? (
-        <FormularioArea
-          modo={formulario.modo}
-          area={formulario.modo === "editar" ? formulario.area : undefined}
-          error={errorFormulario}
-          onCancelar={cerrarFormulario}
-          onCrear={crear}
-          onEditar={editar}
-        />
-      ) : null}
+      {formulario && (
+        <div ref={formularioRef}>
+          {formulario.modo === "asignar" ? (
+            <FormularioAsignacion
+              area={formulario.area}
+              categorias={categorias}
+              cargandoCategorias={cargandoCategorias}
+              onCancelar={cerrarFormulario}
+              onExito={cerrarFormulario}
+            />
+          ) : (
+            <FormularioArea
+              modo={formulario.modo}
+              area={formulario.modo === "editar" ? formulario.area : undefined}
+              error={errorFormulario}
+              onCancelar={cerrarFormulario}
+              onCrear={crear}
+              onEditar={editar}
+            />
+          )}
+        </div>
+      )}
 
       {categoriasSinArea.length > 0 && (
         <div
