@@ -61,6 +61,15 @@ describe("Tabla (F2)", () => {
     expect(screen.getByRole("columnheader", { name: "ID" })).not.toHaveAttribute("aria-sort");
   });
 
+  it("una columna ordenable NO activa ya muestra afordancia de orden (cursor-pointer + ícono)", () => {
+    render(<Tabla columnas={columnas()} filas={FILAS} claveFila={(f) => f.id} etiqueta="Prueba" />);
+
+    const encabezadoNombre = screen.getByRole("columnheader", { name: /nombre/i });
+    const boton = within(encabezadoNombre).getByRole("button");
+    expect(boton).toHaveClass("cursor-pointer");
+    expect(boton.querySelector("svg")).not.toBeNull();
+  });
+
   it("ordena ascendente, luego descendente, luego vuelve a sin ordenar al clicar la misma columna", () => {
     render(<Tabla columnas={columnas()} filas={FILAS} claveFila={(f) => f.id} etiqueta="Prueba" />);
 
