@@ -34,6 +34,7 @@ import { fecha, moneda, numero, porcentaje } from "../../lib/formato.js";
 import { useAdminRepository } from "../../state/admin-contexto.js";
 import { useConexion } from "../../state/useConexion.js";
 import { ChipEstado } from "../primitivos/ChipEstado.js";
+import { Icono } from "../primitivos/Icono.js";
 import { Numeral } from "../primitivos/Numeral.js";
 import { Placa } from "../primitivos/Placa.js";
 import { EvolucionMensual } from "./EvolucionMensual.js";
@@ -359,7 +360,10 @@ export function AnalisisScreen() {
             onClick={() => window.print()}
             className="ml-auto min-h-[var(--size-toque)] rounded-placa border border-borde px-3 text-micro text-tinta hover:border-senal hover:text-senal print:hidden"
           >
-            Imprimir
+            <span className="inline-flex items-center gap-1.5">
+              <Icono nombre="imprimir" className="size-4 shrink-0" />
+              Imprimir
+            </span>
           </button>
         </div>
         <p role="status" className="mt-1 text-micro text-tenue">

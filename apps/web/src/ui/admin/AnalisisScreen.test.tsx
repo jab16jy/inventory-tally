@@ -428,7 +428,7 @@ describe("AnalisisScreen (rediseño)", () => {
     expect(filas[3]).toHaveTextContent("$150000");
   });
 
-  it("botón Imprimir dispara window.print()", async () => {
+  it("botón Imprimir dispara window.print() y lleva un ícono", async () => {
     const repo = new FakeAdminRepository();
     sembrarSesionCompleta(repo);
     const printSpy = vi.spyOn(window, "print").mockImplementation(() => {});
@@ -436,6 +436,7 @@ describe("AnalisisScreen (rediseño)", () => {
     renderPantalla(repo);
 
     const boton = await screen.findByRole("button", { name: /imprimir/i });
+    expect(boton.querySelector("svg")).not.toBeNull();
     fireEvent.click(boton);
 
     expect(printSpy).toHaveBeenCalledTimes(1);

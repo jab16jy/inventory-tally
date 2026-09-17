@@ -57,6 +57,9 @@ const PATHS = {
   /** Papelera cuadrada: tapa recta, sin curva de tacho — botón "Eliminar" en
    *  las pantallas de admin. */
   papelera: "M4 6h16M9 6V4h6v2M6 6l1 14h10l1-14M10 10v6M14 10v6",
+  /** Impresora: bandeja de papel arriba y abajo del cuerpo rectangular —
+   *  botón "Imprimir" de AnalisisScreen.tsx. */
+  imprimir: "M7 2h10v6H7z M3 8h18v9H3z M7 15h10v7H7z",
 } as const;
 
 export interface IconoProps extends Omit<SVGProps<SVGSVGElement>, "children"> {
