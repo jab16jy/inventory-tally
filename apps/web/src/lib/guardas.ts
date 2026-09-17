@@ -12,6 +12,9 @@ export interface UsuarioAutenticado {
   // archivo que no se puede tocar. El consumidor (`SucursalesScreen`)
   // normaliza la ausencia a `[]`.
   readonly sucursales?: readonly string[];
+  // Opcional a propósito (D8/D9): `guardas.test.ts` está protegido y
+  // construye literales sin `rol`.
+  readonly rol?: string;
 }
 
 /** `undefined` = resolviendo la sesión (splash); `null` = sin sesión. */
@@ -22,6 +25,7 @@ export function calcularRedireccion(auth: EstadoAuth, pathname: string): string 
   if (auth === undefined) return null;
   if (auth === null) return "/login";
   if (pathname.startsWith("/admin") && !auth.esAdmin) return "/sucursales";
+  if (pathname.startsWith("/admin/comparativo") && auth.rol === "admin_sucursal") return "/admin";
   return null;
 }
 
