@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { abrirSesionImpl } from "../../src/callables/abrir-sesion.js";
 
 if (getApps().length === 0) {
@@ -15,7 +15,25 @@ if (getApps().length === 0) {
 }
 const db = getFirestore();
 
+// #98: el emulador es compartido por toda la suite. Las sesiones abiertas y las
+// categorías activas que quedaban vivas inflaban el N+1 de reconciliarLineasImpl
+// en los archivos siguientes. Se registra en los helpers para cubrir también las
+// aperturas concurrentes y los tests que no guardan el `sesionId`.
+const sucursalesCreadas: string[] = [];
+const categoriasCreadas: string[] = [];
+
+afterEach(async () => {
+  for (const sucursalId of sucursalesCreadas.splice(0)) {
+    const sesiones = await db.collection("sesiones").where("sucursalId", "==", sucursalId).get();
+    await Promise.all(sesiones.docs.map((sesion) => db.recursiveDelete(sesion.ref)));
+  }
+  await Promise.all(
+    categoriasCreadas.splice(0).map((id) => db.doc(`categoriasValor/${id}`).delete()),
+  );
+});
+
 async function crearSucursal(sucursalId: string, sesionAbiertaId: string | null = null) {
+  sucursalesCreadas.push(sucursalId);
   await db.doc(`sucursales/${sucursalId}`).set({ nombre: "Sucursal de prueba", sesionAbiertaId });
 }
 
@@ -26,6 +44,7 @@ async function crearCategoria(
   sucursalesAsignadas?: readonly string[],
   areaIds?: readonly string[],
 ) {
+  categoriasCreadas.push(categoriaId);
   await db.doc(`categoriasValor/${categoriaId}`).set({
     valor,
     etiqueta: `$${valor}`,
