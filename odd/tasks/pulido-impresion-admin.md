@@ -33,20 +33,31 @@ Feature de acabado post-`analisis-precio-pdf`: esa feature ya dejó documentada 
 
 ## Checklist
 
-- [ ] **T1** — Afordancia de orden en columnas no activas de `Tabla.tsx`.
-- [ ] **T2** — Ícono + restyle del botón "Imprimir" en `AnalisisScreen.tsx`.
-- [ ] **T3** — Forzar layout de escritorio de `Tabla` al imprimir (`beforeprint`/`afterprint` en `useDisenoAdaptativo`) + `overflow-visible` en impresión.
-- [ ] **T4** — `print:hidden` en ambos `<nav>` de `AdminLayout.tsx`.
-- [ ] **T5** — Estructura imprimible de `AnalisisScreen.tsx` + `EvolucionMensual.tsx`.
+- [x] **T1** — Afordancia de orden en columnas no activas de `Tabla.tsx`.
+  - Evidencia: RED confirmado (`toHaveClass("cursor-pointer")` y `querySelector("svg")` fallaban en columna no activa). Fix: `cursor-pointer` en el botón + `Icono nombre="chevron"` siempre presente (atenuado `text-tenue` sin rotar cuando no está activa). GREEN: 17/17 `Tabla.test.tsx`, 33/33 `AnalisisScreen.test.tsx` sin regresión.
+- [x] **T2** — Ícono + restyle del botón "Imprimir" en `AnalisisScreen.tsx`.
+  - Evidencia: RED confirmado (`boton.querySelector("svg")` era `null`). Fix: nuevo path `imprimir` en `Icono.tsx` (sólo `M`/`h`/`v`/`H`/`z`, sin curvas) + `<Icono nombre="imprimir">` antepuesto al texto dentro de un `<span>`. GREEN: 33/33 `AnalisisScreen.test.tsx`, el test existente `getByRole("button", { name: /imprimir/i })` siguió pasando sin tocarlo.
+- [x] **T3** — Forzar layout de escritorio de `Tabla` al imprimir + `overflow-visible` en impresión.
+  - Evidencia: RED confirmado (`useDisenoAdaptativo` seguía en `"movil"` tras `beforeprint`). Fix: efecto nuevo con listeners `beforeprint`/`afterprint` en `useDisenoAdaptativo.ts` (fuerza `"escritorio"`, restaura recalculando con `calcular(window.innerWidth)` — sin `matchMedia`, respeta la decisión documentada en la cabecera del archivo) + `print:overflow-visible` en el wrapper de `Tabla.tsx`. GREEN: 7/7 `useDisenoAdaptativo.test.ts`, 17/17 `Tabla.test.tsx`, 12/12 `AdminLayout.test.tsx`, 33/33 `AnalisisScreen.test.tsx`.
+- [x] **T4** — `print:hidden` en ambos `<nav>` de `AdminLayout.tsx`.
+  - Evidencia: RED confirmado (ambos navs sin `print:hidden`). Fix: clase agregada al sidebar de escritorio y a la barra inferior móvil. GREEN: 14/14 `AdminLayout.test.tsx`. Cierra la limitación conocida documentada en `odd/tasks/analisis-precio-pdf.md`.
+- [x] **T5** — Estructura imprimible de `AnalisisScreen.tsx` + `EvolucionMensual.tsx`.
+  - Evidencia: RED confirmado (cards sin `print:bg-white`/`print:border-black`, selector sin `print:hidden`, sparkline/botón sin `print:hidden`, `<ul>` sin `print:not-sr-only`). Fix: `print:border-black print:bg-white` en las 3 cards + `print:text-black` en sus textos planos (`Delta` se dejó igual — no acepta `className`, documentado en comentario de una línea); `print:hidden` en el wrapper del `<select>` + párrafo equivalente `hidden print:block` con `etiquetaDimension(dimension)` reutilizada; en `EvolucionMensual.tsx`, `print:hidden` en `Sparkline` y en el botón "Ver/Ocultar valores", `print:not-sr-only` en el `<ul>` (sin violar la regla de nunca usar `hidden`/`display:none` ahí). GREEN: 35/35 `AnalisisScreen.test.tsx`, 7/7 `EvolucionMensual.test.tsx`.
 
 ## Progreso
 
-- 2026-09-17: documento creado, rama `feat/pulido-impresion-admin` creada desde `main`.
+- 2026-09-17: documento creado, rama `feat/pulido-impresion-admin` creada desde `main` (`2114870`).
+- 2026-09-17: T1 commiteado (`96fe565`).
+- 2026-09-17: T2 commiteado (`d3a8609`).
+- 2026-09-17: T3 commiteado (`a09a27f`).
+- 2026-09-17: T4 commiteado (`9a55a3e`).
+- 2026-09-17: T5 commiteado (`4810079`) + fix de tipo del test (`e6c02de`, `container.querySelector<HTMLElement>` para que `within()` tipara bien).
+- 2026-09-17: verificación final — `tsc --noEmit` limpio, `npx vitest run` completo: 61 archivos, 508 tests, todos en verde, ninguno en skip. Cero dependencias nuevas (`git diff main --stat -- '**/package.json'` sin salida).
 
 ## Cierre
 
-(pendiente)
+Las 5 tareas quedaron implementadas con TDD estricto (RED confirmado por tarea antes de cada fix) y sin romper ningún test existente del workspace `apps/web`. Cero dependencias npm nuevas, cero backend/Cloud Function nuevo — toda la impresión sigue siendo `window.print()` nativo + CSS de impresión (`print:*` de Tailwind). Cierra explícitamente la limitación conocida documentada en `odd/tasks/analisis-precio-pdf.md` (nav de `AdminLayout` sin `print:hidden`).
 
 ## Próximo paso
 
-Empezar T1.
+Ninguno pendiente de esta feature. Revisión RDD del slice completo pendiente de ejecutar (ver Progreso), y push/PR a criterio del usuario.
