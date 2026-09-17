@@ -12,10 +12,11 @@
 import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { describe, expect, it, afterEach } from "vitest";
-import { crearCategoriaImpl } from "../../src/callables/crear-categoria.js";
+import { crearCategoria, crearCategoriaImpl } from "../../src/callables/crear-categoria.js";
 import { abrirSesionImpl } from "../../src/callables/abrir-sesion.js";
-import { crearCategoriaSchema } from "@conteo/contracts";
+import { crearCategoriaSchema, type CrearCategoriaInput } from "@conteo/contracts";
 
 if (getApps().length === 0) {
   initializeApp({ projectId: "demo-conteo-eficiente" });
@@ -129,5 +130,79 @@ describe("crearCategoriaImpl", () => {
 
     const categoria = await db.doc(`categoriasValor/${resultado.categoriaId}`).get();
     expect(categoria.get("areaIds")).toEqual(["area_aseo", "area_bebidas"]);
+  });
+});
+
+function reqCrearCategoria(
+  rol: string,
+  sucursales: readonly string[] | undefined,
+  sucursalesAsignadas?: readonly string[],
+): CallableRequest<CrearCategoriaInput> {
+  return {
+    // spread condicional: una clave presente con valor `undefined` no es lo
+    // mismo para zod que la clave ausente (ver el test de regresión de
+    // `crearCategoriaImpl` más arriba) — así se simula el payload real.
+    data: { ...datosValidos(), ...(sucursalesAsignadas !== undefined && { sucursalesAsignadas }) },
+    auth: { uid: "uid_x", token: { rol, sucursales } },
+  } as unknown as CallableRequest<CrearCategoriaInput>;
+}
+
+describe("crearCategoria — autorización de sucursal (D2, S3a)", () => {
+  it("admin_sucursal crea exactamente en su propia sucursal (afirmativo)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+
+    const resultado = await crearCategoria.run(
+      reqCrearCategoria("admin_sucursal", [sucursalId], [sucursalId]),
+    );
+    categoriasCreadas.push(resultado.categoriaId);
+
+    const categoria = await db.doc(`categoriasValor/${resultado.categoriaId}`).get();
+    expect(categoria.get("sucursalesAsignadas")).toEqual([sucursalId]);
+  });
+
+  it("admin_sucursal sin sucursalesAsignadas es rechazado, nada se crea (negativo)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const antes = await db.collection("categoriasValor").get();
+
+    await expect(
+      crearCategoria.run(reqCrearCategoria("admin_sucursal", [sucursalId], undefined)),
+    ).rejects.toThrow(HttpsError);
+
+    const despues = await db.collection("categoriasValor").get();
+    expect(despues.size).toBe(antes.size);
+  });
+
+  it("admin_sucursal con sucursalesAsignadas multi-sucursal es rechazado (negativo)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const otraSucursalId = `suc_${randomUUID()}`;
+    const antes = await db.collection("categoriasValor").get();
+
+    await expect(
+      crearCategoria.run(
+        reqCrearCategoria("admin_sucursal", [sucursalId], [sucursalId, otraSucursalId]),
+      ),
+    ).rejects.toThrow(HttpsError);
+
+    const despues = await db.collection("categoriasValor").get();
+    expect(despues.size).toBe(antes.size);
+  });
+
+  it("admin_sucursal con claim malformado (2+ sucursales) es rechazado (negativo)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const otraSucursalId = `suc_${randomUUID()}`;
+
+    await expect(
+      crearCategoria.run(
+        reqCrearCategoria("admin_sucursal", [sucursalId, otraSucursalId], [sucursalId]),
+      ),
+    ).rejects.toThrow(HttpsError);
+  });
+
+  it("admin (Gerente) puede crear una categoría global (regresión)", async () => {
+    const resultado = await crearCategoria.run(reqCrearCategoria("admin", undefined, undefined));
+    categoriasCreadas.push(resultado.categoriaId);
+
+    const categoria = await db.doc(`categoriasValor/${resultado.categoriaId}`).get();
+    expect(categoria.exists).toBe(true);
   });
 });

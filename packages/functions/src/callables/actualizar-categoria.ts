@@ -1,7 +1,11 @@
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { FieldValue, getFirestore, type Firestore } from "firebase-admin/firestore";
 import { actualizarCategoriaSchema, type ActualizarCategoriaInput } from "@conteo/contracts";
-import { exigirAdmin } from "../lib/exigir-admin.js";
+import {
+  exigirAdminDeSucursal,
+  exigirExclusivaDeSucursal,
+  type AlcanceAdmin,
+} from "../lib/exigir-admin.js";
 import { validar } from "../lib/validar.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 
@@ -28,6 +32,7 @@ export async function actualizarCategoriaImpl(
   db: Firestore,
   ejecutadoPor: string,
   input: ActualizarCategoriaInput,
+  alcance: AlcanceAdmin,
 ): Promise<{ categoriaId: string; actualizada: true }> {
   const { categoriaId, etiqueta, valor, orden, areaIds, sucursalesAsignadas } = input;
   const categoriaRef = db.doc(`categoriasValor/${categoriaId}`);
@@ -37,6 +42,10 @@ export async function actualizarCategoriaImpl(
     if (!categoria.exists) {
       throw new HttpsError("not-found", "Categoría inexistente");
     }
+    // D2/S3a: alcance de escritura sobre el valor GUARDADO, antes de cualquier
+    // `tx.update` — global o compartida con otra sucursal se rechaza sin
+    // efecto (Gerente sin restricción).
+    exigirExclusivaDeSucursal(alcance, categoria.get("sucursalesAsignadas"));
 
     tx.update(categoriaRef, {
       etiqueta,
@@ -56,7 +65,11 @@ export async function actualizarCategoriaImpl(
 }
 
 export const actualizarCategoria = onCall({ region: "us-central1" }, async (req) => {
-  exigirAdmin(req);
+  const alcance = exigirAdminDeSucursal(req);
   const datos = validar(req.data, actualizarCategoriaSchema);
-  return actualizarCategoriaImpl(getFirestore(), req.auth!.uid, datos);
+  // D2/S3a: mismo chequeo que crearCategoria sobre el INPUT — omitir
+  // sucursalesAsignadas en la edición borraría el campo (categoría global),
+  // así que no basta con validar sólo el valor guardado dentro de la tx.
+  exigirExclusivaDeSucursal(alcance, datos.sucursalesAsignadas);
+  return actualizarCategoriaImpl(getFirestore(), req.auth!.uid, datos, alcance);
 });

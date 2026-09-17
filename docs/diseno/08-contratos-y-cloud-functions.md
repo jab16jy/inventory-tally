@@ -495,6 +495,14 @@ siguiente vuelve a consultar por `ocurridoEn` y recoge lo que quedó.
 > `admin_sucursal` cuya sucursal no coincide, sin ningún efecto secundario.
 > Gerente (`alcance === null`) queda exento de la segunda etapa.
 
+> `crearCategoria`/`actualizarCategoria` (D2, ADR-27): un `admin_sucursal`
+> sólo escribe una categoría EXCLUSIVA de su sucursal
+> (`sucursalesAsignadas === [suSucursal]`); global o compartida se rechaza,
+> sin cambios. `crearCategoria` valida el `sucursalesAsignadas` del INPUT.
+> `actualizarCategoria` valida el mismo INPUT en el wrapper (omitirlo
+> borraría el campo y volvería la categoría global) y, dentro de la
+> transacción, revalida el valor GUARDADO antes de escribir. Gerente exento.
+
 ### Invocación desde la app web
 
 ```typescript
