@@ -428,6 +428,30 @@ describe("AnalisisScreen (rediseño)", () => {
     expect(filas[3]).toHaveTextContent("$150000");
   });
 
+  it("botón Imprimir dispara window.print()", async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo);
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => {});
+
+    renderPantalla(repo);
+
+    const boton = await screen.findByRole("button", { name: /imprimir/i });
+    fireEvent.click(boton);
+
+    expect(printSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("mientras carga (esqueleto) no ofrece el botón Imprimir: no hay nada listo para imprimir todavía", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(sesionBase());
+    repo.sembrarLinea("ses_1", lineaBase("cat_a", 2000, 10));
+    repo.observarSincronizacion = () => () => {};
+
+    renderPantalla(repo);
+
+    expect(screen.queryByRole("button", { name: /imprimir/i })).not.toBeInTheDocument();
+  });
+
   it("la fila de total cuadra con la card Valor contado en las tres dimensiones", async () => {
     const repo = new FakeAdminRepository();
     sembrarSesionCompleta(repo);

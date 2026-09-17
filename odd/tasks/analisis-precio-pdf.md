@@ -30,14 +30,17 @@ El admin necesita revisar rápido qué categorías de precio alto/bajo concentra
 - [x] **T1** — Ordenar categorías por precio numérico en el desglose por Categoría.
   - Criterio de aceptación: con dimension="categoria", el orden por la columna de precio es numérico ascendente/descendente (no alfabético). Dimensiones "area"/"cajero" sin cambios de comportamiento. Test cubre el caso "$10.000" vs "$2.000" ordenando correctamente.
   - Evidencia: RED confirmado (test fallaba mostrando "$150000" primero al ordenar asc). Fix: `FilaDimension.precioUnitario` nuevo (opcional, sólo poblado en la rama "categoria" de `agruparPorDimension`, packages/shared/src/services/calculadora-analisis.ts) + `columnasTabla` en AnalisisScreen.tsx usa `valorOrden: dimension === "categoria" ? (f) => f.precioUnitario ?? 0 : (f) => f.etiqueta`. GREEN: 31/31 tests AnalisisScreen.test.tsx, 48/48 calculadora-analisis.test.ts, typecheck limpio en apps/web y packages/shared.
-- [ ] **T2** — Exportar/imprimir la sesión de análisis vía `window.print()`.
+- [x] **T2** — Exportar/imprimir la sesión de análisis vía `window.print()`.
   - Criterio de aceptación: botón "Imprimir" visible en `AnalisisScreen`; CSS de impresión oculta elementos no imprimibles y mantiene tabla + resumen legibles; sin nuevas dependencias ni llamadas a backend. Test cubre que el botón dispara `window.print` y que el estado de carga/skeleton y sesión sin líneas contadas no rompen la impresión.
+  - Evidencia: RED confirmado (botón "Imprimir" no existía). Fix: botón nativo `onClick={() => window.print()}` en la cabecera de AnalisisScreen.tsx, con `print:hidden` (Tailwind); el toggle "vs. sesión anterior" también lleva `print:hidden`. GREEN: 33/33 tests AnalisisScreen.test.tsx, typecheck limpio.
+  - Limitación conocida (fuera de alcance, documentada, no silenciosa): el sidebar/nav de `AdminLayout` (shell compartido por las 7 pantallas del panel admin) no lleva `print:hidden` — tocarlo es un cambio de un componente compartido fuera del alcance de esta feature (sólo AnalisisScreen). Al imprimir, el navegador seguiría mostrando esa barra lateral. Si se quiere resolver, es una tarea separada sobre AdminLayout, no de este feature.
 
 ## Progreso
 
-- 2026-09-17: documento creado, rama `feat/analisis-precio-pdf` creada desde `main`.
-- 2026-09-17: T1 implementado y verificado (RED→GREEN). Pendiente commit de work-unit.
+- 2026-09-17: documento creado, rama `feat/analisis-precio-pdf` creada desde `main` (boundary: `9d03189`).
+- 2026-09-17: T1 commiteado (`4b56b52`). `gentle-ai review assess` → risk=medium, deferido a cierre de slice (no revisa ahora).
+- 2026-09-17: T2 implementado y verificado (RED→GREEN). Pendiente commit de work-unit.
 
 ## Próximo paso
 
-Commit de work-unit para T1, luego implementar T2 (RED: botón imprimir aún no existe).
+Commit de work-unit para T2. Con las dos tareas cerradas, la feature termina: cerrar slice y correr la revisión diferida (`gentle-ai review status --next-transition` desde el boundary `9d03189`).

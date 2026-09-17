@@ -351,6 +351,16 @@ export function AnalisisScreen() {
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-base font-semibold text-tinta">Análisis · {sesion.sucursalNombre}</h1>
           <ChipEstado estado={estadoChip} />
+          {/* window.print() nativo: cero dependencias, cero backend (D-11,
+              costo de cuota Blaze). `print:hidden` lo saca de la hoja
+              impresa — el botón en sí no aporta nada en papel. */}
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="ml-auto min-h-[var(--size-toque)] rounded-placa border border-borde px-3 text-micro text-tinta hover:border-senal hover:text-senal print:hidden"
+          >
+            Imprimir
+          </button>
         </div>
         <p role="status" className="mt-1 text-micro text-tenue">
           {sesion.estado === "abierta" ? "Sesión abierta" : "Sesión cerrada"}
@@ -407,7 +417,7 @@ export function AnalisisScreen() {
           aria-pressed={compararActivo}
           disabled={!anterior}
           onClick={() => setCompararActivo((activo) => !activo)}
-          className="min-h-11 w-fit rounded-placa border border-borde px-3 text-micro text-tinta aria-pressed:border-senal aria-pressed:text-senal disabled:cursor-not-allowed disabled:opacity-40"
+          className="min-h-11 w-fit rounded-placa border border-borde px-3 text-micro text-tinta aria-pressed:border-senal aria-pressed:text-senal disabled:cursor-not-allowed disabled:opacity-40 print:hidden"
         >
           {anterior ? "vs. sesión anterior" : "Sin sesión anterior"}
         </button>
