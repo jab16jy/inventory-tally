@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { FieldValue, getFirestore, type Firestore } from "firebase-admin/firestore";
 import { abrirSesionSchema, type AbrirSesionInput } from "@conteo/contracts";
-import { exigirAdmin } from "../lib/exigir-admin.js";
+import { exigirAdminDeSucursal, exigirExclusivaDeSucursal } from "../lib/exigir-admin.js";
 import { validar } from "../lib/validar.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 import { lineaSembrada } from "../lib/linea-sembrada.js";
@@ -128,7 +128,8 @@ export async function abrirSesionImpl(
 }
 
 export const abrirSesion = onCall({ region: "us-central1" }, async (req) => {
-  exigirAdmin(req);
+  const alcance = exigirAdminDeSucursal(req);
   const datos = validar(req.data, abrirSesionSchema);
+  exigirExclusivaDeSucursal(alcance, [datos.sucursalId]);
   return abrirSesionImpl(getFirestore(), req.auth!.uid, datos);
 });
