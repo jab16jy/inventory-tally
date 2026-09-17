@@ -29,11 +29,15 @@ export function useAuthState(auth: Auth): EstadoAuth {
         return;
       }
       void usuario.getIdTokenResult().then((token) => {
+        const sucursales = normalizarSucursales(token.claims.sucursales);
+        const rol = typeof token.claims.rol === "string" ? token.claims.rol : undefined;
+        const esAdmin = rol === "admin" || (rol === "admin_sucursal" && sucursales.length === 1);
         setEstado({
           uid: usuario.uid,
           nombre: usuario.displayName,
-          esAdmin: token.claims.rol === "admin",
-          sucursales: normalizarSucursales(token.claims.sucursales),
+          esAdmin,
+          sucursales,
+          rol,
         });
       });
     });

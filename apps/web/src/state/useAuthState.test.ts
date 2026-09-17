@@ -71,3 +71,101 @@ describe("useAuthState — claim `sucursales` (F3-A)", () => {
     expect(result.current?.sucursales).toEqual(["suc_norte"]);
   });
 });
+
+describe("useAuthState — claim `rol` y `esAdmin` (D8/S5a)", () => {
+  it("expone el claim rol cuando es un string", async () => {
+    onAuthStateChanged.mockImplementation((_auth: unknown, cb: (u: unknown) => void) => {
+      cb(usuarioFake({ rol: "admin_sucursal", sucursales: ["suc_norte"] }));
+      return () => {};
+    });
+
+    const { result } = renderHook(() => useAuthState({} as never));
+
+    await waitFor(() => expect(result.current).not.toBeUndefined());
+    expect(result.current?.rol).toBe("admin_sucursal");
+  });
+
+  it("normaliza rol a undefined cuando el claim está ausente", async () => {
+    onAuthStateChanged.mockImplementation((_auth: unknown, cb: (u: unknown) => void) => {
+      cb(usuarioFake({ sucursales: ["suc_norte"] }));
+      return () => {};
+    });
+
+    const { result } = renderHook(() => useAuthState({} as never));
+
+    await waitFor(() => expect(result.current).not.toBeUndefined());
+    expect(result.current?.rol).toBeUndefined();
+  });
+
+  it("normaliza rol a undefined cuando el claim no es string", async () => {
+    onAuthStateChanged.mockImplementation((_auth: unknown, cb: (u: unknown) => void) => {
+      cb(usuarioFake({ rol: 123, sucursales: ["suc_norte"] }));
+      return () => {};
+    });
+
+    const { result } = renderHook(() => useAuthState({} as never));
+
+    await waitFor(() => expect(result.current).not.toBeUndefined());
+    expect(result.current?.rol).toBeUndefined();
+  });
+
+  it("calcula esAdmin = true para rol 'admin'", async () => {
+    onAuthStateChanged.mockImplementation((_auth: unknown, cb: (u: unknown) => void) => {
+      cb(usuarioFake({ rol: "admin" }));
+      return () => {};
+    });
+
+    const { result } = renderHook(() => useAuthState({} as never));
+
+    await waitFor(() => expect(result.current).not.toBeUndefined());
+    expect(result.current?.esAdmin).toBe(true);
+  });
+
+  it("calcula esAdmin = true para admin_sucursal con exactamente 1 sucursal", async () => {
+    onAuthStateChanged.mockImplementation((_auth: unknown, cb: (u: unknown) => void) => {
+      cb(usuarioFake({ rol: "admin_sucursal", sucursales: ["suc_norte"] }));
+      return () => {};
+    });
+
+    const { result } = renderHook(() => useAuthState({} as never));
+
+    await waitFor(() => expect(result.current).not.toBeUndefined());
+    expect(result.current?.esAdmin).toBe(true);
+  });
+
+  it("calcula esAdmin = false para admin_sucursal con 0 sucursales (fail-closed)", async () => {
+    onAuthStateChanged.mockImplementation((_auth: unknown, cb: (u: unknown) => void) => {
+      cb(usuarioFake({ rol: "admin_sucursal", sucursales: [] }));
+      return () => {};
+    });
+
+    const { result } = renderHook(() => useAuthState({} as never));
+
+    await waitFor(() => expect(result.current).not.toBeUndefined());
+    expect(result.current?.esAdmin).toBe(false);
+  });
+
+  it("calcula esAdmin = false para admin_sucursal con 2 o más sucursales (fail-closed)", async () => {
+    onAuthStateChanged.mockImplementation((_auth: unknown, cb: (u: unknown) => void) => {
+      cb(usuarioFake({ rol: "admin_sucursal", sucursales: ["suc_norte", "suc_sur"] }));
+      return () => {};
+    });
+
+    const { result } = renderHook(() => useAuthState({} as never));
+
+    await waitFor(() => expect(result.current).not.toBeUndefined());
+    expect(result.current?.esAdmin).toBe(false);
+  });
+
+  it("calcula esAdmin = false para rol 'cajero'", async () => {
+    onAuthStateChanged.mockImplementation((_auth: unknown, cb: (u: unknown) => void) => {
+      cb(usuarioFake({ rol: "cajero", sucursales: ["suc_norte"] }));
+      return () => {};
+    });
+
+    const { result } = renderHook(() => useAuthState({} as never));
+
+    await waitFor(() => expect(result.current).not.toBeUndefined());
+    expect(result.current?.esAdmin).toBe(false);
+  });
+});
