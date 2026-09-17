@@ -10,9 +10,10 @@
 import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, Timestamp, type Transaction } from "firebase-admin/firestore";
-import { HttpsError } from "firebase-functions/v2/https";
-import { describe, expect, it, vi } from "vitest";
-import { cerrarSesionImpl } from "../../src/callables/cerrar-sesion.js";
+import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cerrarSesion, cerrarSesionImpl } from "../../src/callables/cerrar-sesion.js";
+import type { CerrarSesionInput } from "@conteo/contracts";
 
 if (getApps().length === 0) {
   initializeApp({ projectId: "demo-conteo-eficiente" });
@@ -75,9 +76,9 @@ describe("cerrarSesionImpl", () => {
     await crearSucursal(sucursalId, null);
     await crearSesion(sesionId, sucursalId, "cerrada");
 
-    await expect(cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false })).rejects.toThrow(
-      HttpsError,
-    );
+    await expect(
+      cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false }, null),
+    ).rejects.toThrow(HttpsError);
 
     const historicos = await db.collection(`sucursales/${sucursalId}/historicos`).get();
     expect(historicos.size).toBe(0);
@@ -90,7 +91,7 @@ describe("cerrarSesionImpl", () => {
     await crearSesion(sesionId, sucursalId, "abierta");
     await sembrarLinea(sesionId, "cat_5000", { cantidadTotal: 10 });
 
-    await cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false });
+    await cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false }, null);
 
     const sesion = await db.doc(`sesiones/${sesionId}`).get();
     expect(sesion.get("estado")).toBe("cerrada");
@@ -114,7 +115,7 @@ describe("cerrarSesionImpl", () => {
     await crearSesion(sesionId, sucursalId, "abierta");
     await sembrarLinea(sesionId, "cat_5000", { cantidadTotal: 10 });
 
-    await cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false });
+    await cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false }, null);
 
     const eventos = await db
       .collection("auditoria")
@@ -138,9 +139,9 @@ describe("cerrarSesionImpl", () => {
     await sembrarUsuario("uid_carla", "Carla Ruiz", false); // desactivada
     await sembrarSinConfirmar(sesionId, ["uid_luis", "uid_maria", "uid_carla"]);
 
-    await expect(cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false })).rejects.toThrow(
-      HttpsError,
-    );
+    await expect(
+      cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false }, null),
+    ).rejects.toThrow(HttpsError);
 
     const sesion = await db.doc(`sesiones/${sesionId}`).get();
     expect(sesion.get("estado")).toBe("abierta"); // sin escribir
@@ -170,9 +171,9 @@ describe("cerrarSesionImpl", () => {
     await sembrarUsuario("uid_luis", "Luis Pérez", true);
     await sembrarSinConfirmar(sesionId, ["uid_luis"]);
 
-    await expect(cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false })).rejects.toThrow(
-      HttpsError,
-    );
+    await expect(
+      cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false }, null),
+    ).rejects.toThrow(HttpsError);
 
     const eventos = await db
       .collection("auditoria")
@@ -194,7 +195,7 @@ describe("cerrarSesionImpl", () => {
     await sembrarSinConfirmar(sesionId, ["uid_luis", "uid_maria", "uid_carla"]);
     await sembrarLinea(sesionId, "cat_5000", { cantidadTotal: 3 });
 
-    await cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: true });
+    await cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: true }, null);
 
     const sesion = await db.doc(`sesiones/${sesionId}`).get();
     expect(sesion.get("estado")).toBe("cerrada");
@@ -234,7 +235,7 @@ describe("cerrarSesionImpl", () => {
       porArea: { area_2: 5 },
     });
 
-    await cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false });
+    await cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false }, null);
 
     const resumen = await db.doc(`sesiones/${sesionId}/resumen/actual`).get();
     const historico = await db.doc(`sucursales/${sucursalId}/historicos/${sesionId}`).get();
@@ -264,13 +265,13 @@ describe("cerrarSesionImpl", () => {
     const espia = vi
       .spyOn(db, "runTransaction")
       .mockImplementationOnce(async (updateFunction: (tx: Transaction) => Promise<unknown>) => {
-        await cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false });
+        await cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false }, null);
         return runTransactionOriginal(updateFunction);
       });
 
-    await expect(cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false })).rejects.toThrow(
-      HttpsError,
-    );
+    await expect(
+      cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false }, null),
+    ).rejects.toThrow(HttpsError);
     espia.mockRestore();
 
     const historicos = await db.collection(`sucursales/${sucursalId}/historicos`).get();
@@ -295,15 +296,15 @@ describe("cerrarSesionImpl", () => {
       throw new Error("fallo simulado de infraestructura durante la Fase B");
     });
 
-    await expect(cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false })).rejects.toThrow(
-      "fallo simulado",
-    );
+    await expect(
+      cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false }, null),
+    ).rejects.toThrow("fallo simulado");
     espia.mockRestore();
 
     const sesionTrasFallo = await db.doc(`sesiones/${sesionId}`).get();
     expect(sesionTrasFallo.get("estado")).toBe("abierta"); // intacta, nada se escribió
 
-    await cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false });
+    await cerrarSesionImpl(db, "uid_admin", { sesionId, forzar: false }, null);
 
     const sesionFinal = await db.doc(`sesiones/${sesionId}`).get();
     expect(sesionFinal.get("estado")).toBe("cerrada");
@@ -313,5 +314,123 @@ describe("cerrarSesionImpl", () => {
       .where("tipo", "==", "SESION_CERRADA")
       .get();
     expect(eventos.size).toBe(1); // el intento fallido no dejó rastro
+  });
+});
+
+// Probado a través de `cerrarSesion.run(req)` (el wrapper `onCall`, D5) y no
+// sólo de `cerrarSesionImpl`: una callable que olvidara pasar el `alcance`
+// pasaría igual si sólo se probara el Impl directamente.
+function reqCerrarSesion(
+  rol: string,
+  sucursales: readonly string[] | undefined,
+  sesionId: string,
+  forzar = false,
+): CallableRequest<CerrarSesionInput> {
+  return {
+    data: { sesionId, forzar },
+    auth: { uid: "uid_x", token: { rol, sucursales } },
+  } as unknown as CallableRequest<CerrarSesionInput>;
+}
+
+describe("cerrarSesion — autorización de sucursal (D4, S2b)", () => {
+  // #98: limpiar sólo lo que ESTE describe crea; los tests de arriba quedan
+  // fuera de alcance (no se retrofitea su limpieza).
+  const sesionesNuevas: string[] = [];
+  const sucursalesNuevas: string[] = [];
+  const usuariosNuevos: string[] = [];
+
+  afterEach(async () => {
+    for (const sesionId of sesionesNuevas.splice(0)) {
+      await db.recursiveDelete(db.doc(`sesiones/${sesionId}`));
+      const eventos = await db.collection("auditoria").where("sesionId", "==", sesionId).get();
+      await Promise.all(eventos.docs.map((evento) => evento.ref.delete()));
+    }
+    for (const sucursalId of sucursalesNuevas.splice(0)) {
+      await db.recursiveDelete(db.doc(`sucursales/${sucursalId}`));
+    }
+    await Promise.all(usuariosNuevos.splice(0).map((uid) => db.doc(`usuarios/${uid}`).delete()));
+  });
+
+  it("admin_sucursal cierra la sesión de su propia sucursal (afirmativo)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const sesionId = `ses_${randomUUID()}`;
+    sucursalesNuevas.push(sucursalId);
+    sesionesNuevas.push(sesionId);
+    await crearSucursal(sucursalId, sesionId);
+    await crearSesion(sesionId, sucursalId, "abierta");
+
+    const resultado = await cerrarSesion.run(
+      reqCerrarSesion("admin_sucursal", [sucursalId], sesionId),
+    );
+
+    expect(resultado.sesionId).toBe(sesionId);
+    const sesion = await db.doc(`sesiones/${sesionId}`).get();
+    expect(sesion.get("estado")).toBe("cerrada");
+  });
+
+  it("admin_sucursal de otra sucursal es rechazado tras la lectura, sin CIERRE_BLOQUEADO ni RF-16 (negativo, discrimina el orden del gate)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const otraSucursalId = `suc_${randomUUID()}`;
+    const sesionId = `ses_${randomUUID()}`;
+    const uidCajero = `uid_${randomUUID()}`;
+    sucursalesNuevas.push(sucursalId);
+    sesionesNuevas.push(sesionId);
+    usuariosNuevos.push(uidCajero);
+    await crearSucursal(sucursalId, sesionId);
+    await crearSesion(sesionId, sucursalId, "abierta", [uidCajero]);
+    await sembrarUsuario(uidCajero, "Cajero de prueba", true);
+    // Condición que dispararía CIERRE_BLOQUEADO si el gate de sucursal no
+    // corriera ANTES de RF-16 — ver el assert de `eventos.size` abajo.
+    await sembrarSinConfirmar(sesionId, [uidCajero]);
+
+    await expect(
+      cerrarSesion.run(reqCerrarSesion("admin_sucursal", [otraSucursalId], sesionId)),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+
+    const sesion = await db.doc(`sesiones/${sesionId}`).get();
+    expect(sesion.get("estado")).toBe("abierta");
+    const eventos = await db
+      .collection("auditoria")
+      .where("sesionId", "==", sesionId)
+      .where("tipo", "==", "CIERRE_BLOQUEADO")
+      .get();
+    expect(eventos.size).toBe(0);
+  });
+
+  it("claim malformado (0 sucursales) es rechazado antes de leer la sesión (negativo)", async () => {
+    const sesionInexistente = `ses_inexistente_${randomUUID()}`;
+
+    await expect(
+      cerrarSesion.run(reqCerrarSesion("admin_sucursal", [], sesionInexistente)),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+  });
+
+  it("claim malformado (2+ sucursales) es rechazado antes de leer la sesión (negativo)", async () => {
+    const sesionInexistente = `ses_inexistente_${randomUUID()}`;
+
+    await expect(
+      cerrarSesion.run(
+        reqCerrarSesion(
+          "admin_sucursal",
+          [`suc_${randomUUID()}`, `suc_${randomUUID()}`],
+          sesionInexistente,
+        ),
+      ),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+  });
+
+  it("admin (Gerente) no se ve afectado por el alcance (regresión)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const sesionId = `ses_${randomUUID()}`;
+    sucursalesNuevas.push(sucursalId);
+    sesionesNuevas.push(sesionId);
+    await crearSucursal(sucursalId, sesionId);
+    await crearSesion(sesionId, sucursalId, "abierta");
+
+    const resultado = await cerrarSesion.run(reqCerrarSesion("admin", undefined, sesionId));
+
+    expect(resultado.sesionId).toBe(sesionId);
+    const sesion = await db.doc(`sesiones/${sesionId}`).get();
+    expect(sesion.get("estado")).toBe("cerrada");
   });
 });

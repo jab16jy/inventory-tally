@@ -50,6 +50,26 @@ describe("exigirAdminOCajeroDeSesion (A-3 / A-4 / I-6)", () => {
     expect(() => exigirAdminOCajeroDeSesion(cajero(["suc_sur"]), sesion)).toThrow(HttpsError);
   });
 
+  it("admin_sucursal con la sucursal en su claim y sesión abierta → pasa (S2b, membresía)", () => {
+    const adminSucursal = {
+      uid: "uid_admin_sucursal",
+      rol: "admin_sucursal",
+      sucursales: ["suc_norte"],
+    };
+    const sesion = snapshot({ exists: true, estado: "abierta", sucursalId: "suc_norte" });
+    expect(exigirAdminOCajeroDeSesion(adminSucursal, sesion)).toEqual({ sucursalId: "suc_norte" });
+  });
+
+  it("admin_sucursal de otra sucursal → permission-denied (S2b, membresía)", () => {
+    const adminSucursal = {
+      uid: "uid_admin_sucursal",
+      rol: "admin_sucursal",
+      sucursales: ["suc_sur"],
+    };
+    const sesion = snapshot({ exists: true, estado: "abierta", sucursalId: "suc_norte" });
+    expect(() => exigirAdminOCajeroDeSesion(adminSucursal, sesion)).toThrow(HttpsError);
+  });
+
   it("sesión cerrada → failed-precondition, también para el admin (A-4 no es por rol)", () => {
     const sesion = snapshot({ exists: true, estado: "cerrada", sucursalId: "suc_norte" });
     expect(() => exigirAdminOCajeroDeSesion(admin, sesion)).toThrow(HttpsError);

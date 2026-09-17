@@ -1,7 +1,11 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { FieldValue, getFirestore, type Firestore } from "firebase-admin/firestore";
 import { cerrarSesionSchema, type CerrarSesionInput } from "@conteo/contracts";
-import { exigirAdmin } from "../lib/exigir-admin.js";
+import {
+  exigirAdminDeSucursal,
+  exigirExclusivaDeSucursal,
+  type AlcanceAdmin,
+} from "../lib/exigir-admin.js";
 import { validar } from "../lib/validar.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 import { verificarSincronizacion } from "../lib/sincronizacion.js";
@@ -35,6 +39,7 @@ export async function cerrarSesionImpl(
   db: Firestore,
   ejecutadoPor: string,
   input: CerrarSesionInput,
+  alcance: AlcanceAdmin,
 ): Promise<{ sesionId: string }> {
   const { sesionId, forzar } = input;
   const sesionRef = db.doc(`sesiones/${sesionId}`);
@@ -43,6 +48,10 @@ export async function cerrarSesionImpl(
   if (!sesionAntes.exists) {
     throw new HttpsError("not-found", "Sesión inexistente");
   }
+  // D4/S2b: gate de sucursal ANTES del estado, RF-16, CIERRE_BLOQUEADO y la
+  // tx de congelamiento — un admin_sucursal ajeno no debe producir ningún
+  // efecto, ni siquiera el diagnóstico de "sesión no abierta".
+  exigirExclusivaDeSucursal(alcance, [sesionAntes.get("sucursalId") as string]);
   if (sesionAntes.get("estado") !== "abierta") {
     throw new HttpsError("failed-precondition", "La sesión no está abierta");
   }
@@ -121,7 +130,7 @@ export async function cerrarSesionImpl(
 }
 
 export const cerrarSesion = onCall({ region: "us-central1" }, async (req) => {
-  exigirAdmin(req);
+  const alcance = exigirAdminDeSucursal(req);
   const datos = validar(req.data, cerrarSesionSchema);
-  return cerrarSesionImpl(getFirestore(), req.auth!.uid, datos);
+  return cerrarSesionImpl(getFirestore(), req.auth!.uid, datos, alcance);
 });
