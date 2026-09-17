@@ -85,6 +85,19 @@ importes** — I-9 y ADR-07 lo hacen estructural, no cosmético: `sesiones/*/res
 del cajero. El desglose por persona muestra "Tú" y "Compañero N", nunca un uid ni un nombre
 de tercero: `usuarios` es `list: if esAdmin()`.
 
+### Panel acotado por sucursal (admin_sucursal)
+
+`admin_sucursal` entra al mismo `/admin` que Gerente, pero `AdminLayout` **no
+renderiza el destino Comparativo** para ese rol — la comparativa cruza todas
+las sucursales, y este rol sólo ve la propia (D8, `docs/../changes/rol-admin-sucursal`).
+`PanelAdmin` (`router.tsx`) resuelve su propio `useAuthState` y **no monta**
+`AdminRepositoryProvider`/`AdminLayout` hasta que resuelve: así el repositorio
+Firestore nunca se construye con un alcance a medio resolver por una carrera
+de renders. El rol resuelto viaja a las pantallas hijas por
+`<Outlet context={{ rol }} />`; `CajerosScreen` lo lee con
+`useOutletContext()` y sólo ofrece "Cajero" en el selector de rol — igual que
+el servidor, que ya rechaza cualquier otro rol para este caller.
+
 ### Guardas de ruta
 
 ```tsx
@@ -315,6 +328,11 @@ Mismo cliente React, servido como PWA en escritorio.
 | Auditoría            | Tabla paginada con filtros combinables                     |
 | Análisis             | Dashboard de la sesión ([10](10-analisis-y-dashboards.md)) |
 | Comparativo          | Últimos conteos cerrados de todas las sucursales           |
+
+> **admin_sucursal no ve Comparativo.** El nav de `AdminLayout` lo filtra
+> antes de renderizar — cruza sucursales, y este rol está acotado a la
+> propia — y no es un accidente de permisos: el servidor jamás lo autorizaría
+> aunque el enlace apareciera.
 
 ### Pantalla de cierre
 
