@@ -53,6 +53,7 @@ Feature de acabado post-`analisis-precio-pdf`: esa feature ya dejó documentada 
 - 2026-09-17: T4 commiteado (`9a55a3e`).
 - 2026-09-17: T5 commiteado (`4810079`) + fix de tipo del test (`e6c02de`, `container.querySelector<HTMLElement>` para que `within()` tipara bien).
 - 2026-09-17: verificación final — `tsc --noEmit` limpio, `npx vitest run` completo: 61 archivos, 508 tests, todos en verde, ninguno en skip. Cero dependencias nuevas (`git diff main --stat -- '**/package.json'` sin salida).
+- 2026-09-17: RDD (ON global) — revisión del slice completo ejecutada una sola vez al cierre (`20d9da6`), no por tarea. Riesgo medium (12 archivos, 262 líneas), lente `review-reliability` (lineage `review-0d8af7d45493b4f6`). Resultado: **approved, 0 findings**. Acuse confirmado (`review acknowledge-approved`, authority burned — normal post-acuse).
 
 ## Cierre
 
@@ -60,4 +61,4 @@ Las 5 tareas quedaron implementadas con TDD estricto (RED confirmado por tarea a
 
 ## Próximo paso
 
-Ninguno pendiente de esta feature. Revisión RDD del slice completo pendiente de ejecutar (ver Progreso), y push/PR a criterio del usuario.
+Ninguno pendiente de esta feature. Push/PR a criterio del usuario.
