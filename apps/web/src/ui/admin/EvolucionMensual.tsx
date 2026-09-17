@@ -63,7 +63,7 @@ export function EvolucionMensual({ historicos, etiqueta }: EvolucionMensualProps
         alto={ALTO}
         pad={PAD}
         radioPunto={RADIO_PUNTO}
-        className="h-16 w-full max-w-[280px]"
+        className="h-16 w-full max-w-[280px] print:hidden"
       />
 
       <button
@@ -71,15 +71,18 @@ export function EvolucionMensual({ historicos, etiqueta }: EvolucionMensualProps
         aria-expanded={abierta}
         aria-controls={idLista}
         onClick={() => setAbierta(!abierta)}
-        className="min-h-[var(--size-toque)] w-fit rounded-placa border border-borde px-3 text-micro text-tinta focus-visible:bg-placa-alta"
+        className="min-h-[var(--size-toque)] w-fit rounded-placa border border-borde px-3 text-micro text-tinta focus-visible:bg-placa-alta print:hidden"
       >
         {abierta ? "Ocultar valores" : "Ver valores"}
       </button>
 
       {/* Equivalente accesible del SVG aria-hidden: permanece en el DOM y en
           el árbol de accesibilidad tanto colapsada como desplegada — sólo
+          cambia si se ve. `print:not-sr-only` fuerza esa visibilidad al
+          imprimir sin usar `hidden`/`display:none` (prohibido, ver cabecera
+          del archivo): sigue siendo el mismo nodo sr-only en pantalla, sólo
           cambia si se ve. */}
-      <ul id={idLista} className={`flex flex-col gap-1 ${abierta ? "" : "sr-only"}`}>
+      <ul id={idLista} className={`flex flex-col gap-1 print:not-sr-only ${abierta ? "" : "sr-only"}`}>
         {serie.map((h) => (
           <li key={h.sesionId} className="flex items-center gap-2 text-micro">
             <span className="text-tenue">{fecha(h.cerradaEn)}</span>

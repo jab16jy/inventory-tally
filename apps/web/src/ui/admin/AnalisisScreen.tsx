@@ -426,30 +426,38 @@ export function AnalisisScreen() {
           {anterior ? "vs. sesión anterior" : "Sin sesión anterior"}
         </button>
 
-        <div className="rounded-placa border border-borde bg-placa p-4">
-          <p className="mb-1 text-micro text-tenue">Valor contado</p>
+        <div className="rounded-placa border border-borde bg-placa p-4 print:border-black print:bg-white">
+          <p className="mb-1 text-micro text-tenue print:text-black">Valor contado</p>
           <div className="flex flex-wrap items-baseline gap-2">
-            <Numeral>{moneda(totalMonetario)}</Numeral>
+            <Numeral className="print:text-black">{moneda(totalMonetario)}</Numeral>
+            {/* Delta no acepta className (ver Delta() más arriba): su
+                text-tenue por defecto ya es legible en escala de grises sobre
+                el fondo blanco forzado, así que se deja igual en vez de
+                envolverlo sólo para el caso de impresión. */}
             <Delta valor={deltaValor} activo={compararActivo} />
           </div>
           <EvolucionMensual historicos={historicos} etiqueta="Valor contado por cierre" />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-placa border border-borde bg-placa p-4">
-            <p className="mb-1 text-micro text-tenue">Valor por unidad</p>
+          <div className="rounded-placa border border-borde bg-placa p-4 print:border-black print:bg-white">
+            <p className="mb-1 text-micro text-tenue print:text-black">Valor por unidad</p>
             <div className="flex flex-wrap items-baseline gap-2">
-              <Numeral tamano="medio">{moneda(valorPorUnidad)}</Numeral>
+              <Numeral tamano="medio" className="print:text-black">
+                {moneda(valorPorUnidad)}
+              </Numeral>
               <Delta valor={deltaValorPorUnidad} activo={compararActivo} />
             </div>
           </div>
-          <div className="rounded-placa border border-borde bg-placa p-4">
-            <p className="mb-1 text-micro text-tenue">Unidades</p>
+          <div className="rounded-placa border border-borde bg-placa p-4 print:border-black print:bg-white">
+            <p className="mb-1 text-micro text-tenue print:text-black">Unidades</p>
             <div className="flex flex-wrap items-baseline gap-2">
-              <Numeral tamano="medio">{numero(totalUnidades)}</Numeral>
+              <Numeral tamano="medio" className="print:text-black">
+                {numero(totalUnidades)}
+              </Numeral>
               <Delta valor={deltaUnidades} activo={compararActivo} />
             </div>
-            <p className="mt-1 text-micro text-tenue">
+            <p className="mt-1 text-micro text-tenue print:text-black">
               {contadas} / {lineas.length} categorías contadas
             </p>
           </div>
@@ -457,7 +465,7 @@ export function AnalisisScreen() {
       </div>
 
       <div data-seccion="tabla">
-        <div className="mb-3 flex items-center gap-2">
+        <div className="mb-3 flex items-center gap-2 print:hidden">
           <label htmlFor={idDimension} className="text-micro text-tenue">
             Desglose por
           </label>
@@ -474,6 +482,9 @@ export function AnalisisScreen() {
             ))}
           </select>
         </div>
+        {/* Equivalente en texto del <select> oculto arriba: sin esto, la hoja
+            impresa mostraría la tabla sin decir qué dimensión se desglosó. */}
+        <p className="hidden text-micro print:block">Desglose por {etiquetaDimension(dimension)}</p>
         {/* Sin `key={dimension}`: remontar la tabla al cambiar de dimensión
             perdería el orden elegido por el usuario (issue implícito del
             rediseño) y además invocaría de nuevo el listener de `Tabla` — no

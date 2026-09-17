@@ -107,6 +107,20 @@ describe("EvolucionMensual (1.7)", () => {
     expect(container.querySelector("ul")).toHaveClass("sr-only");
   });
 
+  it("al imprimir: el sparkline y el botón se ocultan, y la lista de valores se fuerza visible", () => {
+    const serie = [historico("ses_1", "2026-08-01T00:00:00Z", 250_000)];
+    const { container } = render(<EvolucionMensual historicos={serie} etiqueta="Prueba" />);
+
+    expect(container.querySelector("svg")).toHaveClass("print:hidden");
+    expect(screen.getByRole("button", { name: /ver valores/i })).toHaveClass("print:hidden");
+    // La lista sigue colapsada (`sr-only`) en pantalla, pero `print:not-sr-only`
+    // la fuerza visible en la hoja impresa sin tocar el árbol de
+    // accesibilidad — misma convención que prohíbe `hidden`/`display:none`.
+    const lista = container.querySelector("ul")!;
+    expect(lista).toHaveClass("sr-only");
+    expect(lista).toHaveClass("print:not-sr-only");
+  });
+
   it("el <svg> es aria-hidden y la figura expone su etiqueta como nombre accesible", () => {
     const { container } = render(
       <EvolucionMensual
