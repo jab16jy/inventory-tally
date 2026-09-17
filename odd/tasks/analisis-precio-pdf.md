@@ -38,9 +38,14 @@ El admin necesita revisar rápido qué categorías de precio alto/bajo concentra
 ## Progreso
 
 - 2026-09-17: documento creado, rama `feat/analisis-precio-pdf` creada desde `main` (boundary: `9d03189`).
-- 2026-09-17: T1 commiteado (`4b56b52`). `gentle-ai review assess` → risk=medium, deferido a cierre de slice (no revisa ahora).
-- 2026-09-17: T2 implementado y verificado (RED→GREEN). Pendiente commit de work-unit.
+- 2026-09-17: T1 commiteado (`4b56b52`). `gentle-ai review assess` → risk=medium, deferido a cierre de slice.
+- 2026-09-17: T2 commiteado (`83f17d4`). Slice cerrado (132 líneas, bajo presupuesto de 400).
+- 2026-09-17: RDD (ON global) — revisión medium ejecutada al cierre de slice (lineage `review-ab6610b98adf3a84`, lente `review-reliability`). Resultado: **approved, 0 findings**. Acuse confirmado (`review acknowledge-approved`, authority burned — normal post-acuse).
+
+## Cierre
+
+Feature completa: T1 y T2 implementadas, verificadas (TDD estricto RED→GREEN por tarea) y con revisión RDD aprobada sin hallazgos. Rama `feat/analisis-precio-pdf` lista para push/PR — esa decisión queda al usuario (política de repo ordinaria).
 
 ## Próximo paso
 
-Commit de work-unit para T2. Con las dos tareas cerradas, la feature termina: cerrar slice y correr la revisión diferida (`gentle-ai review status --next-transition` desde el boundary `9d03189`).
+Ninguno pendiente de esta feature. Push/PR a criterio del usuario.
