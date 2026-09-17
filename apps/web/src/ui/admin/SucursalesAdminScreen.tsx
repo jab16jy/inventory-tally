@@ -11,6 +11,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 import type { Conectividad, Sucursal } from "@conteo/shared/models/sucursal.js";
 import type { ActualizarSucursalPayload, CrearSucursalPayload } from "@conteo/data";
 import { useAdminRepository } from "../../state/admin-contexto.js";
+import { useScrollAlAbrir } from "../../state/useScrollAlAbrir.js";
 import { Icono } from "../primitivos/Icono.js";
 import { Spinner } from "../primitivos/Spinner.js";
 import { Tabla, type ColumnaTabla } from "./Tabla.js";
@@ -45,6 +46,7 @@ export function SucursalesAdminScreen() {
   // sucursalId con activar/desactivar/abrir-conteo en vuelo — deshabilita el
   // botón de esa fila y muestra el spinner mientras la Cloud Function responde.
   const [accionEnVueloId, setAccionEnVueloId] = useState<string | null>(null);
+  const formularioRef = useScrollAlAbrir<HTMLDivElement>(formulario !== null);
 
   function abrirCreacion(): void {
     setFormulario({ modo: "crear" });
@@ -249,14 +251,16 @@ export function SucursalesAdminScreen() {
       )}
 
       {formulario && (
-        <FormularioSucursal
-          modo={formulario.modo}
-          sucursal={formulario.modo === "editar" ? formulario.sucursal : undefined}
-          error={errorFormulario}
-          onCancelar={cerrarFormulario}
-          onCrear={crear}
-          onEditar={editar}
-        />
+        <div ref={formularioRef}>
+          <FormularioSucursal
+            modo={formulario.modo}
+            sucursal={formulario.modo === "editar" ? formulario.sucursal : undefined}
+            error={errorFormulario}
+            onCancelar={cerrarFormulario}
+            onCrear={crear}
+            onEditar={editar}
+          />
+        </div>
       )}
 
       <Tabla
