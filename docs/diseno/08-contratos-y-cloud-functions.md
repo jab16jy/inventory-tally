@@ -503,6 +503,12 @@ siguiente vuelve a consultar por `ocurridoEn` y recoge lo que quedó.
 > borraría el campo y volvería la categoría global) y, dentro de la
 > transacción, revalida el valor GUARDADO antes de escribir. Gerente exento.
 
+> `desactivarCategoria`/`reactivarCategoria` (S3b): misma regla de
+> exclusividad, revalidada dentro de la transacción sobre el valor GUARDADO,
+> antes de escribir `activa`. `eliminarCategoria` (S3b) revalida ANTES de
+> contar usos (`count()`): así un llamador rechazado nunca se entera de
+> cuántos conteos referencian la categoría ajena. Gerente exento en las 3.
+
 ### Invocación desde la app web
 
 ```typescript

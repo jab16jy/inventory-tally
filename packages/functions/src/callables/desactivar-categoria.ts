@@ -1,7 +1,11 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { desactivarCategoriaSchema, type DesactivarCategoriaInput } from "@conteo/contracts";
-import { exigirAdmin } from "../lib/exigir-admin.js";
+import {
+  exigirAdminDeSucursal,
+  exigirExclusivaDeSucursal,
+  type AlcanceAdmin,
+} from "../lib/exigir-admin.js";
 import { validar } from "../lib/validar.js";
 import { registrarAuditoria } from "../lib/auditoria.js";
 
@@ -15,6 +19,7 @@ export async function desactivarCategoriaImpl(
   db: Firestore,
   ejecutadoPor: string,
   input: DesactivarCategoriaInput,
+  alcance: AlcanceAdmin,
 ): Promise<{ categoriaId: string; desactivada: true }> {
   const { categoriaId } = input;
   const categoriaRef = db.doc(`categoriasValor/${categoriaId}`);
@@ -24,6 +29,10 @@ export async function desactivarCategoriaImpl(
     if (!categoria.exists) {
       throw new HttpsError("not-found", "Categoría inexistente");
     }
+    // D2/S3b: mismo chequeo que actualizarCategoria sobre el valor GUARDADO,
+    // antes de cualquier `tx.update` (Gerente sin restricción).
+    exigirExclusivaDeSucursal(alcance, categoria.get("sucursalesAsignadas"));
+
     tx.update(categoriaRef, { activa: false });
     registrarAuditoria(tx, db, {
       tipo: "CATEGORIA_DESACTIVADA",
@@ -36,7 +45,7 @@ export async function desactivarCategoriaImpl(
 }
 
 export const desactivarCategoria = onCall({ region: "us-central1" }, async (req) => {
-  exigirAdmin(req);
+  const alcance = exigirAdminDeSucursal(req);
   const datos = validar(req.data, desactivarCategoriaSchema);
-  return desactivarCategoriaImpl(getFirestore(), req.auth!.uid, datos);
+  return desactivarCategoriaImpl(getFirestore(), req.auth!.uid, datos, alcance);
 });
