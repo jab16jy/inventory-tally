@@ -4,6 +4,7 @@ import { FirebaseError } from "firebase/app";
 import { FakeAdminRepository } from "@conteo/data";
 import type { Usuario } from "@conteo/shared/models/usuario.js";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter, Outlet, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { fecha } from "../../lib/formato.js";
 import { AdminRepositoryProvider } from "../../state/admin-contexto.js";
@@ -28,6 +29,28 @@ function renderPantalla(repo: FakeAdminRepository) {
     <AdminRepositoryProvider repo={repo}>
       <CajerosScreen />
     </AdminRepositoryProvider>,
+  );
+}
+
+// El `rol` real llega por `useOutletContext` (D7): sólo un padre con
+// `<Outlet context={{ rol }} />` lo expone, igual que `PanelAdmin` en
+// producción (router.tsx).
+function renderPantallaConRol(repo: FakeAdminRepository, rol: string) {
+  return render(
+    <MemoryRouter initialEntries={["/admin/cajeros"]}>
+      <Routes>
+        <Route path="/admin" element={<Outlet context={{ rol }} />}>
+          <Route
+            path="cajeros"
+            element={
+              <AdminRepositoryProvider repo={repo}>
+                <CajerosScreen />
+              </AdminRepositoryProvider>
+            }
+          />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
   );
 }
 
@@ -243,5 +266,46 @@ describe("CajerosScreen (F2)", () => {
     const boton = screen.getByRole("button", { name: /confirmar/i });
     expect(boton).toBeDisabled();
     expect(boton.querySelector("svg")).toHaveClass("animate-spin");
+  });
+});
+
+describe("CajerosScreen · opción de rol acotada (S5c, anti-escalada)", () => {
+  it("ofrece sólo 'Cajero' a admin_sucursal (afirmativo)", () => {
+    const repo = new FakeAdminRepository();
+    renderPantallaConRol(repo, "admin_sucursal");
+
+    fireEvent.click(screen.getByRole("button", { name: /nuevo cajero/i }));
+
+    const opciones = screen.getAllByRole("option", { name: /.+/ });
+    expect(opciones).toHaveLength(1);
+    expect(opciones[0]).toHaveTextContent("Cajero");
+  });
+
+  it("NO ofrece 'Administrador' a admin_sucursal (negativo)", () => {
+    const repo = new FakeAdminRepository();
+    renderPantallaConRol(repo, "admin_sucursal");
+
+    fireEvent.click(screen.getByRole("button", { name: /nuevo cajero/i }));
+
+    expect(screen.queryByRole("option", { name: /administrador/i })).not.toBeInTheDocument();
+  });
+
+  it("mantiene ambas opciones de rol para Gerente (regresión)", () => {
+    const repo = new FakeAdminRepository();
+    renderPantallaConRol(repo, "admin");
+
+    fireEvent.click(screen.getByRole("button", { name: /nuevo cajero/i }));
+
+    expect(screen.getAllByRole("option")).toHaveLength(2);
+    expect(screen.getByRole("option", { name: /administrador/i })).toBeInTheDocument();
+  });
+
+  it("mantiene ambas opciones de rol sin contexto de Outlet (regresión, uso directo)", () => {
+    const repo = new FakeAdminRepository();
+    renderPantalla(repo);
+
+    fireEvent.click(screen.getByRole("button", { name: /nuevo cajero/i }));
+
+    expect(screen.getAllByRole("option")).toHaveLength(2);
   });
 });
