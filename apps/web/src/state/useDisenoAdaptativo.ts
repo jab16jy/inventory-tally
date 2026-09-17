@@ -32,5 +32,24 @@ export function useDisenoAdaptativo(): DisenoAdaptativo {
     return () => window.removeEventListener("resize", actualizar);
   }, []);
 
+  // Tabla.tsx pinta tarjetas apiladas < 600px: sin esto, imprimir una sesión
+  // abierta en el celular imprimiría esas tarjetas en vez de la tabla de
+  // escritorio. Tampoco usa `matchMedia` (ver comentario de cabecera): sólo
+  // fuerza el estado durante el ciclo de impresión, no reemplaza `calcular`.
+  useEffect(() => {
+    function forzarEscritorio(): void {
+      setDiseno("escritorio");
+    }
+    function restaurar(): void {
+      setDiseno(calcular(window.innerWidth));
+    }
+    window.addEventListener("beforeprint", forzarEscritorio);
+    window.addEventListener("afterprint", restaurar);
+    return () => {
+      window.removeEventListener("beforeprint", forzarEscritorio);
+      window.removeEventListener("afterprint", restaurar);
+    };
+  }, []);
+
   return diseno;
 }

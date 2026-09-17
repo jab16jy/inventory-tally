@@ -428,7 +428,7 @@ describe("AnalisisScreen (rediseño)", () => {
     expect(filas[3]).toHaveTextContent("$150000");
   });
 
-  it("botón Imprimir dispara window.print()", async () => {
+  it("botón Imprimir dispara window.print() y lleva un ícono", async () => {
     const repo = new FakeAdminRepository();
     sembrarSesionCompleta(repo);
     const printSpy = vi.spyOn(window, "print").mockImplementation(() => {});
@@ -436,6 +436,7 @@ describe("AnalisisScreen (rediseño)", () => {
     renderPantalla(repo);
 
     const boton = await screen.findByRole("button", { name: /imprimir/i });
+    expect(boton.querySelector("svg")).not.toBeNull();
     fireEvent.click(boton);
 
     expect(printSpy).toHaveBeenCalledTimes(1);
@@ -701,6 +702,41 @@ describe("AnalisisScreen (rediseño)", () => {
     expect(cardValorContado).toHaveTextContent(`+${porcentaje(50)}`);
     expect(cardValorPorUnidad).toHaveTextContent(`+${porcentaje(20)}`);
     expect(cardUnidades).toHaveTextContent(`+${porcentaje(25)}`);
+  });
+
+  it("las 3 cards de resumen fuerzan blanco y negro al imprimir", async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo);
+
+    const { container } = renderPantalla(repo);
+    await screen.findByText("Sucursal Norte", { exact: false });
+
+    const resumen = container.querySelector<HTMLElement>('[data-seccion="resumen"]')!;
+    const cards = [
+      within(resumen).getByText("Valor contado").closest("div")!,
+      within(resumen).getByText("Valor por unidad").closest("div")!,
+      within(resumen).getByText("Unidades").closest("div")!,
+    ];
+    for (const card of cards) {
+      expect(card).toHaveClass("print:bg-white");
+      expect(card).toHaveClass("print:border-black");
+    }
+  });
+
+  it("el selector 'Desglose por' no imprime, y su rótulo de texto equivalente sí", async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo);
+
+    const { container } = renderPantalla(repo);
+    await screen.findByText("Sucursal Norte", { exact: false });
+
+    const selectorDimension = screen.getByRole("combobox", { name: /desglose por/i }).closest("div")!;
+    expect(selectorDimension).toHaveClass("print:hidden");
+
+    const rotuloImpresion = container.querySelector('[data-seccion="tabla"] p.print\\:block')!;
+    expect(rotuloImpresion).not.toBeNull();
+    expect(rotuloImpresion).toHaveTextContent("Desglose por Categoría");
+    expect(rotuloImpresion).toHaveClass("hidden");
   });
 
   it('la card "Valor contado" monta la evolución mensual con su SVG y el monto de un cierre histórico', async () => {

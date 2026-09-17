@@ -161,7 +161,7 @@ export function Tabla<T>({
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto print:overflow-visible">
       <table className="w-full border border-borde text-base" aria-label={etiqueta}>
         <thead>
           <tr className="border-b border-borde bg-placa">
@@ -191,20 +191,28 @@ export function Tabla<T>({
                       type="button"
                       onClick={() => alternarOrden(columna.clave)}
                       className={clsx(
-                        "inline-flex items-center gap-1 hover:text-tinta",
+                        "inline-flex cursor-pointer items-center gap-1 hover:text-tinta",
                         columna.alinearDerecha && "flex-row-reverse",
                       )}
                     >
                       {columna.etiqueta}
-                      {activa && (
-                        <Icono
-                          nombre="chevron"
-                          className={clsx(
-                            "size-3 shrink-0",
-                            orden.direccion === "asc" ? "-rotate-90" : "rotate-90",
-                          )}
-                        />
-                      )}
+                      {/* Afordancia siempre visible, no sólo cuando `activa`:
+                          sin esto ninguna columna ordenable lo comunica antes
+                          del primer click. Inactiva = chevron atenuado sin
+                          rotar (mismo `text-tenue` de columnas no
+                          seleccionadas, nunca `--color-senal`: ordenar no es
+                          la acción primaria de la pantalla). */}
+                      <Icono
+                        nombre="chevron"
+                        className={clsx(
+                          "size-3 shrink-0",
+                          activa
+                            ? orden.direccion === "asc"
+                              ? "-rotate-90"
+                              : "rotate-90"
+                            : "rotate-90 text-tenue",
+                        )}
+                      />
                     </button>
                   ) : (
                     columna.etiqueta

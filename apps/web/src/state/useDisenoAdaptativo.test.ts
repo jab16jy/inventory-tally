@@ -57,4 +57,20 @@ describe("useDisenoAdaptativo (doc 11 §298-304)", () => {
 
     expect(result.current).toBe("movil");
   });
+
+  it("beforeprint fuerza 'escritorio' aunque el ancho real sea móvil, y afterprint restaura el ancho real", () => {
+    fijarAncho(375);
+    const { result } = renderHook(() => useDisenoAdaptativo());
+    expect(result.current).toBe("movil");
+
+    act(() => {
+      window.dispatchEvent(new Event("beforeprint"));
+    });
+    expect(result.current).toBe("escritorio");
+
+    act(() => {
+      window.dispatchEvent(new Event("afterprint"));
+    });
+    expect(result.current).toBe("movil");
+  });
 });

@@ -76,7 +76,7 @@ export function AdminLayout({ onSalir, rol }: AdminLayoutProps) {
         <nav
           aria-label="Panel de administrador"
           className={clsx(
-            "flex shrink-0 flex-col border-r border-borde bg-placa",
+            "flex shrink-0 flex-col border-r border-borde bg-placa print:hidden",
             soloIconos ? "w-16" : "w-60",
           )}
         >
@@ -158,7 +158,7 @@ export function AdminLayout({ onSalir, rol }: AdminLayoutProps) {
       {barraInferior && (
         <nav
           aria-label="Panel de administrador"
-          className="fixed inset-x-0 bottom-0 flex shrink-0 overflow-x-auto border-t border-borde bg-placa"
+          className="fixed inset-x-0 bottom-0 flex shrink-0 overflow-x-auto border-t border-borde bg-placa print:hidden"
         >
           {destinos.map((destino) => (
             <NavLink

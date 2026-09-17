@@ -161,3 +161,21 @@ describe("AdminLayout · breakpoints (issue #20 item 1, doc 11 §298-304)", () =
     expect(within(nav).getByText("Cajeros")).toBeInTheDocument();
   });
 });
+
+describe("AdminLayout · impresión", () => {
+  it("el sidebar de escritorio lleva print:hidden", () => {
+    fijarAncho(1440);
+    renderLayout("/admin");
+
+    const nav = screen.getByRole("navigation", { name: /panel de administrador/i });
+    expect(nav).toHaveClass("print:hidden");
+  });
+
+  it("la barra inferior móvil también lleva print:hidden", () => {
+    fijarAncho(375);
+    renderLayout("/admin");
+
+    const nav = screen.getByRole("navigation", { name: /panel de administrador/i });
+    expect(nav).toHaveClass("print:hidden");
+  });
+});
