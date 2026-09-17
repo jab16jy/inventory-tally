@@ -307,3 +307,140 @@ describe("FirestoreAdminRepository.cerrarSesion (routing de escrituras vía http
     expect(resultado).toEqual({ sesionId: "ses_1" });
   });
 });
+
+describe("FirestoreAdminRepository — alcance (acotamiento admin_sucursal, D7 diseño §Client scope)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function docCategoria(id: string, extra: Record<string, unknown> = {}) {
+    return {
+      id,
+      data: () => ({
+        valor: 100,
+        etiqueta: "Efectivo",
+        activa: true,
+        orden: 1,
+        creadaEn: { toDate: () => new Date("2026-01-01T00:00:00Z") },
+        ...extra,
+      }),
+    };
+  }
+
+  function idsRecibidos(recibidas: { categoriaId: string }[][]): string[] {
+    return (recibidas.at(-1) ?? []).map((c) => c.categoriaId);
+  }
+
+  it("observarSesionesAbiertas: con alcance agrega where sucursalId==alcance", () => {
+    const repo = new FirestoreAdminRepository({} as never, {} as never, "suc_a");
+    repo.observarSesionesAbiertas(() => {});
+    expect(where).toHaveBeenCalledWith("sucursalId", "==", "suc_a");
+  });
+
+  it("observarSesionesAbiertas: alcance null (Gerente) no agrega where sucursalId", () => {
+    const repo = new FirestoreAdminRepository({} as never, {} as never);
+    repo.observarSesionesAbiertas(() => {});
+    expect(where).toHaveBeenCalledWith("estado", "==", "abierta");
+    expect(where).not.toHaveBeenCalledWith("sucursalId", "==", expect.anything());
+  });
+
+  it("listarSesiones: con alcance fuerza sucursalId=alcance e ignora filtro.sucursalId", async () => {
+    getDocs.mockResolvedValue({ docs: [] });
+    const repo = new FirestoreAdminRepository({} as never, {} as never, "suc_a");
+    await repo.listarSesiones({ sucursalId: "suc_x" });
+    expect(where).toHaveBeenCalledWith("sucursalId", "==", "suc_a");
+    expect(where).not.toHaveBeenCalledWith("sucursalId", "==", "suc_x");
+  });
+
+  it("listarSesiones: alcance null (Gerente) respeta filtro.sucursalId sin forzar", async () => {
+    getDocs.mockResolvedValue({ docs: [] });
+    const repo = new FirestoreAdminRepository({} as never, {} as never);
+    await repo.listarSesiones({ sucursalId: "suc_x" });
+    expect(where).toHaveBeenCalledWith("sucursalId", "==", "suc_x");
+  });
+
+  it("observarUsuarios: con alcance usa array-contains sobre sucursalesAsignadas y no orderBy", () => {
+    const repo = new FirestoreAdminRepository({} as never, {} as never, "suc_a");
+    repo.observarUsuarios(() => {});
+    expect(where).toHaveBeenCalledWith("sucursalesAsignadas", "array-contains", "suc_a");
+    expect(orderBy).not.toHaveBeenCalled();
+  });
+
+  it("observarUsuarios: alcance null (Gerente) usa orderBy nombre sin where", () => {
+    const repo = new FirestoreAdminRepository({} as never, {} as never);
+    repo.observarUsuarios(() => {});
+    expect(orderBy).toHaveBeenCalledWith("nombre");
+    expect(where).not.toHaveBeenCalled();
+  });
+
+  it("observarSucursales: con alcance escucha el doc único sucursales/{alcance}, no la colección", () => {
+    const repo = new FirestoreAdminRepository({} as never, {} as never, "suc_a");
+    repo.observarSucursales(() => {});
+    expect(doc).toHaveBeenCalledWith({}, "sucursales", "suc_a");
+    expect(collection).not.toHaveBeenCalled();
+  });
+
+  it("observarSucursales: alcance null (Gerente) escucha la colección completa, no un doc", () => {
+    const repo = new FirestoreAdminRepository({} as never, {} as never);
+    repo.observarSucursales(() => {});
+    expect(collection).toHaveBeenCalledWith({}, "sucursales");
+    expect(doc).not.toHaveBeenCalled();
+  });
+
+  it("observarCategorias: con alcance filtra en memoria — global y propia pasan, ajena no", () => {
+    let callback: ((snap: unknown) => void) | undefined;
+    onSnapshot.mockImplementation((_ref: unknown, cb: (snap: unknown) => void) => {
+      callback = cb;
+      return vi.fn();
+    });
+    const repo = new FirestoreAdminRepository({} as never, {} as never, "suc_a");
+    const recibidas: { categoriaId: string }[][] = [];
+    repo.observarCategorias((c) => recibidas.push(c));
+
+    callback?.({
+      docs: [
+        docCategoria("cat_global"),
+        docCategoria("cat_propia", { sucursalesAsignadas: ["suc_a"] }),
+        docCategoria("cat_ajena", { sucursalesAsignadas: ["suc_b"] }),
+      ],
+    });
+
+    expect(idsRecibidos(recibidas)).toEqual(["cat_global", "cat_propia"]);
+  });
+
+  it("observarCategorias: alcance null (Gerente) recibe la lista completa sin filtrar", () => {
+    let callback: ((snap: unknown) => void) | undefined;
+    onSnapshot.mockImplementation((_ref: unknown, cb: (snap: unknown) => void) => {
+      callback = cb;
+      return vi.fn();
+    });
+    const repo = new FirestoreAdminRepository({} as never, {} as never);
+    const recibidas: { categoriaId: string }[][] = [];
+    repo.observarCategorias((c) => recibidas.push(c));
+
+    callback?.({
+      docs: [
+        docCategoria("cat_global"),
+        docCategoria("cat_propia", { sucursalesAsignadas: ["suc_a"] }),
+        docCategoria("cat_ajena", { sucursalesAsignadas: ["suc_b"] }),
+      ],
+    });
+
+    expect(idsRecibidos(recibidas)).toEqual(["cat_global", "cat_propia", "cat_ajena"]);
+  });
+
+  it("listarAuditoria: con alcance agrega where sucursalId==alcance y descarta un filtro sucursalId propio", async () => {
+    getDocs.mockResolvedValue({ docs: [] });
+    const repo = new FirestoreAdminRepository({} as never, {} as never, "suc_a");
+    await repo.listarAuditoria({ campo: "sucursalId", valor: "suc_x" });
+    expect(where).toHaveBeenCalledWith("sucursalId", "==", "suc_a");
+    expect(where).not.toHaveBeenCalledWith("sucursalId", "==", "suc_x");
+    expect(where).toHaveBeenCalledTimes(1);
+  });
+
+  it("listarAuditoria: alcance null (Gerente) respeta el filtro sucursalId sin duplicar el where", async () => {
+    getDocs.mockResolvedValue({ docs: [] });
+    const repo = new FirestoreAdminRepository({} as never, {} as never);
+    await repo.listarAuditoria({ campo: "sucursalId", valor: "suc_x" });
+    expect(where).toHaveBeenCalledWith("sucursalId", "==", "suc_x");
+    expect(where).toHaveBeenCalledTimes(1);
+  });
+});
