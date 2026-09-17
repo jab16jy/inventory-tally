@@ -5,6 +5,7 @@
 import type { Auth } from "firebase/auth";
 import { useEffect, useState } from "react";
 import type { Sucursal } from "@conteo/shared";
+import { etiquetaRol } from "../lib/etiqueta-rol.js";
 import { useConteoRepository } from "../state/repositorio-contexto.js";
 import { useAuthState } from "../state/useAuthState.js";
 import { CabeceraCajero } from "./CabeceraCajero.js";
@@ -83,9 +84,7 @@ export function CuentaScreen({ auth, onSalir }: CuentaScreenProps) {
                   puerta si algún día hace falta `pwaInstalada` o
                   `ultimoAccesoEn`. */}
               <dt className="text-micro text-tenue">Rol</dt>
-              <dd className="text-base text-tinta">
-                {estadoAuth?.esAdmin ? "Administrador" : "Cajero"}
-              </dd>
+              <dd className="text-base text-tinta">{etiquetaRol(estadoAuth?.rol)}</dd>
             </div>
           </dl>
         </Placa>

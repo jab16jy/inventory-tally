@@ -91,10 +91,10 @@ describe("CuentaScreen (doc 11 §2)", () => {
     expect(await screen.findByText(/no tienes sucursales asignadas/i)).toBeInTheDocument();
   });
 
-  it("con claim rol: admin muestra 'Administrador'", async () => {
+  it("con claim rol: admin muestra 'Gerente' (etiqueta-rol.ts)", async () => {
     renderPantalla(new FakeConteoRepository(), "admin", []);
 
-    expect(await screen.findByText("Administrador")).toBeInTheDocument();
+    expect(await screen.findByText("Gerente")).toBeInTheDocument();
     expect(screen.queryByText("Cajero")).not.toBeInTheDocument();
   });
 
@@ -102,7 +102,7 @@ describe("CuentaScreen (doc 11 §2)", () => {
     renderPantalla(new FakeConteoRepository(), "cajero", []);
 
     expect(await screen.findByText("Cajero")).toBeInTheDocument();
-    expect(screen.queryByText("Administrador")).not.toBeInTheDocument();
+    expect(screen.queryByText("Gerente")).not.toBeInTheDocument();
   });
 
   it("mientras estadoAuth no ha resuelto hay esqueleto y la región viva anuncia la carga; al resolver desaparece", async () => {

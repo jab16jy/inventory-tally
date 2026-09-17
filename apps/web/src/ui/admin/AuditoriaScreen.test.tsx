@@ -138,7 +138,7 @@ describe("AuditoriaScreen (F3, R6)", () => {
     renderPantalla(repo);
 
     expect(await screen.findByText("Carlos Admin")).toBeInTheDocument();
-    expect(screen.getByText("Administrador")).toBeInTheDocument();
+    expect(screen.getByText("Gerente")).toBeInTheDocument();
     expect(
       screen.getByText(/cierre forzado \(1 pendientes sin sincronizar\)/i),
     ).toBeInTheDocument();

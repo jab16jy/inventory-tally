@@ -3,6 +3,7 @@
 import type { EventoAuditoria } from "@conteo/shared/models/evento-auditoria.js";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import type { Usuario } from "@conteo/shared/models/usuario.js";
+import { etiquetaRol } from "../../lib/etiqueta-rol.js";
 
 export interface AutorAuditoria {
   readonly nombre: string;
@@ -19,17 +20,13 @@ export function obtenerAutor(
 
   if (evento.usuarioNombre) {
     const usuario = evento.usuarioId ? usuariosMap?.get(evento.usuarioId) : undefined;
-    const rol = usuario?.rol === "admin" ? "Administrador" : "Cajero";
-    return { nombre: evento.usuarioNombre, rol };
+    return { nombre: evento.usuarioNombre, rol: etiquetaRol(usuario?.rol) };
   }
 
   if (evento.ejecutadoPor) {
     const usuario = usuariosMap?.get(evento.ejecutadoPor);
     if (usuario) {
-      return {
-        nombre: usuario.nombre,
-        rol: usuario.rol === "admin" ? "Administrador" : "Cajero",
-      };
+      return { nombre: usuario.nombre, rol: etiquetaRol(usuario.rol) };
     }
     return { nombre: evento.ejecutadoPor };
   }
@@ -37,10 +34,7 @@ export function obtenerAutor(
   if (evento.usuarioId) {
     const usuario = usuariosMap?.get(evento.usuarioId);
     if (usuario) {
-      return {
-        nombre: usuario.nombre,
-        rol: usuario.rol === "admin" ? "Administrador" : "Cajero",
-      };
+      return { nombre: usuario.nombre, rol: etiquetaRol(usuario.rol) };
     }
   }
 
