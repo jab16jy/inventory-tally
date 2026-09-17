@@ -176,6 +176,10 @@ export interface FilaDimension {
   readonly etiqueta: string;
   readonly unidades: number;
   readonly valor: number;
+  /** Precio de la categoría (constante por `categoriaId`, ajeno al `valor`
+   *  contado). Sólo presente con `dimension === "categoria"`: en "area"/
+   *  "cajero" la fila no tiene un único precio (agrega varias categorías). */
+  readonly precioUnitario?: number;
 }
 
 /** Clave de la fila que absorbe unidades sin atribuir a ningún cajero. */
@@ -215,21 +219,36 @@ export function agruparPorDimension(
   dimension: DimensionAnalisis,
   nombres: ReadonlyMap<string, string> = new Map(),
 ): FilaDimension[] {
-  const filas = new Map<string, { etiqueta: string; unidades: number; valor: number }>();
+  const filas = new Map<
+    string,
+    { etiqueta: string; unidades: number; valor: number; precioUnitario?: number }
+  >();
 
-  function acumular(clave: string, etiqueta: string, unidades: number, valor: number): void {
+  function acumular(
+    clave: string,
+    etiqueta: string,
+    unidades: number,
+    valor: number,
+    precioUnitario?: number,
+  ): void {
     const existente = filas.get(clave);
     if (existente) {
       existente.unidades += unidades;
       existente.valor += valor;
     } else {
-      filas.set(clave, { etiqueta, unidades, valor });
+      filas.set(clave, { etiqueta, unidades, valor, precioUnitario });
     }
   }
 
   for (const linea of lineas) {
     if (dimension === "categoria") {
-      acumular(linea.categoriaId, linea.etiqueta, linea.cantidadTotal, subtotal(linea));
+      acumular(
+        linea.categoriaId,
+        linea.etiqueta,
+        linea.cantidadTotal,
+        subtotal(linea),
+        linea.valorUnitario,
+      );
     } else if (dimension === "area") {
       let unidadesPorArea = 0;
       for (const [areaId, cantidad] of Object.entries(linea.porArea ?? {})) {

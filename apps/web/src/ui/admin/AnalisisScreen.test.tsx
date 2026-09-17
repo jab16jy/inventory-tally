@@ -410,6 +410,24 @@ describe("AnalisisScreen (rediseño)", () => {
     expect(filas[1]).toHaveTextContent("$2000");
   });
 
+  it("desglose por Categoría ordena el precio numéricamente, no como texto ($2000 antes que $150000)", async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo);
+
+    renderPantalla(repo);
+
+    const encabezadoCategoria = await screen.findByRole("columnheader", { name: /categoría/i });
+    fireEvent.click(within(encabezadoCategoria).getByRole("button"));
+    expect(encabezadoCategoria).toHaveAttribute("aria-sort", "ascending");
+
+    const filas = screen.getAllByRole("row");
+    // Orden alfabético (incorrecto, string) daría $150000, $2000, $5000.
+    // Orden numérico correcto: $2000, $5000, $150000.
+    expect(filas[1]).toHaveTextContent("$2000");
+    expect(filas[2]).toHaveTextContent("$5000");
+    expect(filas[3]).toHaveTextContent("$150000");
+  });
+
   it("la fila de total cuadra con la card Valor contado en las tres dimensiones", async () => {
     const repo = new FakeAdminRepository();
     sembrarSesionCompleta(repo);

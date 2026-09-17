@@ -201,7 +201,10 @@ function columnasTabla(dimension: DimensionAnalisis): ColumnaTabla<FilaConPct>[]
       clave: "etiqueta",
       etiqueta: etiquetaDimension(dimension),
       render: (f) => f.etiqueta,
-      valorOrden: (f) => f.etiqueta,
+      // "categoria": `etiqueta` ES el precio (ej. "$10.000") — ordenarlo como
+      // string pondría "$10.000" antes que "$2.000". "area"/"cajero": `etiqueta`
+      // es un nombre, ahí el orden alfabético sigue siendo el correcto.
+      valorOrden: dimension === "categoria" ? (f) => f.precioUnitario ?? 0 : (f) => f.etiqueta,
     },
     {
       clave: "unidades",
