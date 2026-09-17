@@ -161,7 +161,7 @@ export function Tabla<T>({
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto print:overflow-visible">
       <table className="w-full border border-borde text-base" aria-label={etiqueta}>
         <thead>
           <tr className="border-b border-borde bg-placa">
