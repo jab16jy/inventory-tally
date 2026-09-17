@@ -16,11 +16,11 @@ afterEach(() => {
   fijarAncho(ANCHO_ORIGINAL);
 });
 
-function renderLayout(rutaInicial: string, onSalir = vi.fn()) {
+function renderLayout(rutaInicial: string, onSalir = vi.fn(), rol?: string) {
   return render(
     <MemoryRouter initialEntries={[rutaInicial]}>
       <Routes>
-        <Route path="/admin" element={<AdminLayout onSalir={onSalir} />}>
+        <Route path="/admin" element={<AdminLayout onSalir={onSalir} rol={rol} />}>
           <Route index element={<p>Panel — contenido</p>} />
           <Route path="cajeros" element={<p>Cajeros — contenido</p>} />
           <Route path="sucursales" element={<p>Sucursales — contenido</p>} />
@@ -107,6 +107,24 @@ describe("AdminLayout (F1)", () => {
     fireEvent.click(screen.getByRole("button", { name: /^salir$/i }));
 
     expect(screen.getByRole("dialog")).toHaveClass("m-auto");
+  });
+});
+
+describe("AdminLayout · alcance por rol (S5c, D8)", () => {
+  it("oculta el destino Comparativo para admin_sucursal", () => {
+    renderLayout("/admin", vi.fn(), "admin_sucursal");
+
+    const nav = screen.getByRole("navigation", { name: /panel de administrador/i });
+    expect(within(nav).getAllByRole("link")).toHaveLength(6);
+    expect(within(nav).queryByRole("link", { name: /comparativo/i })).not.toBeInTheDocument();
+  });
+
+  it("mantiene los siete destinos, incluido Comparativo, para Gerente", () => {
+    renderLayout("/admin", vi.fn(), "admin");
+
+    const nav = screen.getByRole("navigation", { name: /panel de administrador/i });
+    expect(within(nav).getAllByRole("link")).toHaveLength(7);
+    expect(within(nav).getByRole("link", { name: /comparativo/i })).toBeInTheDocument();
   });
 });
 

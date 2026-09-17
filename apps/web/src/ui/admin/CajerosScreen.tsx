@@ -8,6 +8,7 @@
 // puede desincronizar de la real.
 import { FirebaseError } from "firebase/app";
 import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
+import { useOutletContext } from "react-router-dom";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import type { RolUsuario, Usuario } from "@conteo/shared/models/usuario.js";
 import type { ActualizarCajeroPayload, CrearCajeroPayload } from "@conteo/data";
@@ -16,6 +17,7 @@ import { useAdminRepository } from "../../state/admin-contexto.js";
 import { Icono } from "../primitivos/Icono.js";
 import { Spinner } from "../primitivos/Spinner.js";
 import { Tabla, type ColumnaTabla } from "./Tabla.js";
+import type { PanelContexto } from "./AdminLayout.js";
 
 const CAMPO =
   "w-full min-h-[var(--size-toque)] rounded-placa border border-borde bg-fondo px-3 " +
@@ -25,6 +27,16 @@ const ROLES: readonly { readonly valor: RolUsuario; readonly etiqueta: string }[
   { valor: "cajero", etiqueta: "Cajero" },
   { valor: "admin", etiqueta: "Administrador" },
 ];
+
+/** Anti-escalada en el cliente (D7/S4): un admin_sucursal nunca puede ni
+ *  ver la opción "Administrador" — el servidor ya lo rechaza (S4-*), esto
+ *  evita ofrecer una opción que siempre fallará. `rol` ausente (uso sin
+ *  `<Outlet/>`, p. ej. tests existentes) se trata como Gerente. */
+function rolesPara(
+  rol: string | undefined,
+): readonly { readonly valor: RolUsuario; readonly etiqueta: string }[] {
+  return rol === "admin_sucursal" ? ROLES.filter((r) => r.valor === "cajero") : ROLES;
+}
 
 function useUsuarios(): Usuario[] {
   const repo = useAdminRepository();
@@ -47,6 +59,10 @@ export function CajerosScreen() {
   const repo = useAdminRepository();
   const usuarios = useUsuarios();
   const sucursales = useSucursalesTodas();
+  // `useOutletContext` fuera de un `<Outlet/>` (tests que montan la pantalla
+  // sola) devuelve `undefined`, no lanza — de ahí el `?.`.
+  const contexto = useOutletContext<PanelContexto>();
+  const roles = rolesPara(contexto?.rol);
   const nombresSucursal = useMemo(
     () => new Map(sucursales.map((s) => [s.sucursalId, s.nombre])),
     [sucursales],
@@ -313,6 +329,7 @@ export function CajerosScreen() {
           modo={formulario.modo}
           usuario={formulario.modo === "editar" ? formulario.usuario : undefined}
           sucursales={sucursales}
+          roles={roles}
           error={errorFormulario}
           onCancelar={cerrarFormulario}
           onCrear={crear}
@@ -335,6 +352,7 @@ interface FormularioCajeroProps {
   readonly modo: "crear" | "editar";
   readonly usuario?: Usuario;
   readonly sucursales: readonly Sucursal[];
+  readonly roles: readonly { readonly valor: RolUsuario; readonly etiqueta: string }[];
   readonly error: string | null;
   readonly onCancelar: () => void;
   readonly onCrear: (payload: CrearCajeroPayload) => void | Promise<void>;
@@ -345,6 +363,7 @@ function FormularioCajero({
   modo,
   usuario,
   sucursales,
+  roles,
   error,
   onCancelar,
   onCrear,
@@ -432,7 +451,7 @@ function FormularioCajero({
             onChange={(e) => setRol(e.target.value as RolUsuario)}
             className={CAMPO}
           >
-            {ROLES.map((r) => (
+            {roles.map((r) => (
               <option key={r.valor} value={r.valor}>
                 {r.etiqueta}
               </option>

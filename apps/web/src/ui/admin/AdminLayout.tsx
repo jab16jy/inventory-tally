@@ -45,14 +45,25 @@ const DESTINOS: readonly Destino[] = [
   { ruta: "/admin/comparativo", etiqueta: "Comparativo", icono: "comparativo" },
 ];
 
-export interface AdminLayoutProps {
-  readonly onSalir: () => void | Promise<void>;
+/** Contexto que `<Outlet/>` pasa a las pantallas hijas (D7): así
+ *  `CajerosScreen` sabe qué rol la está mirando sin leer Firebase de nuevo. */
+export interface PanelContexto {
+  readonly rol?: string;
 }
 
-export function AdminLayout({ onSalir }: AdminLayoutProps) {
+export interface AdminLayoutProps {
+  readonly onSalir: () => void | Promise<void>;
+  /** Rol crudo del token (D8/D9): un admin_sucursal nunca ve el destino
+   *  Comparativo — sin esto (Gerente o tests existentes) se ven los siete. */
+  readonly rol?: string;
+}
+
+export function AdminLayout({ onSalir, rol }: AdminLayoutProps) {
   const diseno = useDisenoAdaptativo();
   const barraInferior = diseno === "movil";
   const soloIconos = diseno === "tablet";
+  const destinos =
+    rol === "admin_sucursal" ? DESTINOS.filter((d) => d.ruta !== "/admin/comparativo") : DESTINOS;
   // Mismo patrón de confirmación que BotonSalir.tsx (issue #72/ADR-19):
   // un toque accidental aquí saca al admin del panel de golpe. Un solo
   // <dialog> para los dos triggers posibles (sidebar / nav inferior) porque
@@ -82,7 +93,7 @@ export function AdminLayout({ onSalir }: AdminLayoutProps) {
           <ul
             className={clsx("flex flex-1 flex-col gap-0.5 px-2", soloIconos && "items-center pt-3")}
           >
-            {DESTINOS.map((destino) => (
+            {destinos.map((destino) => (
               <li key={destino.ruta} className="list-none">
                 <NavLink
                   to={destino.ruta}
@@ -137,7 +148,7 @@ export function AdminLayout({ onSalir }: AdminLayoutProps) {
       )}
 
       <main className={clsx("min-w-0 flex-1 overflow-y-auto", barraInferior && "pb-16")}>
-        <Outlet />
+        <Outlet context={{ rol } satisfies PanelContexto} />
       </main>
 
       {/* < 600px (doc 11 §298-304): navegación inferior en vez de sidebar.
@@ -149,7 +160,7 @@ export function AdminLayout({ onSalir }: AdminLayoutProps) {
           aria-label="Panel de administrador"
           className="fixed inset-x-0 bottom-0 flex shrink-0 overflow-x-auto border-t border-borde bg-placa"
         >
-          {DESTINOS.map((destino) => (
+          {destinos.map((destino) => (
             <NavLink
               key={destino.ruta}
               to={destino.ruta}

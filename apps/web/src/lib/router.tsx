@@ -6,7 +6,7 @@
 // sesiones y auditoría; F4 suma cierre y comparativo; F5 suma el análisis de
 // una sesión, alcanzado desde el botón "Análisis →" de PanelScreen.
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
-import type { ReactElement, ReactNode } from "react";
+import { useMemo, type ReactElement, type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { FirestoreAdminRepository } from "@conteo/data";
 import { calcularRedireccion, homePorRol } from "./guardas.js";
@@ -33,12 +33,6 @@ import { ComparativoScreen } from "../ui/admin/ComparativoScreen.js";
 import { PanelScreen } from "../ui/admin/PanelScreen.js";
 import { SesionesScreen } from "../ui/admin/SesionesScreen.js";
 import { SucursalesAdminScreen } from "../ui/admin/SucursalesAdminScreen.js";
-
-// Módulo, no componente: una sola instancia para todo el árbol de /admin,
-// igual que `auth`/`db` en lib/firebase.ts. Sin React.lazy — no hay ninguno
-// hoy en esta app y no se está sumando ninguna librería de gráficas que lo
-// justifique (doc plan §1); un `// ponytail:` si algún día hace falta.
-const adminRepo = new FirestoreAdminRepository(db, functions);
 
 function SplashScreen() {
   return <p>Cargando…</p>;
@@ -77,6 +71,26 @@ function RequireAuth({ children }: { readonly children: ReactElement }): ReactEl
   const destino = calcularRedireccion(estadoAuth, location.pathname);
   if (destino) return <Navigate to={destino} state={{ from: location }} replace />;
   return children;
+}
+
+/** Arma `FirestoreAdminRepository` con el alcance del admin (D7): resuelve
+ *  su propio `useAuthState` — `RequireAuth` ya bloqueó el render hasta que
+ *  hay sesión, pero no reenvía el resultado a sus hijos — y no monta
+ *  `AdminLayout` (ni el repositorio queda "en uso") hasta que resuelve, para
+ *  no despachar nunca una consulta sin alcance por una carrera de renders. */
+function PanelAdmin(): ReactElement | null {
+  const estadoAuth = useAuthState(auth);
+  const alcance =
+    estadoAuth && estadoAuth.rol === "admin_sucursal" ? (estadoAuth.sucursales?.[0] ?? null) : null;
+  const repo = useMemo(() => new FirestoreAdminRepository(db, functions, alcance), [alcance]);
+
+  if (!estadoAuth) return null;
+
+  return (
+    <AdminRepositoryProvider repo={repo}>
+      <AdminLayout rol={estadoAuth.rol} onSalir={() => signOut(auth)} />
+    </AdminRepositoryProvider>
+  );
 }
 
 export function AppRouter(): ReactNode {
@@ -161,9 +175,7 @@ export function AppRouter(): ReactNode {
           path="/admin"
           element={
             <RequireAuth>
-              <AdminRepositoryProvider repo={adminRepo}>
-                <AdminLayout onSalir={() => signOut(auth)} />
-              </AdminRepositoryProvider>
+              <PanelAdmin />
             </RequireAuth>
           }
         >
