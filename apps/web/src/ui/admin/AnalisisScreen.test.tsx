@@ -410,6 +410,48 @@ describe("AnalisisScreen (rediseño)", () => {
     expect(filas[1]).toHaveTextContent("$2000");
   });
 
+  it("desglose por Categoría ordena el precio numéricamente, no como texto ($2000 antes que $150000)", async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo);
+
+    renderPantalla(repo);
+
+    const encabezadoCategoria = await screen.findByRole("columnheader", { name: /categoría/i });
+    fireEvent.click(within(encabezadoCategoria).getByRole("button"));
+    expect(encabezadoCategoria).toHaveAttribute("aria-sort", "ascending");
+
+    const filas = screen.getAllByRole("row");
+    // Orden alfabético (incorrecto, string) daría $150000, $2000, $5000.
+    // Orden numérico correcto: $2000, $5000, $150000.
+    expect(filas[1]).toHaveTextContent("$2000");
+    expect(filas[2]).toHaveTextContent("$5000");
+    expect(filas[3]).toHaveTextContent("$150000");
+  });
+
+  it("botón Imprimir dispara window.print()", async () => {
+    const repo = new FakeAdminRepository();
+    sembrarSesionCompleta(repo);
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => {});
+
+    renderPantalla(repo);
+
+    const boton = await screen.findByRole("button", { name: /imprimir/i });
+    fireEvent.click(boton);
+
+    expect(printSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("mientras carga (esqueleto) no ofrece el botón Imprimir: no hay nada listo para imprimir todavía", () => {
+    const repo = new FakeAdminRepository();
+    repo.sembrarSesion(sesionBase());
+    repo.sembrarLinea("ses_1", lineaBase("cat_a", 2000, 10));
+    repo.observarSincronizacion = () => () => {};
+
+    renderPantalla(repo);
+
+    expect(screen.queryByRole("button", { name: /imprimir/i })).not.toBeInTheDocument();
+  });
+
   it("la fila de total cuadra con la card Valor contado en las tres dimensiones", async () => {
     const repo = new FakeAdminRepository();
     sembrarSesionCompleta(repo);
