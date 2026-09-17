@@ -281,13 +281,13 @@ describe("CajerosScreen · opción de rol acotada (S5c, anti-escalada)", () => {
     expect(opciones[0]).toHaveTextContent("Cajero");
   });
 
-  it("NO ofrece 'Administrador' a admin_sucursal (negativo)", () => {
+  it("NO ofrece 'Gerente' a admin_sucursal (negativo)", () => {
     const repo = new FakeAdminRepository();
     renderPantallaConRol(repo, "admin_sucursal");
 
     fireEvent.click(screen.getByRole("button", { name: /nuevo cajero/i }));
 
-    expect(screen.queryByRole("option", { name: /administrador/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /gerente/i })).not.toBeInTheDocument();
   });
 
   it("mantiene ambas opciones de rol para Gerente (regresión)", () => {
@@ -297,7 +297,7 @@ describe("CajerosScreen · opción de rol acotada (S5c, anti-escalada)", () => {
     fireEvent.click(screen.getByRole("button", { name: /nuevo cajero/i }));
 
     expect(screen.getAllByRole("option")).toHaveLength(2);
-    expect(screen.getByRole("option", { name: /administrador/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /gerente/i })).toBeInTheDocument();
   });
 
   it("mantiene ambas opciones de rol sin contexto de Outlet (regresión, uso directo)", () => {

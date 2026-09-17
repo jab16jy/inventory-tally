@@ -84,7 +84,7 @@ describe("auditoria-helpers · obtenerAutor", () => {
     });
     const autor = obtenerAutor(e, mockUsuarios);
     expect(autor.nombre).toBe("Carlos Admin");
-    expect(autor.rol).toBe("Administrador");
+    expect(autor.rol).toBe("Gerente");
   });
 
   it("muestra el UID si ejecutadoPor no está en el mapa de usuarios", () => {

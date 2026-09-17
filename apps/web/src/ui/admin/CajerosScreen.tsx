@@ -12,6 +12,7 @@ import { useOutletContext } from "react-router-dom";
 import type { Sucursal } from "@conteo/shared/models/sucursal.js";
 import type { RolUsuario, Usuario } from "@conteo/shared/models/usuario.js";
 import type { ActualizarCajeroPayload, CrearCajeroPayload } from "@conteo/data";
+import { etiquetaRol } from "../../lib/etiqueta-rol.js";
 import { fecha } from "../../lib/formato.js";
 import { useAdminRepository } from "../../state/admin-contexto.js";
 import { Icono } from "../primitivos/Icono.js";
@@ -24,13 +25,13 @@ const CAMPO =
   "text-tinta placeholder:text-tenue focus:border-senal focus:outline-none";
 
 const ROLES: readonly { readonly valor: RolUsuario; readonly etiqueta: string }[] = [
-  { valor: "cajero", etiqueta: "Cajero" },
-  { valor: "admin", etiqueta: "Administrador" },
+  { valor: "cajero", etiqueta: etiquetaRol("cajero") },
+  { valor: "admin", etiqueta: etiquetaRol("admin") },
 ];
 
 /** Anti-escalada en el cliente (D7/S4): un admin_sucursal nunca puede ni
- *  ver la opción "Administrador" — el servidor ya lo rechaza (S4-*), esto
- *  evita ofrecer una opción que siempre fallará. `rol` ausente (uso sin
+ *  ver la opción "Gerente" — el servidor ya lo rechaza (S4-*), esto evita
+ *  ofrecer una opción que siempre fallará. `rol` ausente (uso sin
  *  `<Outlet/>`, p. ej. tests existentes) se trata como Gerente. */
 function rolesPara(
   rol: string | undefined,
@@ -181,7 +182,7 @@ export function CajerosScreen() {
     {
       clave: "rol",
       etiqueta: "Rol",
-      render: (u) => (u.rol === "admin" ? "Administrador" : "Cajero"),
+      render: (u) => etiquetaRol(u.rol),
       valorOrden: (u) => u.rol,
     },
     {
