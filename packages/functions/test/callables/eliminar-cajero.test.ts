@@ -6,10 +6,11 @@ import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
-import { HttpsError } from "firebase-functions/v2/https";
-import { describe, expect, it } from "vitest";
+import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { EliminarCajeroInput } from "@conteo/contracts";
 import { crearCajeroImpl } from "../../src/callables/crear-cajero.js";
-import { eliminarCajeroImpl } from "../../src/callables/eliminar-cajero.js";
+import { eliminarCajero, eliminarCajeroImpl } from "../../src/callables/eliminar-cajero.js";
 
 if (getApps().length === 0) {
   initializeApp({ projectId: "demo-conteo-eficiente" });
@@ -168,5 +169,177 @@ describe("eliminarCajeroImpl", () => {
     await expect(
       eliminarCajeroImpl(db, auth, "uid_admin", { uid: `uid_fantasma_${randomUUID()}` }),
     ).rejects.toThrow(/Cajero inexistente/);
+  });
+});
+
+// Probado a través de `eliminarCajero.run(req)` (el wrapper `onCall`, D5) y no
+// sólo de `eliminarCajeroImpl`: un olvido del gate de sucursal pasaría igual
+// si sólo se probara el Impl directamente.
+describe("eliminarCajero — autorización de sucursal (D3, S4-eliminar)", () => {
+  // Todo lo que crean los tests nuevos se borra aquí: sin huérfanos en Auth
+  // ni perfiles/eventos/sesiones residuales para los demás archivos (emulador
+  // compartido, `fileParallelism: false`).
+  const uidsCreados: string[] = [];
+  const sesionesCreadas: string[] = [];
+
+  afterEach(async () => {
+    for (const sesionId of sesionesCreadas.splice(0)) {
+      await db
+        .doc(`sesiones/${sesionId}`)
+        .delete()
+        .catch(() => undefined);
+    }
+    for (const uid of uidsCreados.splice(0)) {
+      await auth.deleteUser(uid).catch(() => undefined);
+      await db
+        .doc(`usuarios/${uid}`)
+        .delete()
+        .catch(() => undefined);
+      const eventos = await db.collection("auditoria").where("usuarioId", "==", uid).get();
+      await Promise.all(eventos.docs.map((evento) => evento.ref.delete()));
+    }
+  });
+
+  async function sembrarCajeroDe(sucursalesAsignadas: string[]): Promise<string> {
+    const correo = `s4e_${randomUUID()}@negocio.com`;
+    const resultado = await crearCajeroImpl(db, auth, "uid_admin", {
+      nombre: "Cajero Objetivo",
+      correo,
+      passwordTemporal: "Temp2026#",
+      rol: "cajero",
+      sucursalesAsignadas,
+    });
+    uidsCreados.push(resultado.uid);
+    return resultado.uid;
+  }
+
+  function reqEliminarCajero(
+    rol: string,
+    sucursales: readonly string[] | undefined,
+    datos: EliminarCajeroInput,
+  ): CallableRequest<EliminarCajeroInput> {
+    return {
+      data: datos,
+      auth: { uid: "uid_admin_sucursal", token: { rol, sucursales } },
+    } as unknown as CallableRequest<EliminarCajeroInput>;
+  }
+
+  it("admin_sucursal elimina un cajero de su propia sucursal (afirmativo)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const uid = await sembrarCajeroDe([sucursalId]);
+
+    const resultado = await eliminarCajero.run(
+      reqEliminarCajero("admin_sucursal", [sucursalId], { uid }),
+    );
+
+    expect(resultado.eliminado).toBe(true);
+    const perfil = await db.doc(`usuarios/${uid}`).get();
+    expect(perfil.exists).toBe(false);
+    await expect(auth.getUser(uid)).rejects.toMatchObject({ code: "auth/user-not-found" });
+  });
+
+  it("objetivo con custom claims admin/admin_sucursal es rechazado sin efectos (negativo, anti-escalada del objetivo)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const uidAdmin = await sembrarCajeroDe([sucursalId]);
+    await auth.setCustomUserClaims(uidAdmin, { rol: "admin", sucursales: undefined });
+    const uidAdminSucursal = await sembrarCajeroDe([sucursalId]);
+    await auth.setCustomUserClaims(uidAdminSucursal, {
+      rol: "admin_sucursal",
+      sucursales: [sucursalId],
+    });
+    const borrar = vi.spyOn(auth, "deleteUser");
+
+    await expect(
+      eliminarCajero.run(reqEliminarCajero("admin_sucursal", [sucursalId], { uid: uidAdmin })),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+    await expect(
+      eliminarCajero.run(
+        reqEliminarCajero("admin_sucursal", [sucursalId], { uid: uidAdminSucursal }),
+      ),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+
+    expect(borrar).not.toHaveBeenCalled();
+    const perfilAdmin = await db.doc(`usuarios/${uidAdmin}`).get();
+    expect(perfilAdmin.exists).toBe(true);
+    borrar.mockRestore();
+  });
+
+  it(
+    "objetivo con sucursal compartida EN USO es rechazado sin efectos (negativo, D3: el gate " +
+      "corre antes del count() de participaciones, para que un llamador rechazado nunca se " +
+      "entere de cuántos conteos lo referencian)",
+    async () => {
+      const sucursalId = `suc_${randomUUID()}`;
+      const otraSucursalId = `suc_${randomUUID()}`;
+      const uid = await sembrarCajeroDe([sucursalId, otraSucursalId]);
+      const sesionId = `ses_${randomUUID()}`;
+      await db.doc(`sesiones/${sesionId}`).set({ estado: "abierta", participantes: [uid] });
+      sesionesCreadas.push(sesionId);
+      const borrar = vi.spyOn(auth, "deleteUser");
+
+      await expect(
+        eliminarCajero.run(reqEliminarCajero("admin_sucursal", [sucursalId], { uid })),
+      ).rejects.toMatchObject({ code: "permission-denied" });
+
+      expect(borrar).not.toHaveBeenCalled();
+      const perfil = await db.doc(`usuarios/${uid}`).get();
+      expect(perfil.exists).toBe(true);
+      borrar.mockRestore();
+    },
+  );
+
+  it("objetivo de sucursal ajena es rechazado sin efectos (negativo)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const foraneaId = `suc_${randomUUID()}`;
+    const uid = await sembrarCajeroDe([foraneaId]);
+    const borrar = vi.spyOn(auth, "deleteUser");
+
+    await expect(
+      eliminarCajero.run(reqEliminarCajero("admin_sucursal", [sucursalId], { uid })),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+
+    expect(borrar).not.toHaveBeenCalled();
+    const perfil = await db.doc(`usuarios/${uid}`).get();
+    expect(perfil.exists).toBe(true);
+    borrar.mockRestore();
+  });
+
+  it("admin (Gerente) no se ve afectado por el alcance (regresión)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const uid = await sembrarCajeroDe([sucursalId]);
+
+    const resultado = await eliminarCajero.run(reqEliminarCajero("admin", undefined, { uid }));
+
+    expect(resultado.eliminado).toBe(true);
+    const perfil = await db.doc(`usuarios/${uid}`).get();
+    expect(perfil.exists).toBe(false);
+  });
+
+  it(
+    "objetivo huérfano (cuenta de Auth borrada, perfil de cajero remanente): admin_sucursal " +
+      "recibe not-found y el perfil sobrevive (negativo, D3: el fallback de huérfanos de " +
+      "eliminarCajeroImpl queda reservado al Gerente)",
+    async () => {
+      const sucursalId = `suc_${randomUUID()}`;
+      const uid = await sembrarCajeroDe([sucursalId]);
+      await auth.deleteUser(uid);
+
+      await expect(
+        eliminarCajero.run(reqEliminarCajero("admin_sucursal", [sucursalId], { uid })),
+      ).rejects.toMatchObject({ code: "not-found" });
+
+      expect((await db.doc(`usuarios/${uid}`).get()).exists).toBe(true);
+    },
+  );
+
+  it("objetivo huérfano: el Gerente sigue pudiendo barrer el perfil remanente (regresión, D3)", async () => {
+    const sucursalId = `suc_${randomUUID()}`;
+    const uid = await sembrarCajeroDe([sucursalId]);
+    await auth.deleteUser(uid);
+
+    const resultado = await eliminarCajero.run(reqEliminarCajero("admin", undefined, { uid }));
+
+    expect(resultado.eliminado).toBe(true);
+    expect((await db.doc(`usuarios/${uid}`).get()).exists).toBe(false);
   });
 });
