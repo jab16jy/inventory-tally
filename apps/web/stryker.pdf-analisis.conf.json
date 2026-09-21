@@ -3,6 +3,6 @@
   "packageManager": "npm",
   "testRunner": "vitest",
   "reporters": ["clear-text", "progress"],
-  "mutate": ["src/ui/admin/pdf-analisis.ts:1-102"],
+  "mutate": ["src/ui/admin/pdf-analisis.ts:1-109"],
   "coverageAnalysis": "perTest"
 }
