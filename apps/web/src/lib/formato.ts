@@ -57,6 +57,15 @@ export function porcentaje(valor: number): string {
   return `${FORMATO_PORCENTAJE.format(valor)}%`;
 }
 
+/** Variación frente a la sesión anterior (escala 0–100) con su signo: la
+ *  dirección la lleva el signo (+ / −, U+2212), nunca el color. Sin signo en
+ *  cero: "+0,0%" se lee como crecimiento y cero no tiene dirección. Lo
+ *  comparten el `Delta` de AnalisisScreen y el PDF de análisis. */
+export function variacionConSigno(valor: number): string {
+  const signo = valor > 0 ? "+" : valor < 0 ? "\u2212" : "";
+  return `${signo}${porcentaje(Math.abs(valor))}`;
+}
+
 const FORMATO_DATOS = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 1 });
 
 /** Consumo de datos aproximado — issue #20 item 2 (doc 11 §24, fila "Datos
