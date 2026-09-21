@@ -30,6 +30,7 @@ una decisión no examinada.
 | [18](#adr-18) | Medir RNF-01 con dos clientes contra el emulador   | 🆕 Aceptada                |
 | [19](#adr-19) | Confirmación antes de "Salir" para el cajero        | 🆕 Aceptada                |
 | [20](#adr-20) | El comparativo mide ejecución, no tamaño            | 🆕 Aceptada                |
+| [28](#adr-28) | PDF de análisis generado en el cliente (jsPDF)      | 🆕 Aceptada                |
 
 ---
 
@@ -1003,6 +1004,46 @@ datos: un claim `admin_sucursal` revertido se trata como no-admin.
 
 **Detonante de reevaluación:** si el negocio pide un admin_sucursal con más de una
 sucursal asignada (el diseño actual fuerza cardinalidad 1 por contrato).
+
+---
+
+## ADR-28 {#adr-28}
+
+### PDF de análisis generado en el cliente (jsPDF), sin Storage ni backend
+
+**Contexto.** El análisis de sesión se "exportaba" con `window.print()`: depende del
+diálogo del navegador (márgenes, encabezados del navegador, "Guardar como PDF" escondido
+en móvil) y el resultado se ve como una pantalla impresa, no como un documento. El diseño
+original (doc 10 §8) preveía exportar por Cloud Function → Cloud Storage → enlace
+temporal. El proyecto corre en plan Blaze (Cloud Functions v2 lo exige) y la restricción
+real del usuario es no salir de las cuotas gratuitas mensuales: cada PDF generado en
+servidor consumiría invocaciones, CPU y almacenamiento. `analisis-precio-pdf` ya había
+fijado "cero backend" y, además, "cero dependencia nueva".
+
+**Decisión.** El PDF del análisis se genera y descarga en el navegador con `jspdf` +
+`jspdf-autotable` (`apps/web/src/ui/admin/pdf-analisis.ts`). La pantalla lo carga con
+`import()` dinámico al pulsar "Exportar PDF", así que ambas librerías viven en un chunk
+aparte y no cuentan contra el bundle inicial (RNF-07, < 500 KB). El generador recibe los
+datos que la pantalla ya calculó (filas en el orden elegido, totales, variación) y sólo
+formatea con `lib/formato.ts` — ninguna agregación nueva, ninguna lectura extra de
+Firestore. Revierte, por decisión explícita del usuario, la restricción "cero dependencia
+nueva" de `analisis-precio-pdf`; la restricción de costo no cambia.
+
+| Alternativa | Por qué se descartó |
+| --- | --- |
+| Cloud Function → Cloud Storage → enlace temporal (doc 10 §8 original) | Consume cuota de Blaze en cada exportación y suma una función, un bucket y sus reglas que mantener |
+| Seguir con `window.print()` | Resultado dependiente del navegador, poco presentable y confuso en móvil |
+| PDF desde HTML (`html2canvas` + jsPDF) | Rasteriza la pantalla: texto no seleccionable, archivos pesados y el tema oscuro no sirve en papel |
+
+**Consecuencias.** ✅ Cero backend, cero Storage, cero cuota de Blaze · ✅ Documento con
+cabecera, resumen, tabla paginada con encabezado repetido y "Página N de M" · ⚠️ Dos
+dependencias nuevas (cargadas de forma diferida) · ⚠️ Helvetica estándar de jsPDF usa
+WinAnsi: el signo menos U+2212, la flecha U+2192 y el espacio fino U+202F se traducen a
+ASCII sólo en el PDF · ⚠️ El PDF sigue el orden del selector "Ordenar por", no un orden
+manual por encabezado de `Tabla`.
+
+**Detonante de reevaluación:** si se pide un acta de cierre con firma o constancia no
+alterable por el cliente — eso sí justificaría generarla en servidor.
 
 ---
 

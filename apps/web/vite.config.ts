@@ -57,6 +57,16 @@ export default defineConfig({
         // assets con hash sí, porque son inmutables por versión (doc 06 §4).
         navigateFallback: "/index.html",
         runtimeCaching: [],
+        // ADR-28: jsPDF y sus chunks opcionales (~800 kB) sólo los usa el
+        // admin al exportar; precachearlos cargaría ese peso en cada teléfono
+        // de cajero. Se bajan de la red al primer "Exportar PDF".
+        globIgnores: [
+          "**/node_modules/**/*",
+          "**/pdf-analisis-*.js",
+          "**/html2canvas*.js",
+          "**/purify.es-*.js",
+          "**/index.es-*.js",
+        ],
       },
       manifest: {
         name: "Conteo de Inventario",
