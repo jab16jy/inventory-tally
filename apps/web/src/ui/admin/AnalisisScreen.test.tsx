@@ -520,6 +520,29 @@ describe("AnalisisScreen (rediseño)", () => {
       expect(screen.queryByRole("combobox", { name: /ordenar por/i })).not.toBeInTheDocument();
     });
 
+    // jsdom no calcula layout: se fija el markup que evita el desborde. En
+    // angosto, la fila con "Desglose por" y "Ordenar por" se envuelve, y cada
+    // rótulo viaja pegado a su selector (nunca uno al final de una línea y el
+    // otro al principio de la siguiente).
+    it("no desborda en angosto: la fila se envuelve y cada rótulo va con su selector", async () => {
+      const repo = new FakeAdminRepository();
+      sembrarSesionCompleta(repo);
+
+      renderPantalla(repo);
+      const orden = await screen.findByRole("combobox", { name: /ordenar por/i });
+      const dimension = screen.getByRole("combobox", { name: /desglose por/i });
+
+      const fila = orden.closest(".print\\:hidden")!;
+      expect(fila).toHaveClass("flex-wrap");
+      for (const select of [orden, dimension]) {
+        const grupo = select.parentElement!;
+        expect(grupo).not.toBe(fila);
+        expect(grupo.querySelectorAll("select")).toHaveLength(1);
+        expect(grupo.querySelector("label")).not.toBeNull();
+        expect(select).toHaveClass("min-w-0");
+      }
+    });
+
     it("no imprime el <select>, y su rótulo de texto equivalente sí", async () => {
       const repo = new FakeAdminRepository();
       sembrarSesionCompleta(repo);
@@ -527,8 +550,10 @@ describe("AnalisisScreen (rediseño)", () => {
       const { container } = renderPantalla(repo);
       await ordenarPor("Precio menor → mayor");
 
-      const selector = screen.getByRole("combobox", { name: /ordenar por/i }).closest("div")!;
-      expect(selector).toHaveClass("print:hidden");
+      const selector = screen
+        .getByRole("combobox", { name: /ordenar por/i })
+        .closest(".print\\:hidden");
+      expect(selector).not.toBeNull();
       const rotulos = Array.from(
         container.querySelectorAll('[data-seccion="tabla"] p.print\\:block'),
       ).map((p) => p.textContent);
@@ -916,8 +941,8 @@ describe("AnalisisScreen (rediseño)", () => {
 
     const selectorDimension = screen
       .getByRole("combobox", { name: /desglose por/i })
-      .closest("div")!;
-    expect(selectorDimension).toHaveClass("print:hidden");
+      .closest(".print\\:hidden");
+    expect(selectorDimension).not.toBeNull();
 
     const rotuloImpresion = container.querySelector('[data-seccion="tabla"] p.print\\:block')!;
     expect(rotuloImpresion).not.toBeNull();
