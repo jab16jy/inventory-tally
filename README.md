@@ -108,31 +108,23 @@ listener local ya actualizó la pantalla. No lo "arregles".
 
 ---
 
-## Qué hay implementado
+## Estado
 
-Esto es un **esqueleto caminante**, no el sistema completo: demuestra la cadena
-aporte → trigger → total en tiempo real, con offline, reglas reales y auditoría.
+**La aplicación está terminada y en producción** (`v0.2.0`):
+https://proyectoconteoinv-d017a.web.app
 
-| Implementado                                                 | Pendiente |
-| ------------------------------------------------------------ | --------- |
-| Security Rules completas + 27 tests                          | App Check |
-| `onAporteEscrito` idempotente y tolerante a reordenamiento   |           |
-| `abrirSesion` transaccional con rollback de siembra          |           |
-| PWA: login, conteo en tiempo real, banner de pendientes      |           |
-| Detección de degradación de persistencia                     |           |
-| CI por rutas afectadas, con E2E como requisito de deploy-dev |           |
-| `crearCajero`, `actualizarCajero`, `desactivarCajero`        |           |
-| `cerrarSesion` con verificación RF-16                        |           |
-| Crons: resúmenes, reconciliación, purga                      |           |
-| Panel de administrador, análisis mensual y por área          |           |
-| Pantallas `/preparar` y `/finalizar`                         |           |
-| Eliminar/reactivar categorías, áreas y cajeros (con guardas) |           |
-| Admin puede contar sesiones abiertas de cualquier sucursal   |           |
-| Control de versión mínima (bloquea clientes desactualizados) |           |
-| E2E con Playwright contra el Emulator Suite                  |           |
+Cuenta el inventario por valor monetario con tres roles: `admin` (Gerente),
+`admin_sucursal` (acotado a una sola sucursal) y `cajero`.
 
-También faltan los iconos de la PWA (`apps/web/public/icons/*.png`): el manifest
-los referencia pero no existen todavía.
+| Área           | Incluye                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| Conteo         | Tiempo real, offline, banner de pendientes, nuevo producto, vista de cajero                |
+| Sesiones       | `abrirSesion`, `cerrarSesion` con verificación RF-16, pantallas `/preparar` y `/finalizar` |
+| Backend        | `onAporteEscrito` idempotente, crons (resúmenes, reconciliación, purga)                    |
+| Administración | Cajeros, categorías y áreas (con guardas), panel, análisis con PDF y orden por precio      |
+| Seguridad      | Security Rules completas con sus tests, auditoría inmutable, versión mínima del cliente    |
+
+Pendiente: App Check.
 
 ---
 
