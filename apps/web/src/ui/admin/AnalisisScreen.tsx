@@ -286,7 +286,7 @@ export function AnalisisScreen() {
   const [compararActivo, setCompararActivo] = useState(true);
   const [ordenCategoria, setOrdenCategoria] = useState(ORDENES_CATEGORIA[0]!.valor);
   const [exportando, setExportando] = useState(false);
-  const [errorPdf, setErrorPdf] = useState(false);
+  const [errorPdf, setErrorPdf] = useState<string | null>(null);
   const idDimension = useId();
   const idOrden = useId();
 
@@ -375,7 +375,7 @@ export function AnalisisScreen() {
   // encabezado (vive dentro de `Tabla`); salida = prop `orden` controlada.
   const exportarPdf = async (): Promise<void> => {
     setExportando(true);
-    setErrorPdf(false);
+    setErrorPdf(null);
     try {
       const { descargarPdfAnalisis } = await import("./pdf-analisis.js");
       descargarPdfAnalisis({
@@ -392,8 +392,15 @@ export function AnalisisScreen() {
         contadas,
         totalLineas: lineas.length,
       });
-    } catch {
-      setErrorPdf(true);
+    } catch (error) {
+      console.error("Exportar PDF falló", error);
+      // El chunk de jsPDF no está en el precache (vite.config.ts): sin red y
+      // sin haberlo bajado antes, el `import()` no puede resolverse.
+      setErrorPdf(
+        enLinea
+          ? "No se pudo generar el PDF. Intenta de nuevo."
+          : "Sin conexión: la primera exportación necesita internet. Conéctate e intenta de nuevo.",
+      );
     } finally {
       setExportando(false);
     }
@@ -420,12 +427,12 @@ export function AnalisisScreen() {
             </span>
           </button>
         </div>
-        {errorPdf && (
+        {errorPdf !== null && (
           <p
             role="alert"
             className="mt-3 rounded-placa border border-riesgo bg-riesgo-placa px-3 py-2 text-micro text-tinta print:hidden"
           >
-            No se pudo generar el PDF. Intenta de nuevo.
+            {errorPdf}
           </p>
         )}
         <p role="status" className="mt-1 text-micro text-tenue">

@@ -587,10 +587,12 @@ describe("AnalisisScreen (rediseño)", () => {
       expect(datos.filas.map((f) => f.etiqueta)).toEqual(["Vitrina", "Bodega"]);
     });
 
-    it("si la generación falla, lo dice con role=alert y el botón vuelve a quedar disponible", async () => {
+    it("si la generación falla, lo dice con role=alert, registra el error y el botón vuelve a quedar disponible", async () => {
+      const fallo = new Error("jsPDF reventó");
       vi.mocked(descargarPdfAnalisis).mockImplementation(() => {
-        throw new Error("jsPDF reventó");
+        throw fallo;
       });
+      const consola = vi.spyOn(console, "error").mockImplementation(() => {});
       const repo = new FakeAdminRepository();
       sembrarSesionCompleta(repo);
 
@@ -599,6 +601,28 @@ describe("AnalisisScreen (rediseño)", () => {
 
       expect(await screen.findByRole("alert")).toHaveTextContent(/no se pudo generar el pdf/i);
       expect(screen.getByRole("button", { name: /exportar pdf/i })).toBeEnabled();
+      expect(consola).toHaveBeenCalledWith("Exportar PDF falló", fallo);
+      consola.mockRestore();
+    });
+
+    it("sin conexión, el fallo explica que la primera exportación necesita internet", async () => {
+      vi.mocked(descargarPdfAnalisis).mockImplementation(() => {
+        throw new Error("Failed to fetch dynamically imported module");
+      });
+      const consola = vi.spyOn(console, "error").mockImplementation(() => {});
+      fijarEnLinea(false);
+      const repo = new FakeAdminRepository();
+      sembrarSesionCompleta(repo);
+
+      renderPantalla(repo);
+      fireEvent.click(await screen.findByRole("button", { name: /exportar pdf/i }));
+
+      // El chip de estado también dice "Sin conexión": se ubica por el texto
+      // propio de la alerta.
+      const alerta = await screen.findByText(/necesita internet/i);
+      expect(alerta).toHaveAttribute("role", "alert");
+      expect(alerta).toHaveTextContent(/sin conexión/i);
+      consola.mockRestore();
     });
 
     it("mientras carga (esqueleto) no se ofrece: no hay nada listo para exportar todavía", () => {
