@@ -534,32 +534,34 @@ export function AnalisisScreen() {
       </div>
 
       <div data-seccion="tabla">
-        <div className="mb-3 flex items-center gap-2 print:hidden">
-          <label htmlFor={idDimension} className="text-micro text-tenue">
-            Desglose por
-          </label>
-          <select
-            id={idDimension}
-            value={dimension}
-            onChange={(e) => setDimension(e.target.value as DimensionAnalisis)}
-            className="min-h-[var(--size-toque)] rounded-placa border border-borde bg-fondo px-3 text-tinta focus:border-senal focus:outline-none"
-          >
-            {DIMENSIONES.map((d) => (
-              <option key={d.valor} value={d.valor}>
-                {d.etiqueta}
-              </option>
-            ))}
-          </select>
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 print:hidden">
+          <div className="flex min-w-0 max-w-full items-center gap-2">
+            <label htmlFor={idDimension} className="text-micro text-tenue">
+              Desglose por
+            </label>
+            <select
+              id={idDimension}
+              value={dimension}
+              onChange={(e) => setDimension(e.target.value as DimensionAnalisis)}
+              className="min-w-0 min-h-[var(--size-toque)] rounded-placa border border-borde bg-fondo px-3 text-tinta focus:border-senal focus:outline-none"
+            >
+              {DIMENSIONES.map((d) => (
+                <option key={d.valor} value={d.valor}>
+                  {d.etiqueta}
+                </option>
+              ))}
+            </select>
+          </div>
           {dimension === "categoria" && (
-            <>
-              <label htmlFor={idOrden} className="ml-2 text-micro text-tenue">
+            <div className="flex min-w-0 max-w-full items-center gap-2">
+              <label htmlFor={idOrden} className="text-micro text-tenue">
                 Ordenar por
               </label>
               <select
                 id={idOrden}
                 value={ordenCategoria}
                 onChange={(e) => setOrdenCategoria(e.target.value)}
-                className="min-h-[var(--size-toque)] rounded-placa border border-borde bg-fondo px-3 text-tinta focus:border-senal focus:outline-none"
+                className="min-w-0 min-h-[var(--size-toque)] rounded-placa border border-borde bg-fondo px-3 text-tinta focus:border-senal focus:outline-none"
               >
                 {ORDENES_CATEGORIA.map((o) => (
                   <option key={o.valor} value={o.valor}>
@@ -567,7 +569,7 @@ export function AnalisisScreen() {
                   </option>
                 ))}
               </select>
-            </>
+            </div>
           )}
         </div>
         {/* Equivalente en texto de los <select> ocultos arriba: sin esto, la
