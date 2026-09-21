@@ -14,6 +14,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fecha, moneda, porcentaje } from "../../lib/formato.js";
 import { AdminRepositoryProvider } from "../../state/admin-contexto.js";
 import { AnalisisScreen } from "./AnalisisScreen.js";
+import { descargarPdfAnalisis } from "./pdf-analisis.js";
+
+// jsPDF no se ejecuta en estos tests: el generador tiene sus propios tests
+// (pdf-analisis.test.ts). Aquí sólo importa QUÉ datos le pasa la pantalla.
+vi.mock("./pdf-analisis.js", () => ({ descargarPdfAnalisis: vi.fn() }));
 
 const ESPACIO_NO_SEPARABLE = String.fromCharCode(0xa0);
 
@@ -428,29 +433,208 @@ describe("AnalisisScreen (rediseño)", () => {
     expect(filas[3]).toHaveTextContent("$150000");
   });
 
-  it("botón Imprimir dispara window.print() y lleva un ícono", async () => {
-    const repo = new FakeAdminRepository();
-    sembrarSesionCompleta(repo);
-    const printSpy = vi.spyOn(window, "print").mockImplementation(() => {});
+  describe("selector 'Ordenar por' (desglose por Categoría)", () => {
+    async function ordenarPor(etiqueta: string): Promise<void> {
+      const select = await screen.findByRole("combobox", { name: /ordenar por/i });
+      const opcion = within(select).getByRole("option", { name: etiqueta }) as HTMLOptionElement;
+      fireEvent.change(select, { target: { value: opcion.value } });
+    }
 
-    renderPantalla(repo);
+    /** Primera celda de cada fila de datos (sin encabezado ni total). */
+    function etiquetasFilas(): string[] {
+      const filas = screen.getAllByRole("row").slice(1, -1);
+      return filas.map((f) => within(f).getAllByRole("cell")[0]!.textContent ?? "");
+    }
 
-    const boton = await screen.findByRole("button", { name: /imprimir/i });
-    expect(boton.querySelector("svg")).not.toBeNull();
-    fireEvent.click(boton);
+    it("por defecto sigue ordenando por Valor descendente", async () => {
+      const repo = new FakeAdminRepository();
+      sembrarSesionCompleta(repo);
 
-    expect(printSpy).toHaveBeenCalledTimes(1);
+      renderPantalla(repo);
+
+      const select = await screen.findByRole("combobox", { name: /ordenar por/i });
+      expect(select).toHaveDisplayValue("Mayor valor total");
+      expect(etiquetasFilas()).toEqual(["$2000", "$150000", "$5000"]);
+    });
+
+    it("'Precio mayor → menor' ordena por precio unitario descendente", async () => {
+      const repo = new FakeAdminRepository();
+      sembrarSesionCompleta(repo);
+
+      renderPantalla(repo);
+      await ordenarPor("Precio mayor → menor");
+
+      expect(etiquetasFilas()).toEqual(["$150000", "$5000", "$2000"]);
+    });
+
+    it("'Precio menor → mayor' ordena por precio unitario ascendente", async () => {
+      const repo = new FakeAdminRepository();
+      sembrarSesionCompleta(repo);
+
+      renderPantalla(repo);
+      await ordenarPor("Precio menor → mayor");
+
+      expect(etiquetasFilas()).toEqual(["$2000", "$5000", "$150000"]);
+    });
+
+    it("en móvil (tarjetas, sin encabezado clicable) también ordena por precio", async () => {
+      const anchoOriginal = window.innerWidth;
+      Object.defineProperty(window, "innerWidth", {
+        writable: true,
+        configurable: true,
+        value: 400,
+      });
+      try {
+        const repo = new FakeAdminRepository();
+        sembrarSesionCompleta(repo);
+
+        renderPantalla(repo);
+        await ordenarPor("Precio mayor → menor");
+
+        const tarjetas = within(screen.getByRole("list", { name: /desglose por/i })).getAllByRole(
+          "listitem",
+        );
+        // La última tarjeta es la fila total.
+        expect(
+          tarjetas.slice(0, -1).map((t) => within(t).getAllByRole("definition")[0]!.textContent),
+        ).toEqual(["$150000", "$5000", "$2000"]);
+      } finally {
+        Object.defineProperty(window, "innerWidth", {
+          writable: true,
+          configurable: true,
+          value: anchoOriginal,
+        });
+      }
+    });
+
+    it("no aparece en las dimensiones Cajero ni Área", async () => {
+      const repo = new FakeAdminRepository();
+      sembrarSesionCompleta(repo);
+
+      renderPantalla(repo);
+      await screen.findByRole("combobox", { name: /ordenar por/i });
+
+      await irADimension("cajero");
+      expect(screen.queryByRole("combobox", { name: /ordenar por/i })).not.toBeInTheDocument();
+      await irADimension("area");
+      expect(screen.queryByRole("combobox", { name: /ordenar por/i })).not.toBeInTheDocument();
+    });
+
+    it("no imprime el <select>, y su rótulo de texto equivalente sí", async () => {
+      const repo = new FakeAdminRepository();
+      sembrarSesionCompleta(repo);
+
+      const { container } = renderPantalla(repo);
+      await ordenarPor("Precio menor → mayor");
+
+      const selector = screen.getByRole("combobox", { name: /ordenar por/i }).closest("div")!;
+      expect(selector).toHaveClass("print:hidden");
+      const rotulos = Array.from(
+        container.querySelectorAll('[data-seccion="tabla"] p.print\\:block'),
+      ).map((p) => p.textContent);
+      expect(rotulos).toContain("Ordenado por Precio menor → mayor");
+    });
   });
 
-  it("mientras carga (esqueleto) no ofrece el botón Imprimir: no hay nada listo para imprimir todavía", () => {
-    const repo = new FakeAdminRepository();
-    repo.sembrarSesion(sesionBase());
-    repo.sembrarLinea("ses_1", lineaBase("cat_a", 2000, 10));
-    repo.observarSincronizacion = () => () => {};
+  describe("botón Exportar PDF", () => {
+    afterEach(() => {
+      vi.mocked(descargarPdfAnalisis).mockReset();
+    });
 
-    renderPantalla(repo);
+    it("lleva un ícono y exporta la dimensión, el orden y las filas en el orden elegido", async () => {
+      const repo = new FakeAdminRepository();
+      sembrarSesionCompleta(repo);
 
-    expect(screen.queryByRole("button", { name: /imprimir/i })).not.toBeInTheDocument();
+      renderPantalla(repo);
+      const select = await screen.findByRole("combobox", { name: /ordenar por/i });
+      fireEvent.change(select, { target: { value: "precio-desc" } });
+
+      const boton = screen.getByRole("button", { name: /exportar pdf/i });
+      expect(boton.querySelector("svg")).not.toBeNull();
+      fireEvent.click(boton);
+
+      await vi.waitFor(() => expect(descargarPdfAnalisis).toHaveBeenCalledTimes(1));
+      const datos = vi.mocked(descargarPdfAnalisis).mock.calls[0]![0];
+      expect(datos.sucursalNombre).toBe("Sucursal Norte");
+      expect(datos.dimension).toBe("Categoría");
+      expect(datos.orden).toBe("Precio mayor → menor");
+      expect(datos.filas.map((f) => f.etiqueta)).toEqual(["$150000", "$5000", "$2000"]);
+      expect(datos.totalMonetario).toBe(920_000);
+      expect(datos.totalUnidades).toBe(312);
+      expect(datos.contadas).toBe(2);
+      expect(datos.totalLineas).toBe(3);
+      // Sin histórico sembrado: no hay variación que imprimir.
+      expect(datos.deltaValor).toBeNull();
+    });
+
+    it("en otra dimensión exporta sus filas por Valor descendente", async () => {
+      const repo = new FakeAdminRepository();
+      repo.sembrarSesion(sesionBase());
+      repo.sembrarArea({ areaId: "area_a", nombre: "Bodega", activa: true, creadaEn: new Date() });
+      repo.sembrarArea({ areaId: "area_b", nombre: "Vitrina", activa: true, creadaEn: new Date() });
+      repo.sembrarLinea("ses_1", lineaBase("cat_a", 1000, 10, { porArea: { area_a: 10 } })); // 10.000
+      repo.sembrarLinea("ses_1", lineaBase("cat_b", 5000, 10, { porArea: { area_b: 10 } })); // 50.000
+      repo.sembrarSincronizacion("ses_1", todosSincronizados());
+
+      renderPantalla(repo);
+      await irADimension("area");
+      fireEvent.click(screen.getByRole("button", { name: /exportar pdf/i }));
+
+      await vi.waitFor(() => expect(descargarPdfAnalisis).toHaveBeenCalledTimes(1));
+      const datos = vi.mocked(descargarPdfAnalisis).mock.calls[0]![0];
+      expect(datos.dimension).toBe("Área");
+      expect(datos.orden).toBe("Mayor valor total");
+      expect(datos.filas.map((f) => f.etiqueta)).toEqual(["Vitrina", "Bodega"]);
+    });
+
+    it("si la generación falla, lo dice con role=alert, registra el error y el botón vuelve a quedar disponible", async () => {
+      const fallo = new Error("jsPDF reventó");
+      vi.mocked(descargarPdfAnalisis).mockImplementation(() => {
+        throw fallo;
+      });
+      const consola = vi.spyOn(console, "error").mockImplementation(() => {});
+      const repo = new FakeAdminRepository();
+      sembrarSesionCompleta(repo);
+
+      renderPantalla(repo);
+      fireEvent.click(await screen.findByRole("button", { name: /exportar pdf/i }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(/no se pudo generar el pdf/i);
+      expect(screen.getByRole("button", { name: /exportar pdf/i })).toBeEnabled();
+      expect(consola).toHaveBeenCalledWith("Exportar PDF falló", fallo);
+      consola.mockRestore();
+    });
+
+    it("sin conexión, el fallo explica que la primera exportación necesita internet", async () => {
+      vi.mocked(descargarPdfAnalisis).mockImplementation(() => {
+        throw new Error("Failed to fetch dynamically imported module");
+      });
+      const consola = vi.spyOn(console, "error").mockImplementation(() => {});
+      fijarEnLinea(false);
+      const repo = new FakeAdminRepository();
+      sembrarSesionCompleta(repo);
+
+      renderPantalla(repo);
+      fireEvent.click(await screen.findByRole("button", { name: /exportar pdf/i }));
+
+      // El chip de estado también dice "Sin conexión": se ubica por el texto
+      // propio de la alerta.
+      const alerta = await screen.findByText(/necesita internet/i);
+      expect(alerta).toHaveAttribute("role", "alert");
+      expect(alerta).toHaveTextContent(/sin conexión/i);
+      consola.mockRestore();
+    });
+
+    it("mientras carga (esqueleto) no se ofrece: no hay nada listo para exportar todavía", () => {
+      const repo = new FakeAdminRepository();
+      repo.sembrarSesion(sesionBase());
+      repo.sembrarLinea("ses_1", lineaBase("cat_a", 2000, 10));
+      repo.observarSincronizacion = () => () => {};
+
+      renderPantalla(repo);
+
+      expect(screen.queryByRole("button", { name: /exportar pdf/i })).not.toBeInTheDocument();
+    });
   });
 
   it("la fila de total cuadra con la card Valor contado en las tres dimensiones", async () => {
@@ -730,7 +914,9 @@ describe("AnalisisScreen (rediseño)", () => {
     const { container } = renderPantalla(repo);
     await screen.findByText("Sucursal Norte", { exact: false });
 
-    const selectorDimension = screen.getByRole("combobox", { name: /desglose por/i }).closest("div")!;
+    const selectorDimension = screen
+      .getByRole("combobox", { name: /desglose por/i })
+      .closest("div")!;
     expect(selectorDimension).toHaveClass("print:hidden");
 
     const rotuloImpresion = container.querySelector('[data-seccion="tabla"] p.print\\:block')!;

@@ -59,6 +59,28 @@ export interface Orden {
   readonly direccion: Direccion;
 }
 
+/** Orden que aplica la tabla — exportado para que quien exporte las mismas
+ *  filas fuera de la tabla (el PDF de AnalisisScreen) las ordene idéntico,
+ *  sin una segunda copia del comparador. Sin orden, o con una clave sin
+ *  `valorOrden`, devuelve `filas` tal cual. */
+export function ordenarFilas<T>(
+  filas: readonly T[],
+  columnas: readonly ColumnaTabla<T>[],
+  orden: Orden | null,
+): readonly T[] {
+  const columna = orden && columnas.find((c) => c.clave === orden.clave);
+  if (!orden || !columna?.valorOrden) return filas;
+  const { valorOrden } = columna;
+  const signo = orden.direccion === "asc" ? 1 : -1;
+  return [...filas].sort((a, b) => {
+    const va = valorOrden(a);
+    const vb = valorOrden(b);
+    if (va < vb) return -signo;
+    if (va > vb) return signo;
+    return 0;
+  });
+}
+
 /** Cuerpo etiqueta/valor de una tarjeta móvil. Lo comparten la fila normal y
  *  la fila total: sólo cambia la superficie del `<li>` que la envuelve. */
 function CuerpoTarjeta<T>({
@@ -99,19 +121,10 @@ export function Tabla<T>({
   // guardarlo así evita los dos `as T` que harían falta si no.
   const total = !cargando ? filaTotal : undefined;
 
-  const filasOrdenadas = useMemo(() => {
-    const columna = orden && columnas.find((c) => c.clave === orden.clave);
-    if (!orden || !columna?.valorOrden) return filas;
-    const { valorOrden } = columna;
-    const signo = orden.direccion === "asc" ? 1 : -1;
-    return [...filas].sort((a, b) => {
-      const va = valorOrden(a);
-      const vb = valorOrden(b);
-      if (va < vb) return -signo;
-      if (va > vb) return signo;
-      return 0;
-    });
-  }, [filas, orden, columnas]);
+  const filasOrdenadas = useMemo(
+    () => ordenarFilas(filas, columnas, orden),
+    [filas, orden, columnas],
+  );
 
   // Ciclo de 3 estados por columna: sin ordenar → ascendente → descendente →
   // sin ordenar. Cada click cambia sólo la columna clicada.

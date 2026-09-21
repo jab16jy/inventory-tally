@@ -273,14 +273,21 @@ denegación por defecto de `infra/firestore.rules`.
 
 ---
 
-## 8. Exportación (fuera del alcance de v1)
+## 8. Exportación
+
+**Implementado — PDF del análisis de sesión ([ADR-28](13-decisiones-adr.md#adr-28)).**
+El botón "Exportar PDF" de la pantalla de análisis genera y descarga el PDF **en el
+navegador** (jsPDF + jspdf-autotable, cargadas con `import()` dinámico): cabecera con
+sucursal y fechas, el resumen de las tres cards, la dimensión y el orden elegidos, y la
+tabla con su fila total en el mismo orden que se ve en pantalla. Cero Cloud Function,
+cero Cloud Storage.
 
 Preparado en el diseño, no implementado:
 
 - CSV/Excel del resumen y del detalle por categoría.
 - PDF del acta de conteo cerrado, con firma del administrador que cerró y constancia de
-  si el cierre fue forzado.
-- Ambos generados por Cloud Function → Cloud Storage → enlace temporal.
+  si el cierre fue forzado. Un acta con firma sí puede requerir servidor (constancia no
+  alterable por el cliente); el PDF de análisis de arriba no la sustituye.
 
 ---
 

@@ -41,7 +41,7 @@ La app no muestra "cuántas unidades hay", muestra **cuánto contaste tú** fren
 - Presupuestos técnicos que acotan cualquier pantalla nueva: rendimiento de UI ≥ 55 fps con hasta 200 categorías (RNF-05, < 20 ms/frame), consumo de datos < 1,5 MB por sesión tras la carga inicial (RNF-10), bundle < 500 KB comprimido, arranque < 5 s en 4G / < 3 s con service worker caliente (RNF-07).
 - Accesibilidad exigida por producto: contraste mínimo AA (4.5:1), objetivos táctiles ≥ 48×48 px, escalado de texto probado hasta 200 %, `aria-label` descriptivo en cada fila de conteo, moneda en `Intl.NumberFormat('es-CO', …)` cuando aplique (sólo para el administrador).
 - **Fuera de alcance explícito** (`docs/diseno/01-requisitos-y-alcance.md#33-fuera-de-alcance-explícito`): gestión de productos/SKU individuales, facturación o movimientos de inventario, multi-empresa con aislamiento por organización. También fuera del alcance visual actual: el panel de administrador completo.
-- **Deseable, no construido**: exportar a Excel/PDF, comparar contra el inventario teórico del POS, escaneo de código de barras, apps nativas vía tienda de aplicaciones.
+- **Deseable, no construido**: exportar a Excel, acta de cierre en PDF con firma (el PDF del análisis de sesión sí existe, generado en el navegador — ADR-28), comparar contra el inventario teórico del POS, escaneo de código de barras, apps nativas vía tienda de aplicaciones.
 
 ## Evidence on Hand
 

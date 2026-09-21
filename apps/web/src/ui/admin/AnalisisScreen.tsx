@@ -30,7 +30,7 @@ import {
   type FilaDimension,
 } from "@conteo/shared/services/calculadora-analisis.js";
 import type { EstadoSincronizacion } from "@conteo/data";
-import { fecha, moneda, numero, porcentaje } from "../../lib/formato.js";
+import { fecha, moneda, numero, porcentaje, variacionConSigno } from "../../lib/formato.js";
 import { useAdminRepository } from "../../state/admin-contexto.js";
 import { useConexion } from "../../state/useConexion.js";
 import { ChipEstado } from "../primitivos/ChipEstado.js";
@@ -38,7 +38,7 @@ import { Icono } from "../primitivos/Icono.js";
 import { Numeral } from "../primitivos/Numeral.js";
 import { Placa } from "../primitivos/Placa.js";
 import { EvolucionMensual } from "./EvolucionMensual.js";
-import { Tabla, type ColumnaTabla, type Orden } from "./Tabla.js";
+import { ordenarFilas, Tabla, type ColumnaTabla, type Orden } from "./Tabla.js";
 
 const SINCRONIZACION_VACIA: EstadoSincronizacion = { participantes: [] };
 
@@ -191,6 +191,29 @@ interface FilaConPct extends FilaDimension {
  *  encabezado. */
 const ORDEN_INICIAL_TABLA: Orden = { clave: "valor", direccion: "desc" };
 
+/** Órdenes explícitos del desglose por Categoría — en móvil `Tabla` pinta
+ *  tarjetas sin encabezado clicable, así que este selector es la ÚNICA forma
+ *  de ordenar por precio ahí. `orden` es identidad de módulo estable por la
+ *  misma razón que `ORDEN_INICIAL_TABLA`. La primera entrada ES el orden por
+ *  defecto de la tabla. */
+const ORDENES_CATEGORIA: readonly {
+  readonly valor: string;
+  readonly etiqueta: string;
+  readonly orden: Orden;
+}[] = [
+  { valor: "valor-desc", etiqueta: "Mayor valor total", orden: ORDEN_INICIAL_TABLA },
+  {
+    valor: "precio-desc",
+    etiqueta: "Precio mayor → menor",
+    orden: { clave: "etiqueta", direccion: "desc" },
+  },
+  {
+    valor: "precio-asc",
+    etiqueta: "Precio menor → mayor",
+    orden: { clave: "etiqueta", direccion: "asc" },
+  },
+];
+
 /** Columnas de la tabla — una sola definición que comparten el esqueleto (con
  *  `filas=[]`) y la tabla real. La `clave` de la primera columna es
  *  `"etiqueta"` en las TRES dimensiones, sólo cambia su rótulo: eso permite
@@ -241,15 +264,7 @@ function columnasTabla(dimension: DimensionAnalisis): ColumnaTabla<FilaConPct>[]
  *  también llega a quien no distingue color. */
 function Delta({ valor, activo }: { readonly valor: number | null; readonly activo: boolean }) {
   if (!activo || valor === null) return null;
-  // Sin signo cuando no hubo cambio: "+0,0 %" se lee como crecimiento y aquí
-  // no creció nada. El signo informa dirección, y cero no tiene dirección.
-  const signo = valor > 0 ? "+" : valor < 0 ? "−" : "";
-  return (
-    <span className="text-micro text-tenue">
-      {signo}
-      {porcentaje(Math.abs(valor))}
-    </span>
-  );
+  return <span className="text-micro text-tenue">{variacionConSigno(valor)}</span>;
 }
 
 export function AnalisisScreen() {
@@ -269,7 +284,11 @@ export function AnalisisScreen() {
 
   const [dimension, setDimension] = useState<DimensionAnalisis>("categoria");
   const [compararActivo, setCompararActivo] = useState(true);
+  const [ordenCategoria, setOrdenCategoria] = useState(ORDENES_CATEGORIA[0]!.valor);
+  const [exportando, setExportando] = useState(false);
+  const [errorPdf, setErrorPdf] = useState<string | null>(null);
   const idDimension = useId();
+  const idOrden = useId();
 
   const cargando = cargandoSesion || cargandoSync;
 
@@ -345,6 +364,47 @@ export function AnalisisScreen() {
     // 99.99999999999999 en vez de 100 (ver su propio doc-comment).
     pct: 100,
   };
+  const ordenElegido = ORDENES_CATEGORIA.find((o) => o.valor === ordenCategoria)!;
+  // Fuera de Categoría el selector no existe y la tabla arranca por Valor
+  // desc — la primera entrada de ORDENES_CATEGORIA.
+  const ordenAplicado = dimension === "categoria" ? ordenElegido : ORDENES_CATEGORIA[0]!;
+
+  // `import()` dinámico: jsPDF (~cientos de KB) queda en su propio chunk y
+  // sólo se descarga al exportar. El error se muestra, nunca se traga.
+  // ponytail: el PDF sigue el orden del selector, no un orden manual por
+  // encabezado (vive dentro de `Tabla`); salida = prop `orden` controlada.
+  const exportarPdf = async (): Promise<void> => {
+    setExportando(true);
+    setErrorPdf(null);
+    try {
+      const { descargarPdfAnalisis } = await import("./pdf-analisis.js");
+      descargarPdfAnalisis({
+        sucursalNombre: sesion.sucursalNombre,
+        sesionAbiertaEn: sesion.abiertaEn,
+        generadoEn: new Date(),
+        dimension: etiquetaDimension(dimension),
+        orden: ordenAplicado.etiqueta,
+        filas: ordenarFilas(filas, columnas, ordenAplicado.orden),
+        totalUnidades,
+        totalMonetario,
+        deltaValor: compararActivo ? deltaValor : null,
+        valorPorUnidad,
+        contadas,
+        totalLineas: lineas.length,
+      });
+    } catch (error) {
+      console.error("Exportar PDF falló", error);
+      // El chunk de jsPDF no está en el precache (vite.config.ts): sin red y
+      // sin haberlo bajado antes, el `import()` no puede resolverse.
+      setErrorPdf(
+        enLinea
+          ? "No se pudo generar el PDF. Intenta de nuevo."
+          : "Sin conexión: la primera exportación necesita internet. Conéctate e intenta de nuevo.",
+      );
+    } finally {
+      setExportando(false);
+    }
+  };
 
   return (
     <section className="p-6">
@@ -352,20 +412,29 @@ export function AnalisisScreen() {
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-base font-semibold text-tinta">Análisis · {sesion.sucursalNombre}</h1>
           <ChipEstado estado={estadoChip} />
-          {/* window.print() nativo: cero dependencias, cero backend (D-11,
-              costo de cuota Blaze). `print:hidden` lo saca de la hoja
-              impresa — el botón en sí no aporta nada en papel. */}
+          {/* PDF generado en el navegador (ADR-28): cero backend, cero
+              Storage, cero cuota Blaze. `print:hidden` sigue sacándolo de
+              una impresión nativa del navegador, que continúa funcionando. */}
           <button
             type="button"
-            onClick={() => window.print()}
-            className="ml-auto min-h-[var(--size-toque)] rounded-placa border border-borde px-3 text-micro text-tinta hover:border-senal hover:text-senal print:hidden"
+            onClick={() => void exportarPdf()}
+            disabled={exportando}
+            className="ml-auto min-h-[var(--size-toque)] rounded-placa border border-borde px-3 text-micro text-tinta hover:border-senal hover:text-senal disabled:cursor-wait disabled:opacity-60 print:hidden"
           >
             <span className="inline-flex items-center gap-1.5">
-              <Icono nombre="imprimir" className="size-4 shrink-0" />
-              Imprimir
+              <Icono nombre="descargar" className="size-4 shrink-0" />
+              {exportando ? "Generando…" : "Exportar PDF"}
             </span>
           </button>
         </div>
+        {errorPdf !== null && (
+          <p
+            role="alert"
+            className="mt-3 rounded-placa border border-riesgo bg-riesgo-placa px-3 py-2 text-micro text-tinta print:hidden"
+          >
+            {errorPdf}
+          </p>
+        )}
         <p role="status" className="mt-1 text-micro text-tenue">
           {sesion.estado === "abierta" ? "Sesión abierta" : "Sesión cerrada"}
           {!enLinea && " · Mostrando datos guardados"}
@@ -481,10 +550,32 @@ export function AnalisisScreen() {
               </option>
             ))}
           </select>
+          {dimension === "categoria" && (
+            <>
+              <label htmlFor={idOrden} className="ml-2 text-micro text-tenue">
+                Ordenar por
+              </label>
+              <select
+                id={idOrden}
+                value={ordenCategoria}
+                onChange={(e) => setOrdenCategoria(e.target.value)}
+                className="min-h-[var(--size-toque)] rounded-placa border border-borde bg-fondo px-3 text-tinta focus:border-senal focus:outline-none"
+              >
+                {ORDENES_CATEGORIA.map((o) => (
+                  <option key={o.valor} value={o.valor}>
+                    {o.etiqueta}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
         </div>
-        {/* Equivalente en texto del <select> oculto arriba: sin esto, la hoja
-            impresa mostraría la tabla sin decir qué dimensión se desglosó. */}
+        {/* Equivalente en texto de los <select> ocultos arriba: sin esto, la
+            hoja impresa mostraría la tabla sin decir qué se desglosó ni cómo. */}
         <p className="hidden text-micro print:block">Desglose por {etiquetaDimension(dimension)}</p>
+        {dimension === "categoria" && (
+          <p className="hidden text-micro print:block">Ordenado por {ordenElegido.etiqueta}</p>
+        )}
         {/* Sin `key={dimension}`: remontar la tabla al cambiar de dimensión
             perdería el orden elegido por el usuario (issue implícito del
             rediseño) y además invocaría de nuevo el listener de `Tabla` — no
@@ -494,13 +585,19 @@ export function AnalisisScreen() {
         {/* `vacio` es neutro respecto a la dimensión: "no hay categorías"
             sería falso mirando el desglose por cajero o por área, y la tabla
             queda vacía por la misma razón en las tres — nadie contó nada. */}
+        {/* ponytail: `key` por orden elegido → cambiar el selector REMONTA
+            `Tabla` (su `ordenInicial` sólo se lee al montar) y con eso se
+            pierde el orden manual por encabezado. El `key` no depende de la
+            dimensión, así que cambiar de dimensión sigue sin remontar. Salida:
+            prop `orden` controlada en `Tabla` si hace falta conservar ambos. */}
         <Tabla
+          key={ordenCategoria}
           columnas={columnas}
           filas={filas}
           claveFila={(f) => f.clave}
           etiqueta={`Desglose por ${etiquetaDimension(dimension).toLowerCase()}`}
           vacio="Todavía no hay unidades contadas."
-          ordenInicial={ORDEN_INICIAL_TABLA}
+          ordenInicial={ordenAplicado.orden}
           filaTotal={filaTotal}
         />
       </div>

@@ -1,6 +1,6 @@
 // apps/web/src/lib/formato.test.ts (docs/plan-panel-administrador.md §5, F1)
 import { describe, expect, it } from "vitest";
-import { datos, duracion, fecha, moneda, numero } from "./formato.js";
+import { datos, duracion, fecha, moneda, numero, variacionConSigno } from "./formato.js";
 
 describe("formato (doc plan-panel-administrador §5, fase F1)", () => {
   it("formatea 1234500 como moneda es-CO sin decimales", () => {
@@ -63,6 +63,20 @@ describe("formato (doc plan-panel-administrador §5, fase F1)", () => {
 
     it("días y horas combinados, sin minutos (fuera de escala en ese tramo)", () => {
       expect(duracion(2 * 86_400_000 + 4 * 3_600_000)).toBe("2 d 4 h");
+    });
+  });
+
+  describe("variacionConSigno", () => {
+    it("positiva lleva +", () => {
+      expect(variacionConSigno(12.5)).toBe("+12,5%");
+    });
+
+    it("negativa lleva el signo menos tipográfico U+2212, no un guion", () => {
+      expect(variacionConSigno(-4)).toBe("−4,0%");
+    });
+
+    it("cero no lleva signo: cero no tiene dirección", () => {
+      expect(variacionConSigno(0)).toBe("0,0%");
     });
   });
 });
