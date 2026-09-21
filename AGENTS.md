@@ -1,192 +1,103 @@
 # AGENTS.md — reglas de trabajo para agentes
 
-Este archivo manda sobre el comportamiento por defecto del agente. El **contenido**
+Este archivo manda sobre el comportamiento por defecto del agente. El contenido
 técnico manda desde `docs/`.
 
----
+## 0. Los documentos son la autoridad
 
-## 0. Primero leer, después escribir
+Antes de tocar código, lee `README.md`, luego `docs/diseno/README.md` (índice de
+los documentos de diseño) y el documento del área que vas a tocar (04 datos,
+05 concurrencia, 08 contratos, 09 seguridad…). Para UI, también `docs/PRODUCT.md`
+y `docs/DESIGN.md`.
 
-Orden obligatorio antes de tocar código:
+- Si el código contradice un documento, gana el documento. Si el documento está
+  mal, se corrige en el mismo commit.
+- Principio rector: _el cliente nunca escribe un total; sólo declara su aporte_.
+  Una propuesta que lo rompe está mal.
+- Las decisiones nuevas van como `ADR-NN` en `docs/diseno/13-decisiones-adr.md`.
 
-1. `README.md` — arranque, estructura, y las tres cosas que muerden.
-2. `docs/diseno/README.md` — índice de los 13 documentos de diseño. **Son la autoridad.**
-3. El documento concreto del área que vas a tocar (04 datos, 05 concurrencia,
-   08 contratos, 09 seguridad…). No trabajes de memoria ni por inferencia del código.
-4. Si el cambio es de UI: `docs/PRODUCT.md` y `docs/DESIGN.md`.
+## 1. Código mínimo (ponytail)
 
-Si el código contradice un documento, **el documento gana**. Si el documento está
-mal, se corrige el documento en el mismo commit — no se deja la divergencia viva.
-
-Principio rector, no negociable (README): _el cliente nunca escribe un total; sólo
-declara su aporte_. Una propuesta que lo rompe está mal, la regla no.
-
----
-
-## 1. Ponytail (modo `full`, siempre activo)
-
-Escalera de decisión, se para en el primer escalón que aguanta:
-
-1. ¿Hace falta que exista? Necesidad especulativa = no se construye.
-2. ¿Ya existe en el repo? Reutiliza el primitivo, hook o servicio que ya está.
-3. ¿Lo cubre la stdlib o la plataforma? Úsala.
-4. ¿Lo cubre una dependencia ya instalada? Úsala. Dependencia nueva: sólo si de
-   verdad no hay otra forma.
-5. Sólo entonces: el mínimo código que funciona.
-
-- Sin abstracciones no pedidas: nada de interfaz con una implementación, ni factory
-  para un producto, ni config para un valor que nunca cambia.
-- Gana el diff más corto — **pero después de entender el problema**, no en lugar de
-  entenderlo. Un arreglo de síntoma en la ruta que reporta el ticket deja rotos a
-  los demás llamadores: arregla en la raíz, donde todos pasan.
-- Las simplificaciones deliberadas se marcan con un comentario `ponytail:` que
-  nombra el techo y el camino de salida.
-- Nunca se simplifica: validación en fronteras de confianza, manejo de errores que
-  evita pérdida de conteos, seguridad, accesibilidad básica, y lo pedido explícitamente.
-
----
+- Las simplificaciones deliberadas llevan un comentario `ponytail:` que nombra el
+  techo y el camino de salida.
+- Nunca se simplifican: validación en fronteras de confianza, manejo de errores
+  que evita pérdida de conteos, seguridad y accesibilidad básica.
+- Dependencia nueva sólo si no hay otra forma, y se registra en un ADR.
 
 ## 2. TDD estricto
 
-Rojo → verde → refactor, por unidad pequeña.
+Rojo → verde → refactor, por unidad pequeña. El test se escribe antes y falla por
+la razón correcta.
 
-- El test se escribe **antes**, y tiene que fallar por la razón correcta.
-- Los tests de `apps/web/src` fijan el markup: son la red de regresión del rediseño
-  visual, no decoración. Si un cambio rompe doce tests, la señal es el cambio, no
-  los tests.
-- Toda lógica no trivial (rama, bucle, parser, dinero, seguridad) deja su test.
-  Un one-liner trivial no necesita test.
-- Un test negativo que también pasaría con la regla rota **no demuestra nada**:
-  cada regla necesita su par afirmativo.
-- Antes de cerrar cualquier unidad:
+- Los tests de `apps/web/src` fijan el markup: si un cambio rompe muchos tests, la
+  señal es el cambio.
+- Cada regla lleva su par afirmativo: un test negativo que pasaría con la regla
+  rota no demuestra nada.
+- Un archivo de test de `apps/web` se corre desde `apps/web/`
+  (`npx vitest run <ruta>`): el vitest de la raíz no tiene jsdom.
+- Checklist antes de cerrar una unidad:
 
 ```bash
 npm run typecheck && npm run lint && npm test
 npm run test:rules   # si tocaste infra/firestore.rules
 ```
 
-### Mutation testing (Stryker)
+Mutation testing (Stryker) es **opcional**: resérvalo para lógica grave (dinero,
+seguridad, pérdida de conteos) cuando los tests no dan confianza. Ejemplo de config
+acotada: `stryker.percentiles.conf.json`.
 
-Cuando una unidad tiene lógica de bifurcación propia que ningún otro test
-cubre transitivamente (ramas, cálculo con casos borde), se extrae a un helper
-puro y se le agrega mutation testing con Stryker +
-`@stryker-mutator/vitest-runner`, en un `stryker.<nombre>.conf.json` acotado a
-ese archivo — no un gate de todo el repo. Referencia:
-`stryker.percentiles.conf.json` (raíz, mutea `infra/test/percentiles.ts`) y
-`apps/web/stryker.conf.json` (mutea `src/ui/BotonSalir.tsx`). Se corre con
-`npx stryker run <config>`; no forma parte del checklist obligatorio salvo que
-exista ese config para el archivo que tocaste.
+## 3. RDD — revisión antes del commit
 
----
+Con `gentle-ai review` activo, la revisión corre una vez por slice, al cierre:
 
-## 3. RDD — revisión adversarial antes del commit
+1. Checklist de §2 en verde y normalizadores que escriben (format, lint --fix)
+   ya corridos.
+2. `git add -A`: los archivos sin trackear quedan fuera del candidato.
+3. START y seguir sólo el `next_transition` que devuelve el CLI. Una sola
+   corrección por candidato; cambiar bytes después del START invalida la revisión.
+4. Tras el acuse, commits por unidad de trabajo sobre el árbol revisado.
 
-`gentle-ai review` es la puerta de entrada al repositorio.
+El interruptor `gentle-ai review mode enable|disable` es del usuario: si lo apaga,
+se sigue sin revisión y no se reactiva.
 
-- Todo normalizador que **modifica** archivos (format, lint --fix, generación)
-  corre **antes** del START. Después del START sólo corren comprobaciones que no
-  escriben.
-- El candidato queda congelado: cambiar bytes invalida el recibo y obliga a una
-  revisión nueva.
-- El checklist de la sección 2 (`typecheck && lint && test`, y Stryker cuando
-  exista config para el archivo tocado) tiene que estar en verde **antes** de
-  pedir la revisión. RDD no reemplaza TDD: corre después, sobre un candidato
-  que ya pasó sus propios tests.
-- Hay **una sola** transacción de corrección por candidato. Si la validación
-  dirigida falla, se acabó — reejecutar el validador esperando otro veredicto es el
-  bucle que el contrato prohíbe.
-- Cuando la transición pide `correction_lines`, el pronóstico va **antes** de editar
-  un solo archivo.
-- El commit sólo entra con recibo aprobado.
-- El interruptor (`gentle-ai review mode enable|disable`) es del usuario. Si pide
-  desactivarlo, se desactiva y se sigue trabajando de forma orgánica: no se
-  reactiva ni se busca rodeo.
+## 4. ODD — flujo de trabajo por defecto
 
----
+Cada feature vive en `odd/tasks/<feature>.md` (Objetivo, Problema, Por qué, Alcance,
+Restricciones, Checklist con evidencia RED/GREEN, Progreso, Cierre, Próximo paso),
+en su rama `feat/<feature>` desde `main`. SDD (`sdd-*`) sólo si el usuario lo pide.
 
-## 4. SDD — opcional, nunca por defecto
+## 5. Convenciones
 
-Spec-Driven Development (`sdd-*`) se usa **sólo** cuando el usuario lo pide
-explícitamente o acepta una propuesta de usarlo. Tamaño, número de archivos o
-riesgo percibido **no** lo activan. El trabajo normal va por implementación directa
-(inline o con un worker delegado) y no crea artefactos SDD.
-
-Propón SDD sólo si una propuesta/spec/diseño/tareas duradero reduce ambigüedad real.
-
----
-
-## 5. Convenciones del repositorio
-
-- **Dominio en español** (`SesionConteo`, `LineaConteo`, `aporte`, `sucursal`).
-  Se mantiene: los documentos de diseño están en español.
-- **Commits convencionales en español**, un commit por unidad de trabajo revisable.
-  Sin `Co-Authored-By` ni ninguna atribución de IA.
-- **Regla de dependencia:** las flechas apuntan hacia abajo. `shared` no importa
-  nada del proyecto; `data` importa `shared` y `contracts`; `apps/web` importa todo.
-  Sólo `packages/data/firebase` toca el SDK de Firebase — lo impone ESLint.
-- `firebase.json` vive en la raíz del repo: los comandos de firebase no necesitan `--config`.
+- Dominio y documentos en español (`SesionConteo`, `LineaConteo`, `aporte`,
+  `sucursal`).
+- Commits convencionales en español, uno por unidad de trabajo, con sus tests y
+  docs. Sin `Co-Authored-By` ni atribución de IA.
+- Regla de dependencia: `shared` no importa nada del proyecto; `data` importa
+  `shared` y `contracts`; `apps/web` importa todo. Sólo `packages/data/firebase`
+  toca el SDK de Firebase (lo impone ESLint).
 - Node 22 (`.nvmrc`): Cloud Functions v2 no soporta runtime 24.
-
----
 
 ## 6. Skills
 
-`.atl/skill-registry.md` es el índice de skills disponibles en esta máquina
-(está en `.gitignore`: es local, con rutas absolutas, no viaja con el repo;
-se regenera con `gentle-ai skill-registry refresh --force`).
+Antes de responder, busca en `.atl/skill-registry.md` (local, fuera de git) la
+skill que encaje y lee su `SKILL.md`. Al delegar, pasa las rutas de los `SKILL.md`,
+no un resumen.
 
-- **Antes de responder**, comprueba si la tarea encaja con alguna entrada de la
-  columna _Trigger / description_ y lee su `SKILL.md` completo. El registro es un
-  índice, no un resumen: `SKILL.md` es la fuente de verdad.
-- **Al delegar en un subagente**, pásale las rutas exactas de los `SKILL.md` que
-  apliquen bajo `## Skills to load before work`, no un resumen tuyo.
-- Si no hay registro o ninguna entrada encaja, sigue sin inyección de skills.
+| Skill                             | Cuándo                                      |
+| --------------------------------- | ------------------------------------------- |
+| `impeccable`                      | Toda UI de `apps/web`.                      |
+| `firebase-firestore`              | Modelo de datos, consultas, índices.        |
+| `firebase-security-rules-auditor` | Cambios en `infra/firestore.rules`.         |
+| `systematic-debugging`            | Bug o test rojo, antes de proponer arreglo. |
+| `work-unit-commits`               | Partir el trabajo en commits.               |
+| `find-docs`                       | API de una librería.                        |
 
-Las que más aplican en este repositorio:
+## 7. Configuración para skills de ingeniería
 
-| Skill                             | Cuándo                                                               |
-| --------------------------------- | -------------------------------------------------------------------- |
-| `impeccable`                      | **Toda** UI de `apps/web` — es la convención establecida en F0–F4.   |
-| `firebase-firestore`              | Modelo de datos, consultas, índices.                                 |
-| `firebase-security-rules-auditor` | Cualquier cambio en `infra/firestore.rules`.                         |
-| `systematic-debugging`            | Bug, test rojo o comportamiento raro, **antes** de proponer arreglo. |
-| `work-unit-commits`               | Partir el trabajo en commits revisables.                             |
-| `find-docs`                       | API de una librería — no contestes de memoria.                       |
-| `judgment-day`                    | Revisión adversarial doble, cuando el usuario la pide.               |
-
----
-
-## 7. Memoria (Engram)
-
-- Antes de retomar cualquier trabajo previo: `mem_search` / `mem_context`.
-- Después de una decisión, un bug arreglado, una convención nueva o un hallazgo no
-  obvio: `mem_save`. Sin esperar a que lo pidan.
-- Antes de decir "listo": `mem_session_summary`.
-
----
-
-## 8. Agent skills
-
-Configuración por repositorio que asumen las skills de ingeniería. La §6 indexa
-_qué_ skills existen; esta sección les dice _dónde_ trabajar.
-
-### Issue tracker
-
-Issues de GitHub en `jab16jy/inventory-tally`, vía la CLI `gh`. Cuerpos en
-español. Los PRs **no** entran en la cola de triage.
-Ver `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Las cinco etiquetas canónicas sin renombrar: `needs-triage`, `needs-info`,
-`ready-for-agent`, `ready-for-human`, `wontfix`. Sólo `ready-for-agent` y
-`wontfix` existen hoy en el repo; las otras tres se crean al primer uso.
-Ver `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context: un `CONTEXT.md` en la raíz, sin `CONTEXT-MAP.md` — los siete
-workspaces son capas de un mismo dominio. **Los ADRs viven en
-`docs/diseno/13-decisiones-adr.md`**, un solo archivo con entradas `ADR-NN`, no
-en `docs/adr/`. Un ADR nuevo se añade ahí.
-Ver `docs/agents/domain.md`.
+- **Issues:** GitHub `jab16jy/inventory-tally` vía `gh`, cuerpos en español; los
+  PRs no entran en triage. Ver `docs/agents/issue-tracker.md`.
+- **Etiquetas de triage:** `needs-triage`, `needs-info`, `ready-for-agent`,
+  `ready-for-human`, `wontfix` (las que falten se crean al primer uso). Ver
+  `docs/agents/triage-labels.md`.
+- **Dominio:** un solo `CONTEXT.md` en la raíz; ADRs en
+  `docs/diseno/13-decisiones-adr.md`. Ver `docs/agents/domain.md`.
