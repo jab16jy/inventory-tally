@@ -37,6 +37,11 @@ El admin necesita un PDF presentable de la sesión (cierre de caja, auditoría i
 - [x] **T3** — Botón "Exportar PDF" + ADR + docs.
   - Evidencia: RED confirmado (3 tests con `Unable to find … role "button" and name /exportar pdf/i`; el test de esqueleto pasaba vacío, su par afirmativo es el primero). Fix: `exportarPdf` con `import("./pdf-analisis.js")` dinámico, `disabled` + "Generando…" mientras corre, `role="alert"` visible si falla (sin catch silencioso), ícono nuevo `descargar` en `Icono.tsx`. Los datos salen de lo ya calculado en pantalla, filas vía `ordenarFilas` con el orden aplicado. GREEN: 43/43 `AnalisisScreen.test.tsx` (se reemplazaron los 2 tests de `window.print`/esqueleto por 4), 236/236 en `src/ui/admin`.
   - Docs: ADR-28 en `docs/diseno/13-decisiones-adr.md`; doc 10 §8 (decía "Cloud Function → Cloud Storage") y `docs/PRODUCT.md` ("exportar a PDF: no construido") corregidos. Ningún doc mencionaba `window.print`.
+- [x] **T4** — Seguimiento de los hallazgos informativos de RDD (R4-1, R4-2, R3-001, R3-002).
+  - R4-1 + R4-2 — RED confirmado (2 tests: `console.error` no se llamaba con el error; sin conexión la alerta no decía que hace falta internet). Fix: el `catch` registra `console.error("Exportar PDF falló", error)` y el mensaje depende de `enLinea` (`useConexion`): sin conexión dice que la primera exportación necesita internet, porque el chunk de jsPDF no está en el precache. Par afirmativo: el test en línea sigue esperando el mensaje genérico. GREEN: 44/44 `AnalisisScreen.test.tsx`.
+  - R3-001 — rango de `stryker.pdf-analisis.conf.json` ampliado a 1-109 (cubre `nombreArchivoPdf` completo). Stryker: **100 %** (44 killed, 6 timeout, 0 survived), las mismas cifras que con 1-102: Stryker ya mutaba la cadena porque la expresión arranca en la línea 102; el rango nuevo lo deja explícito.
+  - R3-002 — borrado el ícono `imprimir` de `Icono.tsx` (sin usos tras T3).
+- [x] **T5** — `AGENTS.md` reducido a lo esencial (a pedido del usuario): Stryker pasa a opcional, sólo para lógica grave (dinero, seguridad, pérdida de conteos); se documenta el flujo ODD; se quitan las reglas que ya cubren los hooks y las instrucciones globales (escalera ponytail completa, Engram). Las secciones que citan código y docs (§0 docs, §1 ponytail, §2 TDD, §3 RDD, §5 convenciones) conservan su número; el archivo queda con §0-§7. Comentario de `eslint.config.js` alineado.
 
 ## Progreso
 
@@ -50,6 +55,9 @@ El admin necesita un PDF presentable de la sesión (cierre de caja, auditoría i
   - R4-1 (WARNING): sin conexión y sin el chunk en caché, "Exportar PDF" falla con un mensaje genérico; podría avisar que hace falta conexión.
   - R4-2 (WARNING): el `catch` de la exportación descarta el error sin registrarlo.
 - 2026-09-20: commits por unidad: `93f0377` (refactor), `1e95318` (generador PDF), `9f71d3d` (selector + botón).
+- 2026-09-20: T4 y T5 implementados (seguimiento de hallazgos + AGENTS.md). Checklist en verde (530 tests web; un timeout del emulador en `packages/functions`, paquete no tocado, pasó 264/264 al re-correr).
+- 2026-09-20: RDD del seguimiento — riesgo medium (7 archivos, 303 líneas), 1 lente `review-reliability` con Sonnet 5 (lineage `review-6527e92e82da6491`). **approved**, 0 bloqueantes, acuse confirmado. Único hallazgo informativo (WARNING, redacción de T5 sobre la numeración de AGENTS.md) corregido en este registro.
+- 2026-09-20: commits: `78a30c6` (aviso sin conexión + log), `c4ef2f3` (ícono + Stryker), `85a64ec` (AGENTS.md).
 
 ## Cierre
 
@@ -57,4 +65,4 @@ Las tres tareas quedaron implementadas con TDD estricto. Dos dependencias nuevas
 
 ## Próximo paso
 
-Push/PR a criterio del usuario. Los hallazgos informativos R3-001, R3-002, R4-1 y R4-2 quedan para una feature de seguimiento.
+Push/PR a criterio del usuario.
